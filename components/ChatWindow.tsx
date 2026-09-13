@@ -63,7 +63,6 @@ interface Props {
   /** Completion sound state + controls, owned by AppShell so tasks finishing in
    *  a non-active workspace can still ring. */
   soundEnabled?: boolean;
-  onSoundToggle?: () => void;
   playDoneSound?: () => void;
   unlockAudio?: () => void;
 }
@@ -240,7 +239,7 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, defaultExpanded = fa
   );
 }
 
-export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onOpenFile, onOpenSession, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, onSoundToggle, playDoneSound = () => {}, unlockAudio }: Props) {
+export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initialScrollPosition, onScrollPositionChange, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onOpenFile, onOpenSession, onAskInNewChat, quoteSelectionEnabled = false, initialPrompt, onInitialPromptConsumed, soundEnabled = true, playDoneSound = () => {}, unlockAudio }: Props) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const completionNotificationsEnabled = session?.relation?.kind !== "subagent";
@@ -286,7 +285,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     sessionIdRef, scrollContainerRef,
     lastUserMsgRef, promptAnchorActive,
     handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
-    handleCompact, handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
+    handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
     handleRecallQueue,
     handleBuiltinSlashCommand,
     handleToolPresetChange, handleThinkingLevelChange, loadSlashCommands, scrollUserMsgToTop,
@@ -859,6 +858,18 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     [modelList],
   );
 
+  // The status bar owns the model / level / tools menus now, so it builds the same option rows.
+  const statusModelOptions = useMemo(
+    () => (modelList && modelList.length > 0
+      ? modelList.map((entry) => ({ provider: entry.provider, modelId: entry.id, name: entry.name }))
+      : Object.entries(modelNames ?? {}).map(([key, name]) => ({
+          provider: key.includes(":") ? key.slice(0, key.indexOf(":")) : "",
+          modelId: key.includes(":") ? key.slice(key.indexOf(":") + 1) : key,
+          name,
+        }))),
+    [modelList, modelNames],
+  );
+
   const currentThinkingLevelMap = displayModelValue
     ? (modelThinkingLevelMaps[`${displayModelValue.provider}:${displayModelValue.modelId}`] ?? null)
     : null;
@@ -873,24 +884,13 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       onPromptWithStreamingBehavior={agentRunning ? handlePromptWithStreamingBehavior : undefined}
       isStreaming={sessionBusy}
       model={displayModelValue}
-      isAutoModelSelection={isAutoModelSelection}
-      modelNames={modelNames}
       modelList={modelList}
       modelError={modelError}
       modelScopeWarnings={modelScopeWarnings}
-      onModelChange={handleModelChange}
-      modelSwitching={modelSwitching}
-      onCompact={session || isNew ? handleCompact : undefined}
       onAbortCompaction={handleAbortCompaction}
       isCompacting={isCompacting}
       compactError={compactError}
       compactResult={compactResult}
-      toolPreset={toolPreset}
-      onToolPresetChange={session || isNew ? handleToolPresetChange : undefined}
-      thinkingLevel={thinkingLevel}
-      onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
-      availableThinkingLevels={availableThinkingLevels}
-      thinkingLevelMap={currentThinkingLevelMap}
       retryInfo={retryInfo}
       queuedMessages={queuedMessages}
       inputHistory={inputHistory}
@@ -899,8 +899,6 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       slashCommandsLoading={slashCommandsLoading}
       onLoadSlashCommands={loadSlashCommands}
       onBuiltinCommand={handleBuiltinSlashCommand}
-      soundEnabled={soundEnabled}
-      onSoundToggle={onSoundToggle}
       onAudioUnlock={unlockAudio}
       draftKey={session?.id ?? newSessionDraftKey ?? undefined}
       cwd={session?.cwd ?? newSessionCwd}
@@ -1352,6 +1350,16 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
           providerCount={statusProviderCount}
           thinkingLevel={thinkingLevel}
           supportsReasoning={(availableThinkingLevels?.length ?? 0) > 0}
+          busy={sessionBusy}
+          modelOptions={statusModelOptions}
+          onModelChange={handleModelChange}
+          modelSwitching={modelSwitching}
+          isAutoModelSelection={isAutoModelSelection}
+          onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
+          availableThinkingLevels={availableThinkingLevels}
+          thinkingLevelMap={currentThinkingLevelMap}
+          toolPreset={toolPreset}
+          onToolPresetChange={session || isNew ? handleToolPresetChange : undefined}
         />
         <ExtensionStatusBar statuses={extensionStatuses} widgets={extensionWidgets} />
       </div>

@@ -159,15 +159,21 @@ test("cycleListIndex wraps in both directions", () => {
   assert.equal(cycleListIndex(-1, 4, 1), 0);
 });
 
-test("shows the follow-up shortcut in the button tooltip", () => {
+test("keeps the queue actions off the composer and hints the keyboard instead", () => {
   const html = renderToStaticMarkup(
     React.createElement(I18nProvider, null, React.createElement(ChatInput, {
-      onSend() {}, onAbort() {}, onFollowUp() {}, isStreaming: true,
+      onSend() {}, onAbort() {}, onSteer() {}, onFollowUp() {}, isStreaming: true,
     })),
   );
 
-  assert.match(html, /title="Queue this message after the agent finishes \(Alt\/Option\+Enter\)"/);
-  assert.match(html, /aria-keyshortcuts="Alt\+Enter"/);
+  // pi queues with Enter / Alt+Enter rather than dedicated buttons, so the composer shows the
+  // two-icon shape (attach left, stop right) plus a mono hint.
+  assert.match(html, /class="chat-composer-hint"/);
+  assert.match(html, /Alt\+Enter queues a follow-up/);
+  assert.doesNotMatch(html, />Steer<\/button>|>Follow-up<\/button>/);
+  assert.match(html, /aria-label="Attach image"/);
+  assert.match(html, /aria-label="Stop"/);
+  assert.equal((html.match(/<button\b/g) ?? []).length, 2);
 });
 
 test("renders the upstream model error", () => {
@@ -216,65 +222,6 @@ test("renders enabledModels scope warnings", () => {
   );
 });
 
-test("keeps the model selector visible when a model error leaves no options", () => {
-  const html = renderToStaticMarkup(
-    React.createElement(
-      I18nProvider,
-      null,
-      React.createElement(ChatInput, {
-        onSend() {},
-        onAbort() {},
-        onModelChange() {},
-        isStreaming: false,
-        modelError: "Invalid models.json schema",
-        modelList: [],
-        modelNames: {},
-      }),
-    ),
-  );
-
-  assert.match(html, />No models</);
-  assert.match(html, /title="No available models"/);
-});
-
-test("renders the read-only tool preset as the active selection", () => {
-  const html = renderToStaticMarkup(
-    React.createElement(
-      I18nProvider,
-      null,
-      React.createElement(ChatInput, {
-        onSend() {},
-        onAbort() {},
-        onToolPresetChange() {},
-        isStreaming: false,
-        toolPreset: "read-only",
-      }),
-    ),
-  );
-
-  assert.match(html, /title="Change tool preset: read-only"/);
-  assert.match(html, />read-only<\/span>/);
-});
-
-test("renders the empty tool preset as Chat only", () => {
-  const html = renderToStaticMarkup(
-    React.createElement(
-      I18nProvider,
-      null,
-      React.createElement(ChatInput, {
-        onSend() {},
-        onAbort() {},
-        onToolPresetChange() {},
-        isStreaming: false,
-        toolPreset: "none",
-      }),
-    ),
-  );
-
-  assert.match(html, /title="Change tool preset: Chat only"/);
-  assert.match(html, />Chat only<\/span>/);
-});
-
 test("renders the compact composer with the standard Send button and no session controls", () => {
   const html = renderToStaticMarkup(
     React.createElement(
@@ -293,30 +240,6 @@ test("renders the compact composer with the standard Send button and no session 
   assert.match(html, />Send<\/button>/);
   assert.equal((html.match(/<button\b/g) ?? []).length, 1);
   assert.doesNotMatch(html, /type="file"|Attach image|Change tool preset/);
-});
-
-test("shows and locks the optimistic model while a switch is pending", () => {
-  const html = renderToStaticMarkup(
-    React.createElement(
-      I18nProvider,
-      null,
-      React.createElement(ChatInput, {
-        onSend() {},
-        onAbort() {},
-        onModelChange() {},
-        isStreaming: false,
-        model: { provider: "deepseek", modelId: "deepseek-v4-flash" },
-        modelList: [{ provider: "deepseek", id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" }],
-        modelSwitching: true,
-      }),
-    ),
-  );
-
-  assert.match(html, /title="Switching model"/);
-  assert.match(html, /aria-busy="true"/);
-  assert.match(html, /disabled=""/);
-  assert.match(html, />DeepSeek V4 Flash</);
-  assert.match(html, /animation:spin 0\.8s linear infinite/);
 });
 
 test("filters model options by name and id", () => {

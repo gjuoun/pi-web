@@ -21,8 +21,13 @@ interface ModelSelectorProps {
   busy?: boolean;
   isAutoSelection?: boolean;
   ariaLabel?: string;
-  variant?: "toolbar" | "field";
+  variant?: "toolbar" | "field" | "status";
   placement?: "up" | "auto";
+  /**
+   * Replaces the trigger text. The `status` variant renders pi's footer label
+   * (`provider` + raw model id) rather than the human-facing display name.
+   */
+  triggerLabel?: string;
 }
 
 const MODEL_FILTER_THRESHOLD = 8;
@@ -58,6 +63,7 @@ export function ModelSelector({
   ariaLabel,
   variant = "toolbar",
   placement = "up",
+  triggerLabel,
 }: ModelSelectorProps) {
   const { t } = useI18n();
   const isMobile = useIsMobile();
@@ -78,7 +84,7 @@ export function ModelSelector({
     else modelsByProvider.push({ provider: option.provider, options: [option] });
   }
 
-  const currentName = selectedLabel ?? (value
+  const currentName = triggerLabel ?? selectedLabel ?? (value
     ? sortedOptions.find((option) => option.modelId === value.modelId && option.provider === value.provider)?.name ?? value.modelId
     : emptyLabel ?? (sortedOptions.length > 0 ? "Select model" : "No models"));
 
@@ -102,7 +108,24 @@ export function ModelSelector({
     setFilter("");
   }, [locked]);
 
-  const buttonStyle: CSSProperties = variant === "field"
+  const buttonStyle: CSSProperties = variant === "status"
+    ? {
+        // Pi paints its footer as plain text, so the trigger must not read as a button.
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        maxWidth: "100%",
+        padding: 0,
+        overflow: "hidden",
+        border: "none",
+        background: "none",
+        color: "inherit",
+        font: "inherit",
+        cursor: locked ? "default" : "pointer",
+        textDecoration: open && !locked ? "underline" : "none",
+        textUnderlineOffset: 2,
+      }
+    : variant === "field"
     ? {
         display: "flex",
         alignItems: "center",
@@ -151,7 +174,7 @@ export function ModelSelector({
     <div
       ref={rootRef}
       className={`model-selector is-${variant}${locked ? " is-disabled" : ""}`}
-      style={{ position: "relative", width: variant === "field" || isMobile ? "100%" : undefined, minWidth: 0, flex: variant === "toolbar" && isMobile ? "1 1 auto" : undefined }}
+      style={{ position: "relative", width: variant === "field" || (isMobile && variant === "toolbar") ? "100%" : undefined, minWidth: 0, flex: variant === "toolbar" && isMobile ? "1 1 auto" : undefined }}
       onKeyDown={(event) => {
         if (event.key !== "Escape" || !open) return;
         event.preventDefault();
@@ -179,10 +202,12 @@ export function ModelSelector({
         }}
         onMouseEnter={(event) => {
           if (locked) return;
+          if (variant === "status") return;
           event.currentTarget.style.background = "var(--bg-hover)";
           event.currentTarget.style.color = "var(--text)";
         }}
         onMouseLeave={(event) => {
+          if (variant === "status") return;
           if (locked) {
             event.currentTarget.style.background = variant === "field" ? "var(--bg-panel)" : "none";
             event.currentTarget.style.color = variant === "field" ? "var(--text-dim)" : "var(--text-muted)";
@@ -196,7 +221,7 @@ export function ModelSelector({
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" style={{ animation: "spin 0.8s linear infinite", flexShrink: 0 }} aria-hidden="true">
             <path d="M21 12a9 9 0 1 1-2.64-6.36" />
           </svg>
-        ) : (
+        ) : variant === "status" ? null : (
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
             <rect x="4" y="4" width="16" height="16" rx="2" />
             <rect x="9" y="9" width="6" height="6" />

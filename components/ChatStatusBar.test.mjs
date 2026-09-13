@@ -142,7 +142,7 @@ test("tints the context segment by band and nothing else", () => {
   assert.equal(contextColor(null), undefined);
 });
 
-test("renders both lines with the model label right-aligned", () => {
+test("renders both lines with the model segments on the right", () => {
   const html = renderBar({
     cwd: "/Users/junguo/code/gjuoun/pi-web",
     home: "/Users/junguo",
@@ -156,6 +156,11 @@ test("renders both lines with the model label right-aligned", () => {
     providerCount: 2,
     thinkingLevel: "low",
     supportsReasoning: true,
+    modelOptions: [{ provider: "ollama-cloud", modelId: "deepseek-v4.1-flash", name: "DeepSeek V4.1 Flash" }],
+    onModelChange() {},
+    onThinkingLevelChange() {},
+    toolPreset: "read-only",
+    onToolPresetChange() {},
   });
 
   assert.match(html, /~/);
@@ -166,9 +171,72 @@ test("renders both lines with the model label right-aligned", () => {
   assert.match(html, /\$0\.194/);
   assert.match(html, /95\.0%\/1\.0M \(auto\)/);
   assert.match(html, /color:#ef4444/);
-  assert.match(html, /\(ollama-cloud\) deepseek-v4\.1-flash • low/);
+  // pi shows the raw model id, not the display name — the status bar keeps that shape.
+  assert.match(html, /\(ollama-cloud\) deepseek-v4\.1-flash/);
+  assert.doesNotMatch(html, /DeepSeek V4\.1 Flash/);
+  assert.match(html, /• low/);
+  assert.match(html, /tools: read-only/);
   assert.match(html, /class="chat-status-model"/);
   assert.match(html, /role="status"/);
+});
+
+test("keeps the model selector visible when a model error leaves no options", () => {
+  const html = renderBar({
+    cwd: "/tmp/work",
+    model: null,
+    modelOptions: [],
+    onModelChange() {},
+  });
+
+  assert.match(html, />No models</);
+  assert.match(html, /title="No available models"/);
+});
+
+test("labels the tools segment with the active preset", () => {
+  assert.match(
+    renderBar({ cwd: "/tmp/work", toolPreset: "read-only", onToolPresetChange() {} }),
+    /tools: read-only/,
+  );
+
+  const chatOnly = renderBar({ cwd: "/tmp/work", toolPreset: "none", onToolPresetChange() {} });
+  assert.match(chatOnly, /tools: Chat only/);
+  assert.match(chatOnly, /aria-label="Change tool preset"/);
+});
+
+test("shows and locks the optimistic model while a switch is pending", () => {
+  const html = renderBar({
+    cwd: "/tmp/work",
+    model: { provider: "deepseek", modelId: "deepseek-v4-flash" },
+    providerCount: 1,
+    modelOptions: [{ provider: "deepseek", modelId: "deepseek-v4-flash", name: "DeepSeek V4 Flash" }],
+    onModelChange() {},
+    modelSwitching: true,
+  });
+
+  assert.match(html, /title="Switching model"/);
+  assert.match(html, /aria-busy="true"/);
+  assert.match(html, /disabled=""/);
+  assert.match(html, />deepseek-v4-flash</);
+  assert.match(html, /animation:spin 0\.8s linear infinite/);
+});
+
+test("disables every segment while the agent is running", () => {
+  const html = renderBar({
+    cwd: "/tmp/work",
+    busy: true,
+    model: { provider: "deepseek", modelId: "deepseek-v4-flash" },
+    providerCount: 1,
+    modelOptions: [{ provider: "deepseek", modelId: "deepseek-v4-flash", name: "DeepSeek V4 Flash" }],
+    onModelChange() {},
+    thinkingLevel: "low",
+    supportsReasoning: true,
+    onThinkingLevelChange() {},
+    toolPreset: "default",
+    onToolPresetChange() {},
+  });
+
+  // model + reasoning + tools
+  assert.equal((html.match(/disabled=""/g) ?? []).length, 3);
 });
 
 test("renders nothing when there is neither a cwd nor usage data", () => {
@@ -187,15 +255,36 @@ test("never synthesises the extension status line it does not own", async () => 
   assert.doesNotMatch(code, /extension-status|formatExtensionStatusLine/);
 });
 
+test("closes a segment menu on Escape like the model selector", async () => {
+  const source = await readFile(new URL("./ChatStatusBar.tsx", import.meta.url), "utf8");
+
+  // Keyboard users must be able to dismiss a menu without clicking outside.
+  assert.match(
+    source,
+    /onKeyDown=\{\(event\) => \{\s*if \(event\.key !== "Escape" \|\| !open\) return;\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);/,
+  );
+  // The composer's own Escape shortcut must not also fire while a menu is open.
+  assert.match(source, /event\.stopPropagation\(\);[\s\S]{0,80}onOpenChange\(null\)/);
+});
+
 test("styles the bar as mono, dim footer text aligned with the composer", async () => {
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   const barRule = css.match(/\.chat-status-bar\s*\{([^}]*)\}/)?.[1] ?? "";
   const lineRule = css.match(/\.chat-status-line\s*\{([^}]*)\}/)?.[1] ?? "";
   const modelRule = css.match(/\.chat-status-model\s*\{([^}]*)\}/)?.[1] ?? "";
+  const segmentRule = css.match(/\.chat-status-segment\s*\{([^}]*)\}/)?.[1] ?? "";
+  const popoverRule = css.match(/\.chat-status-menu-popover\s*\{([^}]*)\}/)?.[1] ?? "";
 
   assert.match(barRule, /font-family:\s*var\(--font-mono\)/);
   assert.match(barRule, /font-size:\s*11px/);
   assert.match(barRule, /max-width:\s*var\(--chat-content-max-width, 820px\)/);
   assert.match(lineRule, /flex-wrap:\s*wrap/);
   assert.match(modelRule, /margin-left:\s*auto/);
+  // A segment must read as footer text, not as a button.
+  assert.match(segmentRule, /background:\s*none/);
+  assert.match(segmentRule, /font:\s*inherit/);
+  // The menu opens upwards and stays inside the status bar's right edge.
+  assert.match(popoverRule, /position:\s*absolute/);
+  assert.match(popoverRule, /right:\s*0/);
+  assert.match(popoverRule, /bottom:\s*calc\(100% \+ 6px\)/);
 });

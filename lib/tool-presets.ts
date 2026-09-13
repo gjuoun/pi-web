@@ -46,3 +46,24 @@ export function getToolNamesForPreset(preset: ToolPreset): string[] {
   if (preset === "full") return [...PRESET_FULL];
   return [...PRESET_DEFAULT];
 }
+
+/**
+ * Display order for the composer's preset menu. `chat-only` is the UI label for the
+ * empty preset — an empty tool list is how "Chat only" reaches pi.
+ */
+export const TOOL_PRESET_UI_VALUES = ["chat-only", "read-only", "default", "full"] as const;
+
+export type ToolPresetUiValue = (typeof TOOL_PRESET_UI_VALUES)[number];
+
+export const TOOL_PRESET_UI_MAP: Record<ToolPresetUiValue, ToolPreset> = {
+  "chat-only": "none",
+  "read-only": "read-only",
+  default: "default",
+  full: "full",
+};
+
+/** Reverse of {@link TOOL_PRESET_UI_MAP}: the UI value currently in effect. */
+export function toolPresetUiValue(preset: ToolPreset | null | undefined): ToolPresetUiValue {
+  const current = preset ?? "default";
+  return TOOL_PRESET_UI_VALUES.find((value) => TOOL_PRESET_UI_MAP[value] === current) ?? "default";
+}
