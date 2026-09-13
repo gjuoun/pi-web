@@ -14,6 +14,7 @@ import { ProjectTrustDialog } from "./ProjectTrustDialog";
 import { BranchNavigator, hasSessionBranches } from "./BranchNavigator";
 import { SystemPromptPanel } from "./SystemPromptPanel";
 import { ToolDefinitionsPanel } from "./ToolDefinitionsPanel";
+import { ToolSchemasProvider } from "@/hooks/useToolSchemas";
 import { AgentSessionPanel } from "./AgentSessionPanel";
 import { TerminalPanel } from "./TerminalPanel";
 import { newTerminalTab, restoreTerminalTabs, TERMINAL_TABS_KEY, type TerminalTab } from "./terminal-tab-state";
@@ -272,6 +273,23 @@ export function AppShell() {
   const handleSystemToolsChange = useCallback((tools: ToolEntry[] | null) => {
     setSystemTools(tools);
   }, []);
+
+  // A rendered tool call may carry an argument its tool declares as content
+  // (JSON Schema `contentMediaType`) — see lib/tool-schema.ts. That declaration
+  // lives in the session's tool list, which otherwise only loads when the Tools
+  // panel is opened. Load it once per session when a call actually needs it.
+  const schemaRequestedForRef = useRef<string | null>(null);
+  const ensureToolSchemas = useCallback(() => {
+    const sessionId = selectedSession?.id ?? null;
+    if (!sessionId || schemaRequestedForRef.current === sessionId) return;
+    const load = systemInfoLoaderRef.current;
+    if (!load) return; // registered by the session hook once it mounts
+    schemaRequestedForRef.current = sessionId;
+    ++systemInfoLoadIdRef.current;
+    void load().catch((error) => {
+      console.error("Failed to load tool schemas:", error);
+    });
+  }, [selectedSession]);
 
   const handleSystemInfoLoaderChange = useCallback((loader: (() => Promise<void>) | null) => {
     systemInfoLoadIdRef.current += 1;
@@ -2242,6 +2260,7 @@ export function AppShell() {
         {/* Chat content */}
         <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
           {showChat ? (
+            <ToolSchemasProvider tools={systemTools} onRequestSchemas={ensureToolSchemas}>
             <ChatWindow
               key={sessionKey}
               session={selectedSession}
@@ -2276,6 +2295,7 @@ export function AppShell() {
               playDoneSound={playDoneSound}
               unlockAudio={unlockAudio}
             />
+            </ToolSchemasProvider>
           ) : initialCwdStatus === "validating" ? (
             <div
               role="status"

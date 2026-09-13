@@ -2,8 +2,10 @@
 
 import { memo, useState, useRef, useEffect, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
+import { Prism } from "react-syntax-highlighter";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
+import { CodeBlock } from "./MermaidBlock";
 import { ThinkingIcon } from "./ThinkingIcon";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
@@ -11,6 +13,8 @@ import { parseCompactionSummary } from "@/lib/compaction-summary";
 import { getAssistantErrorMessage, getThinkingPreview, isEmptyThinkingBlock } from "@/lib/message-display";
 import { parseUnifiedPatch, type SplitDiffCell } from "@/lib/patch";
 import { isEditToolName } from "@/lib/tool-names";
+import { toolCallDisplay } from "@/lib/tool-schema";
+import { useRequestToolSchemas, useToolParameters } from "@/hooks/useToolSchemas";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
 import type { WrittenFile } from "@/lib/turn-written-files";
@@ -1025,6 +1029,20 @@ function ToolCallBlock({ block, result, duration, onOpenSession }: { block: Tool
   const inputStr = getToolCallInputText(block);
   const isStreamingInput = block.rawInput !== undefined;
   const isEditTool = isEditToolName(block.toolName);
+  // A tool may declare one or more of its string arguments as content, with JSON
+  // Schema's `contentMediaType` (see lib/tool-schema.ts). That declaration — and
+  // only that declaration — turns an argument into a highlighted code block.
+  const parameters = useToolParameters(block.toolName);
+  const requestToolSchemas = useRequestToolSchemas();
+  useEffect(() => {
+    // Expanding is the moment the declaration is actually needed: if nobody has
+    // seen this tool's schema yet, ask the host to load the live tool list.
+    if (expanded && !parameters) requestToolSchemas();
+  }, [expanded, parameters, requestToolSchemas]);
+  const display = useMemo(
+    () => toolCallDisplay(block.input, parameters, hasHighlighterLanguage),
+    [block.input, parameters],
+  );
   const resultDiff = result && !result.isError ? getResultDiff(result) : null;
 
   // Result display
@@ -1093,22 +1111,28 @@ function ToolCallBlock({ block, result, duration, onOpenSession }: { block: Tool
 
       {/* ── Expanded: input args ── */}
       {expanded && (isStreamingInput || !isEditTool) && (
-        <pre
-          style={{
-            margin: 0,
-            padding: "8px 10px",
-            color: "var(--text-muted)",
-            fontSize: "calc(12px + var(--chat-font-size-offset, 0px))",
-            lineHeight: 1.5,
-            overflow: "auto",
-            background: "var(--bg-subtle)",
-            borderTop: isError ? "1px solid rgba(248,113,113,0.25)" : "1px solid rgba(34,197,94,0.2)",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-all",
-          }}
-        >
-          {inputStr}
-        </pre>
+        display.kind === "code" && !isStreamingInput ? (
+          display.arguments.map((argument) => (
+            <CodeBlock key={argument.key} code={argument.value} lang={argument.language} />
+          ))
+        ) : (
+          <pre
+            style={{
+              margin: 0,
+              padding: "8px 10px",
+              color: "var(--text-muted)",
+              fontSize: "calc(12px + var(--chat-font-size-offset, 0px))",
+              lineHeight: 1.5,
+              overflow: "auto",
+              background: "var(--bg-subtle)",
+              borderTop: isError ? "1px solid rgba(248,113,113,0.25)" : "1px solid rgba(34,197,94,0.2)",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-all",
+            }}
+          >
+            {inputStr}
+          </pre>
+        )
       )}
 
       {/* ── Paired result — only shown when expanded ── */}
@@ -1715,6 +1739,19 @@ function safeJson(value: unknown): string {
 
 export function getToolCallInputText(block: ToolCallContent): string {
   return block.rawInput ?? JSON.stringify(block.input, null, 2);
+}
+
+/**
+ * The highlighter's own list of languages, used as the membership test for a
+ * declared `contentMediaType`: a language it does not have renders as plain
+ * text rather than as a wrong guess.
+ */
+const HIGHLIGHTER_LANGUAGES = new Set(
+  (Prism as unknown as { supportedLanguages?: string[] }).supportedLanguages ?? [],
+);
+
+function hasHighlighterLanguage(token: string): boolean {
+  return HIGHLIGHTER_LANGUAGES.has(token);
 }
 
 function formatCustomType(type: string): string {
