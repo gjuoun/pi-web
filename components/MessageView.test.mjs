@@ -19,7 +19,7 @@ const {
 } = await jiti.import("./MessageView.tsx");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
 const { splitFinalAssistantBlocks } = await jiti.import("@/lib/message-display");
-const { codeArgumentOf } = await jiti.import("@/lib/tool-names");
+const { isJunCodeToolName } = await jiti.import("@/lib/tool-names");
 
 function renderMessage(message, props = {}) {
   return renderToStaticMarkup(
@@ -134,31 +134,21 @@ test("treats jun_code as a built-in tool whose argument is code", () => {
   // `jun_code` is this fork's own code-mode tool. The chat view knows it by
   // name, the way the host knows its inline subagent tool — no schema lookup,
   // no media-type parsing, nothing inferred from the value's shape.
-  const code = 'const r = await jun.run("bash/run", { command: "ls -t" });';
-  assert.deepEqual(codeArgumentOf("jun_code", { code }), {
-    key: "code",
-    language: "typescript",
-    code,
-  });
+  assert.equal(isJunCodeToolName("jun_code"), true);
 
   // Every other tool keeps its argument JSON.
-  assert.equal(codeArgumentOf("bash", { code }), null);
-  assert.equal(codeArgumentOf("write", { path: "/tmp/x", content: "hi" }), null);
-  assert.equal(codeArgumentOf("mcp__thing", { content: "hi" }), null);
-
-  // A malformed call is not guessed at.
-  assert.equal(codeArgumentOf("jun_code", {}), null);
-  assert.equal(codeArgumentOf("jun_code", { code: "" }), null);
-  assert.equal(codeArgumentOf("jun_code", { code: 42 }), null);
-  assert.equal(codeArgumentOf("jun_code", undefined), null);
+  assert.equal(isJunCodeToolName("bash"), false);
+  assert.equal(isJunCodeToolName("write"), false);
+  assert.equal(isJunCodeToolName("jun_code_2"), false);
+  assert.equal(isJunCodeToolName("mcp__thing"), false);
 });
 
 test("renders that argument through CodeBlock, with no schema machinery", async () => {
   const source = await readFile(new URL("./MessageView.tsx", import.meta.url), "utf8");
-  assert.match(source, /codeArgumentOf\(block\.toolName, block\.input\)/);
-  assert.match(source, /codeArgument \? \(/);
-  assert.match(source, /<CodeBlock key=\{codeArgument\.key\} code=\{codeArgument\.code\} lang=\{codeArgument\.language\}/);
-  assert.doesNotMatch(source, /tool-schema|useToolSchemas/);
+  assert.match(source, /isJunCodeToolName\(block\.toolName\)/);
+  assert.match(source, /junCode \? \(/);
+  assert.match(source, /<CodeBlock code=\{junCode\} lang="typescript"/);
+  assert.doesNotMatch(source, /tool-schema|useToolSchemas|codeArgumentOf/);
 });
 
 test("renders subagents as standard tool calls with only an extra session button", () => {

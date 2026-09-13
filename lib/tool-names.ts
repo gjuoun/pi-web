@@ -25,30 +25,15 @@ export function isEditToolName(toolName: string): boolean {
 }
 
 /**
- * Tools this fork ships itself.
+ * This fork's own code-mode tool.
  *
- * Treated the way the host treats its own inline tools — the chat view knows
- * them by name (`pi-web-subagent` is handled the same way for subagent cards in
- * `MessageView`). `jun_code` is our code-mode tool and its payload argument IS
- * code, so it renders as a highlighted code block instead of the argument JSON.
+ * Treated the way the host treats its own inline tools — the chat view knows it
+ * by name (`pi-web-subagent` is handled the same way for subagent cards in
+ * `MessageView`). Its `code` argument IS TypeScript source, so an expanded call
+ * renders as a code block instead of as argument JSON.
  *
  * No schema lookup, no media-type parsing, nothing inferred from the value.
  */
-export const JUN_CODE_TOOL_NAME = "jun_code";
-
-/** `jun_code` runs TypeScript, so the language is part of knowing the tool. */
-export const JUN_CODE_LANGUAGE = "typescript";
-
-export interface CodeArgument {
-  key: string;
-  language: string;
-  code: string;
-}
-
-/** The code argument of a built-in tool call, or null for every other tool. */
-export function codeArgumentOf(toolName: string, input: unknown): CodeArgument | null {
-  if (toolName !== JUN_CODE_TOOL_NAME) return null;
-  const code = (input as { code?: unknown } | null | undefined)?.code;
-  if (typeof code !== "string" || code.length === 0) return null;
-  return { key: "code", language: JUN_CODE_LANGUAGE, code };
+export function isJunCodeToolName(toolName: string): boolean {
+  return toolName === "jun_code";
 }

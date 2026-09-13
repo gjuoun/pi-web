@@ -11,7 +11,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { parseCompactionSummary } from "@/lib/compaction-summary";
 import { getAssistantErrorMessage, getThinkingPreview, isEmptyThinkingBlock } from "@/lib/message-display";
 import { parseUnifiedPatch, type SplitDiffCell } from "@/lib/patch";
-import { codeArgumentOf, isEditToolName } from "@/lib/tool-names";
+import { isEditToolName, isJunCodeToolName } from "@/lib/tool-names";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
 import type { WrittenFile } from "@/lib/turn-written-files";
@@ -1026,12 +1026,13 @@ function ToolCallBlock({ block, result, duration, onOpenSession }: { block: Tool
   const inputStr = getToolCallInputText(block);
   const isStreamingInput = block.rawInput !== undefined;
   const isEditTool = isEditToolName(block.toolName);
-  // A built-in tool of ours (`jun_code`) carries code, not parameters — see
-  // lib/tool-names.ts. Streamed input is partial JSON, so it waits.
-  const codeArgument = useMemo(
-    () => (isStreamingInput ? null : codeArgumentOf(block.toolName, block.input)),
-    [block.toolName, block.input, isStreamingInput],
-  );
+  // `jun_code` is our own code-mode tool and runs TypeScript, so expanding a
+  // call shows the code rather than the argument JSON — see lib/tool-names.ts.
+  // Streamed input is partial JSON, so it waits.
+  const junCode = !isStreamingInput && isJunCodeToolName(block.toolName) &&
+      typeof block.input.code === "string" && block.input.code
+    ? block.input.code
+    : null;
   const resultDiff = result && !result.isError ? getResultDiff(result) : null;
 
   // Result display
@@ -1100,8 +1101,8 @@ function ToolCallBlock({ block, result, duration, onOpenSession }: { block: Tool
 
       {/* ── Expanded: input args ── */}
       {expanded && (isStreamingInput || !isEditTool) && (
-        codeArgument ? (
-          <CodeBlock key={codeArgument.key} code={codeArgument.code} lang={codeArgument.language} />
+        junCode ? (
+          <CodeBlock code={junCode} lang="typescript" />
         ) : (
           <pre
             style={{
