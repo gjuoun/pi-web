@@ -9,6 +9,7 @@ import type {
   ExtensionWidgetItem,
   SessionInfo,
   SessionTreeNode,
+  ToolEntry,
   ToolResultMessage,
   UserMessage,
 } from "@/lib/types";
@@ -16,8 +17,6 @@ import { isBlockingExtensionUiRequest } from "@/lib/browser-notifications";
 import { normalizeToolCalls } from "@/lib/normalize";
 import { isPromptRejectedError, sendAgentCommand } from "@/lib/agent-client";
 import { clearDraft, rekeyDraft, restoreDraftSubmission } from "@/lib/draft-store";
-import { getPreferredToolPreset, setPreferredToolPreset } from "@/lib/tool-preset-preference";
-import { getPresetFromToolNames, getToolNamesForPreset, type ToolEntry, type ToolPreset } from "@/lib/tool-presets";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import { mergeSessionStats, type SessionFileStats } from "@/lib/session-stats";
 import { userMessageKey } from "@/lib/prompt-recovery";
@@ -40,7 +39,6 @@ export interface SessionData {
   totalActiveMs: number;
   tree: SessionTreeNode[];
   leafId: string | null;
-  toolNames?: string[];
   context: {
     messages: AgentMessage[];
     entryIds: string[];
@@ -158,7 +156,6 @@ export interface UseAgentSessionOptions {
   /** Registers an action that lazily starts the session and loads its prompt and tools. */
   onSystemInfoLoaderChange?: (loader: (() => Promise<void>) | null) => void;
   onSessionStatsPanelOpen?: () => void;
-  setToolPreset?: (preset: ToolPreset) => void;
   deferInitialScroll?: boolean;
 }
 
@@ -304,7 +301,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [modelThinkingLevelMaps, setModelThinkingLevelMaps] = useState<Record<string, Record<string, string | null>>>({});
   const [newSessionModel, setNewSessionModel] = useState<SelectedModel | null>(null);
   const [newSessionDefaultModel, setNewSessionDefaultModel] = useState<SelectedModel | null>(null);
-  const [toolPreset, setToolPreset] = useState<ToolPreset>("default");
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevelOption>("auto");
   const [retryInfo, setRetryInfo] = useState<{ attempt: number; maxAttempts: number; errorMessage?: string } | null>(null);
   const [contextUsage, setContextUsage] = useState<{ percent: number | null; contextWindow: number; tokens: number | null } | null>(null);
@@ -384,13 +380,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     });
   }
 
-  const setToolPresetState = opts.setToolPreset ?? setToolPreset;
   const existingSessionId = session?.id;
-
-  useLayoutEffect(() => {
-    if (!existingSessionId && (!isNew || sessionIdRef.current)) return;
-    setToolPresetState(getPreferredToolPreset());
-  }, [existingSessionId, isNew, setToolPresetState]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const container = scrollContainerRef.current;
@@ -503,7 +493,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setEntryIds(d.context.entryIds ?? []);
       setHistoryCursor(d.context.oldestEntryId);
       setHasEarlierMessages(d.context.hasMore);
-      setToolPresetState(d.toolNames !== undefined ? getPresetFromToolNames(d.toolNames) : "default");
       setCurrentModelOverride((current) => modelSwitchPendingRef.current ? current : null);
       setError(null);
       if (d.context.thinkingLevel && d.context.thinkingLevel !== "off") {
@@ -543,7 +532,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     } finally {
       if (showLoading && !messagesLoaded) setLoading(false);
     }
-  }, [setToolPresetState, syncLiveModel]);
+  }, [syncLiveModel]);
 
   const loadContext = useCallback(async (sid: string, leafId: string | null, before?: string | null, options?: { tail?: number; signal?: AbortSignal }) => {
     try {
@@ -589,15 +578,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     try {
       const tools = await sendAgentCommand<ToolEntry[]>(sid, { type: "get_tools" });
       if (!tools || !sessionHookMountedRef.current || sessionIdRef.current !== sid) return null;
-      const { getPresetFromTools } = await import("@/lib/tool-presets");
-      setToolPresetState(getPresetFromTools(tools));
       onSystemToolsChange?.(tools);
       return tools;
     } catch (e) {
       console.error("Failed to load tools:", e);
       return null;
     }
-  }, [onSystemToolsChange, setToolPresetState]);
+  }, [onSystemToolsChange]);
 
   const promoteNewSession = useCallback((messageCount = 0, firstMessage = "(no messages)") => {
     const sid = sessionIdRef.current;
@@ -635,14 +622,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       const selectedModel = newSessionModelOverrideRef.current;
       const selectedThinkingLevel = thinkingLevelOverrideRef.current;
       if (selectedModel) setPendingModel(selectedModel);
-      const toolNames = getToolNamesForPreset(toolPreset);
       const res = await fetch("/api/agent/new", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cwd: newSessionCwd,
           type: "ensure_session",
-          toolNames,
           ...(selectedModel ? { provider: selectedModel.provider, modelId: selectedModel.modelId } : {}),
           ...(selectedThinkingLevel
             ? { thinkingLevel: selectedThinkingLevel }
@@ -676,7 +661,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     } finally {
       ensuringNewSessionRef.current = null;
     }
-  }, [isNew, newSessionCwd, toolPreset]);
+  }, [isNew, newSessionCwd]);
 
   // Opening the System or Tools panel may initialize an otherwise dormant
   // session. This is deliberately a non-prompt command: it creates no message
@@ -1899,39 +1884,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, [isNew]);
 
-  const handleToolPresetChange = useCallback(async (preset: ToolPreset) => {
-    const toolNames = getToolNamesForPreset(preset);
-    setPreferredToolPreset(preset);
-    setToolPresetState(preset);
-    const sid = sessionIdRef.current ?? await ensuringNewSessionRef.current;
-    if (!sid) return;
-    try {
-      const result = await sendAgentCommand<{ sessionId?: string; recreated?: boolean }>(sid, { type: "set_tools", toolNames });
-      const activeSessionId = result?.sessionId ?? sid;
-      if (activeSessionId !== sid || result?.recreated) {
-        cancelEventStreamGrace();
-        closeEvents();
-        sessionIdRef.current = activeSessionId;
-        if (result?.recreated && sessionPropIdRef.current === activeSessionId) {
-          maintainEventsConnected(activeSessionId);
-        }
-      }
-      setSlashCommands([]);
-      setExtensionStatuses([]);
-      setExtensionWidgets([]);
-      const [state] = await Promise.all([
-        sendAgentCommand<AgentStateResponse>(activeSessionId, { type: "get_state" }),
-        loadTools(activeSessionId),
-      ]);
-      if (sessionHookMountedRef.current && sessionIdRef.current === activeSessionId) {
-        setSystemPrompt(state.systemPrompt ?? "");
-        syncLiveModel(state);
-      }
-    } catch (e) {
-      console.error("Failed to set tools:", e);
-    }
-  }, [cancelEventStreamGrace, closeEvents, loadTools, maintainEventsConnected, setToolPresetState, syncLiveModel]);
-
   const scrollToMessage = useCallback((element: HTMLElement, viewportOffset = 16) => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -2174,7 +2126,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   return {
     // State
     data, loading, error, activeLeafId, messages, activeToolResults, entryIds, historyCursor, hasEarlierMessages, streamState,
-    agentRunning, modelNames, modelList, modelError, modelScopeWarnings, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
+    agentRunning, modelNames, modelList, modelError, modelScopeWarnings, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, thinkingLevel,
     retryInfo, contextUsage, systemPrompt, forkingEntryId,
     isCompacting, autoCompactionEnabled, compactError, compactResult, currentModel, displayModel, modelSwitching, sessionStats,
     slashCommands, slashCommandsLoading, queuedMessages,
@@ -2192,7 +2144,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     handleRecallQueue,
     handleBuiltinSlashCommand,
     setNoticePaused: setPausedNoticeId,
-    handleToolPresetChange, handleThinkingLevelChange, loadTools, loadSlashCommands, setActiveLeafId, setData, setMessages, loadContext,
+    handleThinkingLevelChange, loadTools, loadSlashCommands, setActiveLeafId, setData, setMessages, loadContext,
     scrollToBottom, scrollUserMsgToTop, scrollToMessage,
     dispatch, setAgentRunning, setForkingEntryId,
     bashRunning, pendingBash,

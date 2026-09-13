@@ -2,7 +2,7 @@
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage, UserMessage } from "@/lib/types";
+import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolEntry, ToolResultMessage, UserMessage } from "@/lib/types";
 import { normalizeCustomPanelLines } from "@/lib/ansi";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { countToolCallBlocks, getAssistantErrorMessage, getDisplayableAssistantBlocks, isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
@@ -21,7 +21,6 @@ import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import type { AppUpdateResponse } from "@/lib/api-types";
-import type { ToolEntry } from "@/lib/tool-presets";
 import { findChatScrollAnchor, type ChatScrollPosition } from "@/lib/chat-scroll-position";
 import {
   captureScrollDistance,
@@ -274,7 +273,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
 
   const {
     loading, error, messages, activeToolResults, entryIds, historyCursor, hasEarlierMessages, streamState,
-    agentRunning, bashRunning, pendingBash, modelNames, modelList, modelError, modelScopeWarnings, modelThinkingLevels, modelThinkingLevelMaps, toolPreset, thinkingLevel,
+    agentRunning, bashRunning, pendingBash, modelNames, modelList, modelError, modelScopeWarnings, modelThinkingLevels, modelThinkingLevelMaps, thinkingLevel,
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, autoCompactionEnabled, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
     slashCommands, slashCommandsLoading, queuedMessages,
@@ -288,7 +287,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     handleSteer, handleFollowUp, handlePromptWithStreamingBehavior, handleAbortCompaction,
     handleRecallQueue,
     handleBuiltinSlashCommand,
-    handleToolPresetChange, handleThinkingLevelChange, loadSlashCommands, scrollUserMsgToTop,
+    handleThinkingLevelChange, loadSlashCommands, scrollUserMsgToTop,
     loadContext, activeLeafId, scrollToBottom, scrollToMessage,
   } = useAgentSession({
     session, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd: wrappedOnAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked,
@@ -1358,8 +1357,6 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
           onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
           availableThinkingLevels={availableThinkingLevels}
           thinkingLevelMap={currentThinkingLevelMap}
-          toolPreset={toolPreset}
-          onToolPresetChange={session || isNew ? handleToolPresetChange : undefined}
         />
         <ExtensionStatusBar statuses={extensionStatuses} widgets={extensionWidgets} />
       </div>

@@ -355,3 +355,12 @@ export interface SessionContext {
   thinkingLevel: string;
   model: { provider: string; modelId: string } | null;
 }
+
+/** One tool as pi reports it (`get_tools`), used by the read-only Tools panel. */
+export interface ToolEntry {
+  name: string;
+  description: string;
+  active: boolean;
+  parameters?: Record<string, unknown>;
+  promptGuidelines?: string[];
+}

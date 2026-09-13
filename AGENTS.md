@@ -51,7 +51,7 @@ app/api/
   sessions/[id]/route.ts          GET/PATCH/DELETE session
   sessions/[id]/context/route.ts  GET ?leafId= — context for a specific leaf
   sessions/[id]/export/route.ts   GET exported HTML for a session
-  agent/new/route.ts              POST { cwd, message, toolNames?, provider?, modelId? }
+  agent/new/route.ts              POST { cwd, message, provider?, modelId? }
   agent/[id]/route.ts             GET state | POST any command
   agent/[id]/events/route.ts      GET SSE stream
   agent/running/route.ts          GET currently-running session ids
@@ -86,8 +86,6 @@ lib/
   rpc-manager.ts      AgentSessionWrapper + registry + startRpcSession
   session-reader.ts   SessionManager wrappers + path cache + buildSessionContext adapter
   subagent-settings.ts  read/write ~/.pi/agent/agents/settings.json
-  tool-presets.ts     PRESET_NONE/READ_ONLY/DEFAULT/FULL + getPresetFromTools()
-  tool-preset-preference.ts  browser-persisted default for fresh sessions
   types.ts            shared TypeScript types
   normalize.ts        normalizeToolCalls() — field name mismatch between file format and our types
   worktree.ts         project/worktree resolution and git worktree operations
@@ -142,10 +140,14 @@ hooks/
 ### ToolCall field normalization
 Pi stores toolCall blocks as `{type:"toolCall", id, name, arguments}` but `ToolCallContent` uses `{toolCallId, toolName, input}`. `normalizeToolCalls()` in `lib/normalize.ts` handles this — called in both `session-reader.ts` (file load) and `handleAgentEvent` in `hooks/useAgentSession.ts` (streaming).
 
-### New session tool preset
-Tool names are passed at session creation (`POST /api/agent/new` -> `toolNames[]`) and persisted in versioned `pi-web:tool-selection` custom entries. No entry means a legacy session and keeps Pi's default behavior; an empty array means Chat only. Chat only resolves before services are created, loads no extensions/skills/prompts/themes, and replaces Pi's base prompt with the ordered contents of Pi's discovered context files. Crossing the Chat-only boundary rebuilds the wrapper; changing between nonempty presets updates it in place. Subagents persist their active tools plus profile-level skill and extension loading switches in `resourceSnapshot`; loaded extensions cannot expose the reserved `Agent`, `get_subagent_result`, or `steer_subagent` tools to a subagent. See `docs/adr/0002-chat-only-tool-selection.md`.
-
-The last preset explicitly selected by the user is stored in browser `localStorage` and initializes fresh-session composers only. Existing sessions never trust that preference; they use their live `get_tools` state or pi's default when no wrapper exists.
+### Tool selection
+Pi Web does not select tools. A normal session runs with Pi's own configuration (`defaultTools` in
+`~/.pi/agent/settings.json`, else the SDK default `read, bash, edit, write`); `POST /api/agent/new`
+takes no `toolNames`, and `POST /api/agent/[id]` rejects `set_tools` with HTTP 400. A subagent is the
+exception: its profile pins the tool list, and `resourceSnapshot` in its `pi-web:subagent` metadata
+keeps that policy for reopened sessions. `lib/chat-only.ts` and `lib/tool-presets.ts` no longer
+exist; the read-only Tools panel still shows live tool state from `get_tools`. See
+`docs/adr/0004-remove-tool-presets.md`.
 
 ### Model defaults for new sessions
 `GET /api/models` returns `defaultModel` read from `~/.pi/agent/settings.json`. `ChatWindow` pre-selects this on mount for new sessions. Explicit browser model/thinking selections are applied atomically during AgentSession construction, then `lib/startup-preferences.ts` persists their effective values without replaying `set_model`/`set_thinking_level`; implicit `enabledModels` fallbacks and thinking pins are not persisted.

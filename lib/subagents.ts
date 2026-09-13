@@ -6,8 +6,10 @@ import { basename, dirname, join, resolve } from "path";
 import { parseFrontmatter } from "./frontmatter";
 import { writePrivateFileAtomicSync } from "./atomic-file";
 import { isExistingPathWithinRoots } from "./path-security";
-import { PRESET_READ_ONLY } from "./tool-presets";
 import type { SessionEntry, SubagentSessionStatus } from "./types";
+
+/** Built-in profiles that must not modify the repo: pi's read-only built-ins. */
+const READ_ONLY_BUILT_IN_TOOLS = ["read", "grep", "find", "ls"];
 
 export const SUBAGENT_META_TYPE = "pi-web:subagent";
 export const SUBAGENT_STATUS_TYPE = "pi-web:subagent-status";
@@ -165,7 +167,7 @@ const BUILTIN_PROFILES: SubagentProfile[] = [
     displayName: "Explore",
     description: "Quickly inspect a codebase without modifying it",
     systemPrompt: "Explore the codebase to answer the delegated question. Do not modify files. Report concrete findings with file paths and relevant symbols.",
-    tools: [...PRESET_READ_ONLY],
+    tools: [...READ_ONLY_BUILT_IN_TOOLS],
     loadSkills: false,
     loadExtensions: false,
     promptMode: "append",
@@ -179,7 +181,7 @@ const BUILTIN_PROFILES: SubagentProfile[] = [
     displayName: "Plan",
     description: "Design an implementation plan without modifying files",
     systemPrompt: "Produce an implementation-ready plan for the delegated task. Inspect the repository as needed, do not modify files, and call out dependencies, risks, and verification steps.",
-    tools: [...PRESET_READ_ONLY],
+    tools: [...READ_ONLY_BUILT_IN_TOOLS],
     loadSkills: false,
     loadExtensions: false,
     promptMode: "append",

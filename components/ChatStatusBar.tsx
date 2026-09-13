@@ -11,12 +11,6 @@ import {
   thinkingLevelAlias,
   type ThinkingLevelChoice,
 } from "@/lib/thinking-levels";
-import {
-  TOOL_PRESET_UI_MAP,
-  TOOL_PRESET_UI_VALUES,
-  toolPresetUiValue,
-  type ToolPreset,
-} from "@/lib/tool-presets";
 import type { AgentUsage } from "@/lib/types";
 import { ModelSelector, type ModelSelectorOption } from "./ModelSelector";
 
@@ -29,7 +23,7 @@ import { ModelSelector, type ModelSelectorOption } from "./ModelSelector";
  * reproduced here — `ExtensionStatusBar` renders whatever extensions publish, including the
  * `tps-status` extension's task-timer line.
  *
- * Where pi only prints text, the model / level / tools segments double as the control surface:
+ * Where pi only prints text, the model / level segments double as the control surface:
  * the composer keeps an image button and a send button and nothing else.
  */
 
@@ -297,9 +291,6 @@ interface Props {
   onThinkingLevelChange?: (level: ThinkingLevelChoice) => void;
   availableThinkingLevels?: string[] | null;
   thinkingLevelMap?: Record<string, string | null> | null;
-  // Tools segment
-  toolPreset?: ToolPreset | null;
-  onToolPresetChange?: (preset: ToolPreset) => void;
 }
 
 export function ChatStatusBar({
@@ -323,8 +314,6 @@ export function ChatStatusBar({
   onThinkingLevelChange,
   availableThinkingLevels,
   thinkingLevelMap,
-  toolPreset,
-  onToolPresetChange,
 }: Props) {
   const { t } = useI18n();
   const fetchedHome = useHomeDir();
@@ -343,7 +332,6 @@ export function ChatStatusBar({
   const items = usageStats(stats, contextUsage, autoCompactionEnabled);
   const modelName = formatModelName({ model, providerCount });
   const thinkingSuffix = formatThinkingSuffix({ thinkingLevel, supportsReasoning });
-  const toolLabel = toolPresetUiValue(toolPreset) === "chat-only" ? t("chat.chatOnly") : toolPresetUiValue(toolPreset);
 
   const thinkingItems: StatusMenuItem[] = thinkingChoicesFor(availableThinkingLevels).map((level) => {
     const alias = thinkingLevelAlias(level, thinkingLevelMap);
@@ -356,20 +344,6 @@ export function ChatStatusBar({
       onSelect: () => onThinkingLevelChange?.(level),
     };
   });
-
-  const toolItems: StatusMenuItem[] = TOOL_PRESET_UI_VALUES.map((value) => ({
-    key: value,
-    label: value === "chat-only" ? t("chat.chatOnly") : value,
-    description: value === "chat-only"
-      ? t("chat.chatOnly")
-      : value === "read-only"
-        ? t("chat.readOnlyTools", { count: 4 })
-        : value === "default"
-          ? t("chat.builtInTools", { count: 4 })
-          : t("chat.allBuiltInTools"),
-    active: toolPresetUiValue(toolPreset) === value,
-    onSelect: () => onToolPresetChange?.(TOOL_PRESET_UI_MAP[value]),
-  }));
 
   if (!pwdLine && items.length === 0) return null;
 
@@ -419,17 +393,6 @@ export function ChatStatusBar({
                 onOpenChange={setOpenMenu}
               />
             ) : <span>{thinkingSuffix}</span>
-          )}
-          {onToolPresetChange && (
-            <StatusMenu
-              label={`tools: ${toolLabel}`}
-              title={t("chat.changeToolPreset")}
-              disabled={busy}
-              items={toolItems}
-              openKey={openMenu}
-              menuKey="tools"
-              onOpenChange={setOpenMenu}
-            />
           )}
         </span>
       </div>

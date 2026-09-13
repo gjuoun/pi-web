@@ -40,13 +40,6 @@ import {
 } from "./subagents";
 import { createSubagentController } from "./subagent-runtime";
 import { isBuiltInSubagentsEnabled } from "./subagent-settings";
-import { resolveShellTools } from "./powershell-settings";
-import { CHAT_ONLY_RESOURCE_LOADER_OPTIONS, contextFilesSystemPrompt } from "./chat-only";
-import {
-  appendSessionToolSelection,
-  readSessionToolSelection,
-  validateSessionToolSelection,
-} from "./session-tool-selection";
 
 // ============================================================================
 // Types
@@ -159,13 +152,11 @@ const COMMANDS_ALLOWED_DURING_SESSION_REPLACEMENT = new Set([
 ]);
 
 export interface RpcSessionStartOptions {
-  toolNames?: string[];
   initialModel?: { provider: string; modelId: string };
   allowInitialModelFallback?: boolean;
   thinkingLevel?: ThinkingLevel;
 }
 
-const CODING_TOOL_NAMES = ["read", "bash", "powershell", "edit", "write", "grep", "find", "ls"];
 const THINKING_LEVEL_NAMES = new Set<ThinkingLevel>(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
 
 // Extensions require a complete Theme, while the web UI applies its own styling.
@@ -195,19 +186,6 @@ class PlainTextTheme extends Theme {
 
 const PLAIN_TEXT_THEME = new PlainTextTheme();
 const CUSTOM_UI_KEYBINDINGS = new TuiKeybindingsManager(TUI_KEYBINDINGS);
-
-function withExtensionTools(session: AgentSessionLike, toolNames: string[]): string[] {
-  if (toolNames.length === 0) return [];
-
-  const codingToolNames = new Set(CODING_TOOL_NAMES);
-  const selectedToolNames = resolveShellTools(toolNames, session.settingsManager.getDefaultTools());
-  const extensionToolNames = session
-    .getAllTools()
-    .map((t) => t.name)
-    .filter((name) => !codingToolNames.has(name));
-
-  return [...new Set([...selectedToolNames, ...extensionToolNames])];
-}
 
 // ============================================================================
 // AgentSessionWrapper
@@ -434,11 +412,6 @@ export class AgentSessionWrapper {
         },
       };
     };
-  }
-
-  setActiveToolSelection(toolNames: string[]): void {
-    this.inner.setActiveToolsByName(withExtensionTools(this.inner, toolNames));
-    this.applyExactSystemPrompt();
   }
 
   private emit(event: AgentEvent): void {
@@ -936,12 +909,6 @@ export class AgentSessionWrapper {
         return { commands };
       }
 
-      case "set_tools": {
-        const toolNames = command.toolNames as string[];
-        this.setActiveToolSelection(toolNames);
-        return null;
-      }
-
       case "reload": {
         if (this.extensionUiAbortController.signal.aborted) {
           this.extensionUiAbortController = new AbortController();
@@ -952,7 +919,8 @@ export class AgentSessionWrapper {
         this.resetExtensionWidgetsForReload();
         this.syncProjectTrust();
         await this.inner.reload();
-        this.setActiveToolSelection(activeToolNames);
+        // pi resets the active set on reload; restore what the session had (pi's own API).
+        this.inner.setActiveToolsByName(activeToolNames);
         if (typeof this.inner.bindExtensions !== "function") {
           this.inner.extensionRunner.setUIContext?.(this.createExtensionUiContext(), "rpc");
         }
@@ -1757,74 +1725,6 @@ export function getRpcSession(sessionId: string): AgentSessionWrapper | undefine
   return getRegistry().get(sessionId);
 }
 
-export interface SetRpcSessionToolsResult {
-  session: AgentSessionWrapper;
-  sessionId: string;
-  recreated: boolean;
-}
-
-/** Persist a normal session's tool selection and rebuild when resource policy changes. */
-export async function setRpcSessionTools(
-  sessionId: string,
-  sessionFile: string | undefined,
-  requestedToolNames: unknown,
-): Promise<SetRpcSessionToolsResult> {
-  const toolNames = validateSessionToolSelection(requestedToolNames);
-  const existing = getRpcSession(sessionId);
-
-  if (!existing?.isAlive()) {
-    if (!sessionFile) throw new Error("Session not found");
-    const manager = SessionManager.open(sessionFile, undefined);
-    if (readSubagentSessionResources(manager.getEntries() as unknown as SessionEntry[])) {
-      throw new Error("Subagent tool selection is fixed by its profile");
-    }
-    appendSessionToolSelection(manager, toolNames);
-    invalidateSessionListCache();
-    const started = await startRpcSession(sessionId, sessionFile, undefined);
-    return { session: started.session, sessionId: started.realSessionId, recreated: false };
-  }
-
-  if (existing.isRunning()) throw new Error("Cannot change tools while the session is running");
-  if (readSubagentSessionResources(existing.inner.sessionManager.getEntries() as unknown as SessionEntry[])) {
-    throw new Error("Subagent tool selection is fixed by its profile");
-  }
-
-  const hasCurrentResourcePolicy = typeof existing.isChatOnly === "function"
-    && typeof existing.setActiveToolSelection === "function";
-  const crossesChatOnlyBoundary = !hasCurrentResourcePolicy
-    || existing.isChatOnly() !== (toolNames.length === 0);
-  appendSessionToolSelection(existing.inner.sessionManager, toolNames);
-  invalidateSessionListCache();
-
-  if (!crossesChatOnlyBoundary) {
-    existing.setActiveToolSelection(toolNames);
-    return { session: existing, sessionId, recreated: false };
-  }
-
-  const persistedFile = existing.sessionFile && existsSync(existing.sessionFile)
-    ? existing.sessionFile
-    : undefined;
-  const sessionCwd = existing.cwd;
-  const model = existing.inner.model;
-  const currentThinkingLevel = existing.inner.agent.state?.thinkingLevel;
-  await existing.shutdown();
-
-  if (persistedFile) {
-    const started = await startRpcSession(sessionId, persistedFile, undefined);
-    return { session: started.session, sessionId: started.realSessionId, recreated: true };
-  }
-
-  const started = await startRpcSession(`__recreate__${randomUUID()}`, "", sessionCwd, {
-    toolNames,
-    ...(model ? { initialModel: { provider: model.provider, modelId: model.id } } : {}),
-    allowInitialModelFallback: true,
-    ...(currentThinkingLevel && THINKING_LEVEL_NAMES.has(currentThinkingLevel as ThinkingLevel)
-      ? { thinkingLevel: currentThinkingLevel as ThinkingLevel }
-      : {}),
-  });
-  return { session: started.session, sessionId: started.realSessionId, recreated: true };
-}
-
 function runtimeMessageText(entry: SessionMessageEntry): string {
   if (entry.message.role === "bashExecution") return "";
   const content = entry.message.content;
@@ -1952,9 +1852,6 @@ export async function startRpcSession(
   options: RpcSessionStartOptions = {},
 ): Promise<{ session: AgentSessionWrapper; realSessionId: string }> {
   const { initialModel, allowInitialModelFallback, thinkingLevel } = options;
-  const requestedToolNames = options.toolNames === undefined
-    ? undefined
-    : validateSessionToolSelection(options.toolNames);
   const registry = getRegistry();
   const locks = getLocks();
 
@@ -1977,48 +1874,31 @@ export async function startRpcSession(
         sessionManager.getEntries() as unknown as SessionEntry[],
       )
     : null;
-  const persistedToolNames = subagentResources
-    ? undefined
-    : readSessionToolSelection(sessionManager.getEntries() as unknown as SessionEntry[]);
-  const selectedToolNames = subagentResources?.tools ?? persistedToolNames ?? requestedToolNames;
-  if (!subagentResources && persistedToolNames === undefined && requestedToolNames !== undefined) {
-    appendSessionToolSelection(sessionManager, requestedToolNames);
-  }
   const subagentLoadsResources = Boolean(
     subagentResources?.loadExtensions || subagentResources?.loadSkills,
   );
-  const chatOnly = selectedToolNames?.length === 0 && !subagentLoadsResources;
+  // Chat only is now purely a subagent-profile policy: a profile with no tools and neither
+  // extensions nor skills. Normal sessions carry no pi-web tool policy at all.
+  const chatOnly = Boolean(
+    subagentResources && subagentResources.tools.length === 0 && !subagentLoadsResources,
+  );
   const finishStartingSession = trackStartingSession(sessionCwd);
   const starting = (async () => {
     // Some extensions access the SDK's global theme even outside the terminal UI.
     if (!chatOnly) initTheme();
     const agentDir = getAgentDir();
 
-    // Determine which tools to pass based on requested toolNames.
-    // Since v0.68.0, session creation expects string[] tool names instead of Tool[] instances.
-    let toolsOption: string[] | undefined = subagentResources?.tools;
-    if (!subagentResources && selectedToolNames !== undefined) {
-      // toolNames === [] -> "all off" (an empty allow-list disables every tool).
-      // Otherwise DO NOT pass a builtin-only allow-list: passing CODING_TOOL_NAMES
-      // set allowedToolNames to coding builtins only, which filtered every
-      // extension/package-provided tool (e.g. subagents, web access) out of the
-      // tool registry — so they were unavailable in Pi Web sessions even though the
-      // `pi` CLI keeps them. Leaving the allow-list unset lets the SDK register all
-      // tools (and activate extension tools); we narrow the ACTIVE set below.
-      toolsOption = selectedToolNames.length === 0 ? [] : undefined;
-    }
+    // Only a subagent profile pins the tool list; a normal session uses pi's own
+    // configuration (`defaultTools` in settings.json, else the SDK default).
+    const toolsOption: string[] | undefined = subagentResources?.tools;
 
     // Build services first so extension-registered providers are available
     // before the SDK restores the saved model from the session file.
     // Gate untrusted project extensions so opening a repository does not run
     // its .pi/extensions code automatically (see lib/project-trust.ts, #236).
-    const trustReloadOptions = subagentResources
-      ? subagentLoadsResources
-        ? projectTrustReloadOptions(sessionCwd, agentDir)
-        : undefined
-      : chatOnly
-        ? undefined
-        : projectTrustReloadOptions(sessionCwd, agentDir);
+    const trustReloadOptions = subagentResources && !subagentLoadsResources
+      ? undefined
+      : projectTrustReloadOptions(sessionCwd, agentDir);
     const settingsManager = SettingsManager.create(sessionCwd, agentDir);
     const services = await createAgentSessionServices({
       cwd: sessionCwd,
@@ -2039,8 +1919,6 @@ export async function startRpcSession(
               : {}),
             appendSystemPrompt: subagentResources.appendSystemPrompt,
           }
-        : chatOnly
-          ? CHAT_ONLY_RESOURCE_LOADER_OPTIONS
         : {
             extensionFactories: [
               createProjectCommandBashExtension({
@@ -2113,19 +1991,10 @@ export async function startRpcSession(
     );
     if (persistedPreferences.modelDefaultChanged) invalidateModelsCache();
 
-    // If specific tool names were requested (non-empty), set the active tools to the
-    // requested builtin coding tools PLUS all extension/package tools, so installed
-    // extensions stay usable in Pi Web just like in the `pi` CLI.
-    if (!subagentResources && !chatOnly) {
-      inner.setActiveToolsByName(withExtensionTools(inner, selectedToolNames ?? inner.getActiveToolNames()));
-    }
-
     const exactSystemPrompt = subagentResources?.exactSystemPrompt !== undefined
       ? () => subagentResources.exactSystemPrompt!
       : chatOnly
-        ? subagentResources
-          ? () => subagentResources.appendSystemPrompt[0] ?? ""
-          : () => contextFilesSystemPrompt(inner.resourceLoader.getAgentsFiles().agentsFiles)
+        ? () => subagentResources?.appendSystemPrompt[0] ?? ""
         : undefined;
     const wrapper = new AgentSessionWrapper(inner, {
       exactSystemPrompt,
