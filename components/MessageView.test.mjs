@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createJiti } from "jiti";
 
@@ -18,6 +19,7 @@ const {
 } = await jiti.import("./MessageView.tsx");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
 const { splitFinalAssistantBlocks } = await jiti.import("@/lib/message-display");
+const { isJunCodeToolName } = await jiti.import("@/lib/tool-names");
 
 function renderMessage(message, props = {}) {
   return renderToStaticMarkup(
@@ -126,6 +128,27 @@ test("keeps streamed tool input out of collapsed markup while counting it", () =
   assert.doesNotMatch(html, /secret-stream-fragment/);
   assert.equal(getToolCallInputText(block), block.rawInput);
   assert.equal(getTokenEstimateText(block), block.rawInput);
+});
+
+test("treats jun_code as a built-in tool whose argument is code", () => {
+  // `jun_code` is this fork's own code-mode tool. The chat view knows it by
+  // name, the way the host knows its inline subagent tool — no schema lookup,
+  // no media-type parsing, nothing inferred from the value's shape.
+  assert.equal(isJunCodeToolName("jun_code"), true);
+
+  // Every other tool keeps its argument JSON.
+  assert.equal(isJunCodeToolName("bash"), false);
+  assert.equal(isJunCodeToolName("write"), false);
+  assert.equal(isJunCodeToolName("jun_code_2"), false);
+  assert.equal(isJunCodeToolName("mcp__thing"), false);
+});
+
+test("renders that argument through CodeBlock, with no schema machinery", async () => {
+  const source = await readFile(new URL("./MessageView.tsx", import.meta.url), "utf8");
+  assert.match(source, /isJunCodeToolName\(block\.toolName\)/);
+  assert.match(source, /junCode \? \(/);
+  assert.match(source, /<CodeBlock code=\{junCode\} lang="typescript"/);
+  assert.doesNotMatch(source, /tool-schema|useToolSchemas|codeArgumentOf/);
 });
 
 test("renders subagents as standard tool calls with only an extra session button", () => {
