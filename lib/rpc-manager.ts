@@ -25,7 +25,7 @@ import type {
 import { createHeadlessCustomUiTui, DEFAULT_CUSTOM_UI_COLUMNS, type HeadlessCustomUiTui } from "./custom-ui-terminal";
 import {
   createSubagentExtension,
-  preferPiWebSubagentExtension,
+  suppressExpectedSubagentConflicts,
 } from "./subagent-extension";
 import {
   listSubagentProfiles,
@@ -1919,7 +1919,7 @@ export async function startRpcSession(
                 isBuiltInSubagentsEnabled,
               ),
             ],
-            extensionsOverride: (base) => preferPiWebSubagentExtension(base),
+            extensionsOverride: (base) => suppressExpectedSubagentConflicts(base),
           },
       ...(trustReloadOptions ? { resourceLoaderReloadOptions: trustReloadOptions } : {}),
     });
