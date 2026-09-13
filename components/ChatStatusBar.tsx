@@ -1,10 +1,24 @@
 "use client";
 
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { useHomeDir } from "@/hooks/useHomeDir";
 import { collapseHomePath } from "@/lib/path-display";
 import type { ContextUsage, SessionStatsInfo } from "@/lib/pi-types";
+import {
+  THINKING_LEVEL_DESC_KEYS,
+  thinkingChoicesFor,
+  thinkingLevelAlias,
+  type ThinkingLevelChoice,
+} from "@/lib/thinking-levels";
+import {
+  TOOL_PRESET_UI_MAP,
+  TOOL_PRESET_UI_VALUES,
+  toolPresetUiValue,
+  type ToolPreset,
+} from "@/lib/tool-presets";
 import type { AgentUsage } from "@/lib/types";
+import { ModelSelector, type ModelSelectorOption } from "./ModelSelector";
 
 /**
  * pi's native footer, reproduced for the web.
@@ -13,7 +27,10 @@ import type { AgentUsage } from "@/lib/types";
  * (`FooterComponent`). Line 1 is `cwd (branch) • session name`; line 2 is the usage stats on the
  * left and `(provider) model • level` on the right. pi's third line (extension statuses) is not
  * reproduced here — `ExtensionStatusBar` renders whatever extensions publish, including the
- * `⏳ … ⚡ … tok/s … ttft …` line from the `tps-status` extension.
+ * `tps-status` extension's task-timer line.
+ *
+ * Where pi only prints text, the model / level / tools segments double as the control surface:
+ * the composer keeps an image button and a send button and nothing else.
  */
 
 /** pi's `formatTokens` (`footer.js:20-30`) — the exact thresholds both lines rely on. */
@@ -108,24 +125,37 @@ export function formatUsageStats(
   return usageStats(stats, contextUsage, autoCompactionEnabled).map((item) => item.text).join(" ");
 }
 
-/** Right side of line 2 — `(provider) model • level` (`footer.js:154-178`). */
+/** `(provider) model` — the model half of pi's right-hand side (`footer.js:154-178`). */
+export function formatModelName(input: {
+  model?: { provider: string; modelId: string } | null;
+  providerCount: number;
+}): string {
+  const modelId = input.model?.modelId || "no-model";
+  // pi only prefixes the provider while more than one provider has available models.
+  if (input.providerCount > 1 && input.model?.provider) {
+    return `(${input.model.provider}) ${modelId}`;
+  }
+  return modelId;
+}
+
+/** `• low` — the thinking half of pi's right-hand side; empty for non-reasoning models. */
+export function formatThinkingSuffix(input: {
+  thinkingLevel?: string | null;
+  supportsReasoning: boolean;
+}): string {
+  if (!input.supportsReasoning) return "";
+  const level = input.thinkingLevel || "off";
+  return level === "off" ? "• thinking off" : `• ${level}`;
+}
+
+/** Right side of line 2, `(provider) model • level`, for the read-only rendering. */
 export function formatModelLabel(input: {
   model?: { provider: string; modelId: string } | null;
   providerCount: number;
   thinkingLevel?: string | null;
   supportsReasoning: boolean;
 }): string {
-  const modelId = input.model?.modelId || "no-model";
-  let label = modelId;
-  if (input.supportsReasoning) {
-    const level = input.thinkingLevel || "off";
-    label = level === "off" ? `${modelId} • thinking off` : `${modelId} • ${level}`;
-  }
-  // pi only prefixes the provider while more than one provider has available models.
-  if (input.providerCount > 1 && input.model?.provider) {
-    label = `(${input.model.provider}) ${label}`;
-  }
-  return label;
+  return [formatModelName(input), formatThinkingSuffix(input)].filter(Boolean).join(" ");
 }
 
 /** `~/path (branch) • name` — pi's line 1 (`footer.js:100-111`). */
@@ -150,6 +180,98 @@ export function contextColor(percent: number | null | undefined): string | undef
   return undefined;
 }
 
+interface StatusMenuItem {
+  key: string;
+  label: string;
+  description?: string;
+  active: boolean;
+  onSelect: () => void;
+}
+
+/** One flat, pi-styled text trigger with an upward menu. */
+function StatusMenu({
+  label,
+  title,
+  disabled,
+  items,
+  openKey,
+  menuKey,
+  onOpenChange,
+}: {
+  label: string;
+  title: string;
+  disabled?: boolean;
+  items: StatusMenuItem[];
+  openKey: string | null;
+  menuKey: string;
+  onOpenChange: (key: string | null) => void;
+}) {
+  const open = openKey === menuKey;
+  const rootRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutside = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) onOpenChange(null);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [open, onOpenChange]);
+
+  return (
+    <span
+      ref={rootRef}
+      className="chat-status-menu"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || !open) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onOpenChange(null);
+      }}
+    >
+      <button
+        type="button"
+        className="chat-status-segment"
+        title={title}
+        aria-label={title}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => onOpenChange(open ? null : menuKey)}
+      >
+        {label}
+      </button>
+      {open && (
+        <div className="chat-status-menu-popover" role="listbox" aria-label={title}>
+          {items.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="option"
+              aria-selected={item.active}
+              className={`chat-status-menu-item${item.active ? " is-active" : ""}`}
+              onClick={() => {
+                onOpenChange(null);
+                if (!item.active) item.onSelect();
+              }}
+            >
+              <span className="chat-status-menu-check">
+                {item.active ? (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="1.5 5 4 7.5 8.5 2.5" />
+                  </svg>
+                ) : null}
+              </span>
+              <span className="chat-status-menu-label">{item.label}</span>
+              {item.description && <span className="chat-status-menu-desc">{item.description}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
+  );
+}
+
 interface Props {
   cwd?: string | null;
   branch?: string | null;
@@ -164,6 +286,20 @@ interface Props {
   providerCount?: number;
   thinkingLevel?: string | null;
   supportsReasoning?: boolean;
+  /** True while the agent is running: every segment is read-only then. */
+  busy?: boolean;
+  // Model segment
+  modelOptions?: ModelSelectorOption[];
+  onModelChange?: (provider: string, modelId: string) => void;
+  modelSwitching?: boolean;
+  isAutoModelSelection?: boolean;
+  // Thinking segment
+  onThinkingLevelChange?: (level: ThinkingLevelChoice) => void;
+  availableThinkingLevels?: string[] | null;
+  thinkingLevelMap?: Record<string, string | null> | null;
+  // Tools segment
+  toolPreset?: ToolPreset | null;
+  onToolPresetChange?: (preset: ToolPreset) => void;
 }
 
 export function ChatStatusBar({
@@ -179,19 +315,83 @@ export function ChatStatusBar({
   providerCount = 0,
   thinkingLevel,
   supportsReasoning = false,
+  busy = false,
+  modelOptions,
+  onModelChange,
+  modelSwitching = false,
+  isAutoModelSelection = false,
+  onThinkingLevelChange,
+  availableThinkingLevels,
+  thinkingLevelMap,
+  toolPreset,
+  onToolPresetChange,
 }: Props) {
   const { t } = useI18n();
   const fetchedHome = useHomeDir();
   const homeDir = home ?? fetchedHome;
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+
+  // A segment opened while idle should not survive a run that starts underneath it.
+  useEffect(() => {
+    if (busy) setOpenMenu(null);
+  }, [busy]);
 
   const pwdLine = formatPwdLine({ cwd, home: homeDir, branch, sessionName });
   const stats = usage
     ? { tokens: usage.tokens, cost: usage.cost ?? 0, cacheHitRate: latestCacheHitRate(messages) }
     : null;
   const items = usageStats(stats, contextUsage, autoCompactionEnabled);
-  const modelLabel = formatModelLabel({ model, providerCount, thinkingLevel, supportsReasoning });
+  const modelName = formatModelName({ model, providerCount });
+  const thinkingSuffix = formatThinkingSuffix({ thinkingLevel, supportsReasoning });
+  const toolLabel = toolPresetUiValue(toolPreset) === "chat-only" ? t("chat.chatOnly") : toolPresetUiValue(toolPreset);
+
+  const thinkingItems: StatusMenuItem[] = thinkingChoicesFor(availableThinkingLevels).map((level) => {
+    const alias = thinkingLevelAlias(level, thinkingLevelMap);
+    const description = t(THINKING_LEVEL_DESC_KEYS[level]);
+    return {
+      key: level,
+      label: alias ?? level,
+      description: alias ? `(${level}) ${description}` : description,
+      active: (thinkingLevel ?? "auto") === level,
+      onSelect: () => onThinkingLevelChange?.(level),
+    };
+  });
+
+  const toolItems: StatusMenuItem[] = TOOL_PRESET_UI_VALUES.map((value) => ({
+    key: value,
+    label: value === "chat-only" ? t("chat.chatOnly") : value,
+    description: value === "chat-only"
+      ? t("chat.chatOnly")
+      : value === "read-only"
+        ? t("chat.readOnlyTools", { count: 4 })
+        : value === "default"
+          ? t("chat.builtInTools", { count: 4 })
+          : t("chat.allBuiltInTools"),
+    active: toolPresetUiValue(toolPreset) === value,
+    onSelect: () => onToolPresetChange?.(TOOL_PRESET_UI_MAP[value]),
+  }));
 
   if (!pwdLine && items.length === 0) return null;
+
+  let modelSegment: ReactNode = modelName;
+  if (onModelChange) {
+    // Rendered even with an empty option list: the selector itself reports "No models", which is
+    // how a broken models.json surfaces next to the model-error banner.
+    modelSegment = (
+      <ModelSelector
+        variant="status"
+        placement="up"
+        options={modelOptions ?? []}
+        value={model}
+        onChange={onModelChange}
+        disabled={busy}
+        busy={modelSwitching}
+        isAutoSelection={isAutoModelSelection}
+        triggerLabel={model ? modelName : undefined}
+        ariaLabel={modelName}
+      />
+    );
+  }
 
   return (
     <div className="chat-status-bar" role="status" aria-label={t("chat.status")}>
@@ -205,8 +405,35 @@ export function ChatStatusBar({
             );
           })}
         </span>
-        <span className="chat-status-model">{modelLabel}</span>
+        <span className="chat-status-model">
+          {modelSegment}
+          {thinkingSuffix && (
+            onThinkingLevelChange ? (
+              <StatusMenu
+                label={thinkingSuffix}
+                title={t("chat.changeReasoningLabel")}
+                disabled={busy}
+                items={thinkingItems}
+                openKey={openMenu}
+                menuKey="thinking"
+                onOpenChange={setOpenMenu}
+              />
+            ) : <span>{thinkingSuffix}</span>
+          )}
+          {onToolPresetChange && (
+            <StatusMenu
+              label={`tools: ${toolLabel}`}
+              title={t("chat.changeToolPreset")}
+              disabled={busy}
+              items={toolItems}
+              openKey={openMenu}
+              menuKey="tools"
+              onOpenChange={setOpenMenu}
+            />
+          )}
+        </span>
       </div>
     </div>
   );
 }
+
