@@ -2,7 +2,6 @@
 
 import { memo, useState, useRef, useEffect, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
-import { Prism } from "react-syntax-highlighter";
 import { MarkdownBody } from "./MarkdownBody";
 import { ImagePreview } from "./ImagePreview";
 import { CodeBlock } from "./MermaidBlock";
@@ -12,9 +11,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { parseCompactionSummary } from "@/lib/compaction-summary";
 import { getAssistantErrorMessage, getThinkingPreview, isEmptyThinkingBlock } from "@/lib/message-display";
 import { parseUnifiedPatch, type SplitDiffCell } from "@/lib/patch";
-import { isEditToolName } from "@/lib/tool-names";
-import { toolCallDisplay } from "@/lib/tool-schema";
-import { useRequestToolSchemas, useToolParameters } from "@/hooks/useToolSchemas";
+import { codeArgumentOf, isEditToolName } from "@/lib/tool-names";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
 import type { WrittenFile } from "@/lib/turn-written-files";
@@ -1029,19 +1026,11 @@ function ToolCallBlock({ block, result, duration, onOpenSession }: { block: Tool
   const inputStr = getToolCallInputText(block);
   const isStreamingInput = block.rawInput !== undefined;
   const isEditTool = isEditToolName(block.toolName);
-  // A tool may declare one or more of its string arguments as content, with JSON
-  // Schema's `contentMediaType` (see lib/tool-schema.ts). That declaration — and
-  // only that declaration — turns an argument into a highlighted code block.
-  const parameters = useToolParameters(block.toolName);
-  const requestToolSchemas = useRequestToolSchemas();
-  useEffect(() => {
-    // Expanding is the moment the declaration is actually needed: if nobody has
-    // seen this tool's schema yet, ask the host to load the live tool list.
-    if (expanded && !parameters) requestToolSchemas();
-  }, [expanded, parameters, requestToolSchemas]);
-  const display = useMemo(
-    () => toolCallDisplay(block.input, parameters, hasHighlighterLanguage),
-    [block.input, parameters],
+  // A built-in tool of ours (`jun_code`) carries code, not parameters — see
+  // lib/tool-names.ts. Streamed input is partial JSON, so it waits.
+  const codeArgument = useMemo(
+    () => (isStreamingInput ? null : codeArgumentOf(block.toolName, block.input)),
+    [block.toolName, block.input, isStreamingInput],
   );
   const resultDiff = result && !result.isError ? getResultDiff(result) : null;
 
@@ -1111,10 +1100,8 @@ function ToolCallBlock({ block, result, duration, onOpenSession }: { block: Tool
 
       {/* ── Expanded: input args ── */}
       {expanded && (isStreamingInput || !isEditTool) && (
-        display.kind === "code" && !isStreamingInput ? (
-          display.arguments.map((argument) => (
-            <CodeBlock key={argument.key} code={argument.value} lang={argument.language} />
-          ))
+        codeArgument ? (
+          <CodeBlock key={codeArgument.key} code={codeArgument.code} lang={codeArgument.language} />
         ) : (
           <pre
             style={{
@@ -1739,19 +1726,6 @@ function safeJson(value: unknown): string {
 
 export function getToolCallInputText(block: ToolCallContent): string {
   return block.rawInput ?? JSON.stringify(block.input, null, 2);
-}
-
-/**
- * The highlighter's own list of languages, used as the membership test for a
- * declared `contentMediaType`: a language it does not have renders as plain
- * text rather than as a wrong guess.
- */
-const HIGHLIGHTER_LANGUAGES = new Set(
-  (Prism as unknown as { supportedLanguages?: string[] }).supportedLanguages ?? [],
-);
-
-function hasHighlighterLanguage(token: string): boolean {
-  return HIGHLIGHTER_LANGUAGES.has(token);
 }
 
 function formatCustomType(type: string): string {
