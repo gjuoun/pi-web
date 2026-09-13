@@ -1337,27 +1337,32 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
           </div>
         )}
         {chatInputElement}
-        <ChatStatusBar
-          cwd={session?.cwd ?? newSessionCwd}
-          branch={session?.branch ?? null}
-          sessionName={session?.name ?? null}
-          usage={sessionStats}
-          messages={messages}
-          contextUsage={contextUsage}
-          autoCompactionEnabled={autoCompactionEnabled}
-          model={displayModelValue}
-          providerCount={statusProviderCount}
-          thinkingLevel={thinkingLevel}
-          supportsReasoning={(availableThinkingLevels?.length ?? 0) > 0}
-          busy={sessionBusy}
-          modelOptions={statusModelOptions}
-          onModelChange={handleModelChange}
-          modelSwitching={modelSwitching}
-          isAutoModelSelection={isAutoModelSelection}
-          onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
-          availableThinkingLevels={availableThinkingLevels}
-          thinkingLevelMap={currentThinkingLevelMap}
-        />
+        {/* Same horizontal frame as the composer box: the fieldset in ChatInput reserves 16px plus the
+            36px minimap rail on the right (:1499-1510), so a centred 820px box lands 18px left of this
+            column's centre. The footer follows that frame instead of the raw column. */}
+        <div style={{ paddingLeft: 16, paddingRight: isMobile ? 16 : 52 }}>
+          <ChatStatusBar
+            cwd={session?.cwd ?? newSessionCwd}
+            branch={session?.branch ?? null}
+            sessionName={session?.name ?? null}
+            usage={sessionStats}
+            messages={messages}
+            contextUsage={contextUsage}
+            autoCompactionEnabled={autoCompactionEnabled}
+            model={displayModelValue}
+            providerCount={statusProviderCount}
+            thinkingLevel={thinkingLevel}
+            supportsReasoning={(availableThinkingLevels?.length ?? 0) > 0}
+            busy={sessionBusy}
+            modelOptions={statusModelOptions}
+            onModelChange={handleModelChange}
+            modelSwitching={modelSwitching}
+            isAutoModelSelection={isAutoModelSelection}
+            onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
+            availableThinkingLevels={availableThinkingLevels}
+            thinkingLevelMap={currentThinkingLevelMap}
+          />
+        </div>
         <ExtensionStatusBar statuses={extensionStatuses} widgets={extensionWidgets} />
       </div>
       {isEmptyNew && <div className="min-h-0 flex-1" />}
