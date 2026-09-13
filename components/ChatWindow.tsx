@@ -12,6 +12,7 @@ import { MessageView } from "./MessageView";
 import { MarkdownBody } from "./MarkdownBody";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
+import { ChatStatusBar } from "./ChatStatusBar";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
 import { AnsiText } from "./AnsiText";
 import { useI18n } from "@/hooks/useI18n";
@@ -276,7 +277,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     loading, error, messages, activeToolResults, entryIds, historyCursor, hasEarlierMessages, streamState,
     agentRunning, bashRunning, pendingBash, modelNames, modelList, modelError, modelScopeWarnings, modelThinkingLevels, modelThinkingLevelMaps, toolPreset, thinkingLevel,
     retryInfo, contextUsage, forkingEntryId,
-    isCompacting, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
+    isCompacting, autoCompactionEnabled, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
     slashCommands, slashCommandsLoading, queuedMessages,
     notices, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused,
     isAutoModelSelection,
@@ -852,6 +853,12 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     ? (modelThinkingLevels[`${displayModelValue.provider}:${displayModelValue.modelId}`] ?? null)
     : null;
 
+  // pi prefixes the provider on the status bar only while several providers are in play.
+  const statusProviderCount = useMemo(
+    () => new Set((modelList ?? []).map((entry) => entry.provider)).size,
+    [modelList],
+  );
+
   const currentThinkingLevelMap = displayModelValue
     ? (modelThinkingLevelMaps[`${displayModelValue.provider}:${displayModelValue.modelId}`] ?? null)
     : null;
@@ -1333,6 +1340,19 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
           </div>
         )}
         {chatInputElement}
+        <ChatStatusBar
+          cwd={session?.cwd ?? newSessionCwd}
+          branch={session?.branch ?? null}
+          sessionName={session?.name ?? null}
+          usage={sessionStats}
+          messages={messages}
+          contextUsage={contextUsage}
+          autoCompactionEnabled={autoCompactionEnabled}
+          model={displayModelValue}
+          providerCount={statusProviderCount}
+          thinkingLevel={thinkingLevel}
+          supportsReasoning={(availableThinkingLevels?.length ?? 0) > 0}
+        />
         <ExtensionStatusBar statuses={extensionStatuses} widgets={extensionWidgets} />
       </div>
       {isEmptyNew && <div className="min-h-0 flex-1" />}

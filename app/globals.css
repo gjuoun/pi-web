@@ -444,6 +444,37 @@ html.dark .web-login-error {
 }
 
 
+.chat-status-bar {
+  flex-shrink: 0;
+  max-width: var(--chat-content-max-width, 820px);
+  margin: 0 auto;
+  padding: 2px 12px 6px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.chat-status-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 10px;
+  min-width: 0;
+}
+
+.chat-status-stats {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0 5px;
+  min-width: 0;
+}
+
+.chat-status-model {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 .extension-status-shelf {
   display: flex;
   flex-shrink: 0;

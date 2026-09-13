@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import type { SessionInfo } from "@/lib/types";
+import { collapseHomePath } from "@/lib/path-display";
 import { listSessionFamilies } from "@/lib/session-family";
 import { loadExplorerOpen, saveExplorerOpen } from "@/lib/file-explorer-state";
 import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
@@ -200,11 +201,6 @@ function saveUnreadSessionIds(ids: Set<string>): void {
   } catch {
     // ignore storage quota / privacy-mode errors
   }
-}
-
-/** Substitute the home dir prefix with ~ (no path truncation — see PathLabel) */
-function displayCwd(cwd: string, homeDir?: string): string {
-  return (homeDir && cwd.startsWith(homeDir)) ? "~" + cwd.slice(homeDir.length) : cwd;
 }
 
 /**
@@ -1116,7 +1112,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           >
             {selectedCwd ? (
               <PathLabel
-                text={displayCwd(selectedProject?.root ?? selectedCwd, homeDir)}
+                text={collapseHomePath(selectedProject?.root ?? selectedCwd, homeDir)}
                 style={{
                   flex: 1,
                   fontFamily: "var(--font-mono)",
@@ -1235,7 +1231,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                       </svg>
                     )}
                     {project.key !== selectedProject?.key && <span style={{ width: 10, flexShrink: 0 }} />}
-                    <PathLabel text={displayCwd(project.root, homeDir)} style={{ flex: 1 }} />
+                    <PathLabel text={collapseHomePath(project.root, homeDir)} style={{ flex: 1 }} />
                     {showProjectActivity(projectActivity.get(project.key), t)}
                   </button>
                 ))}
@@ -1331,7 +1327,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           const showWtFilter = worktreeState.worktrees.length >= 8;
           const visibleWorktrees = showWtFilter && wtFilter.trim()
             ? worktreeState.worktrees.filter((w) =>
-                (w.branch ?? displayCwd(w.path, homeDir)).toLowerCase().includes(wtFilter.trim().toLowerCase()))
+                (w.branch ?? collapseHomePath(w.path, homeDir)).toLowerCase().includes(wtFilter.trim().toLowerCase()))
             : worktreeState.worktrees;
           return (
             <div ref={wtDropdownRef} style={{ position: "relative", marginTop: 6 }}>
@@ -1363,7 +1359,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                   <path d="M18 9a9 9 0 0 1-9 9" />
                 </svg>
                 <PathLabel
-                  text={currentWorktree ? (currentWorktree.branch ?? displayCwd(currentWorktree.path, homeDir)) : "…"}
+                  text={currentWorktree ? (currentWorktree.branch ?? collapseHomePath(currentWorktree.path, homeDir)) : "…"}
                   style={{ flex: 1, fontFamily: "var(--font-mono)", color: "var(--text)" }}
                 />
                 {currentWorktree?.isMain && (
@@ -1484,7 +1480,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                             ) : (
                               <span style={{ width: 10, flexShrink: 0 }} />
                             )}
-                            <PathLabel text={wt.branch ?? displayCwd(wt.path, homeDir)} style={{ flex: 1 }} />
+                            <PathLabel text={wt.branch ?? collapseHomePath(wt.path, homeDir)} style={{ flex: 1 }} />
                             {wt.isMain && <span style={{ flexShrink: 0, color: "var(--text-dim)", fontSize: 10 }}>{t("sidebar.main")}</span>}
                           </button>
                           {!wt.isMain && (
