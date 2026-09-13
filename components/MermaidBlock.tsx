@@ -297,6 +297,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
           style={{
             margin: 0,
             padding: "11px 13px",
+            fontFamily: "var(--font-mono)",
             fontSize: "calc(12.5px + var(--chat-font-size-offset, 0px))",
             lineHeight: 1.62,
             overflowX: "auto",
@@ -314,6 +315,9 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
           customStyle={{
             margin: 0,
             padding: "11px 13px",
+            // The Prism theme carries its own `fontFamily: Consolas…`, which would put the wrapper and
+            // the line-number gutter on a stack the user cannot change; the code tag alone is not enough.
+            fontFamily: "var(--font-mono)",
             fontSize: "calc(12.5px + var(--chat-font-size-offset, 0px))",
             lineHeight: 1.62,
             borderRadius: 0,

@@ -17,6 +17,7 @@
   --color-tool-bg: var(--tool-bg);
   --color-bg-subtle: var(--bg-subtle);
   --font-mono-font: var(--font-mono);
+  --font-ui-font: var(--font-ui);
 }
 
 :root,
@@ -183,7 +184,7 @@ html, body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-ui);
   font-size: 14px;
   overscroll-behavior: none;
 }
@@ -840,6 +841,11 @@ button.extension-widget-trigger:focus-visible {
 }
 
 :root {
+  /* Both roles are selectable at runtime (Settings → General → Appearance). The user's family is
+     composed onto the front of these stacks by `hooks/useFontPreferences.ts`; keep the values here
+     byte-equal to `UI_FONT_DEFAULT` / `MONO_FONT_DEFAULT` in `lib/fonts.ts`
+     (`components/FontSettings.test.mjs` asserts the parity). */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono: var(--font-noto-mono), 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace, 'PingFang SC', 'Microsoft YaHei', monospace;
 }
 

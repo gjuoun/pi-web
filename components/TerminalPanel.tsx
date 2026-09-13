@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { useI18n } from "@/hooks/useI18n";
+import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { createTerminalWriter, terminalRequest } from "@/lib/terminal-client";
 import type { TerminalEvent } from "@/lib/terminal-manager";
 import type { TerminalTab } from "./terminal-tab-state";
@@ -21,6 +22,8 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
   const { id, cwd, restored } = tab;
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
+  const fitRef = useRef<(() => void) | null>(null);
+  const { monoStack } = useFontPreferences();
   const startRef = useRef<Promise<void>>(Promise.resolve());
   const writerRef = useRef<ReturnType<typeof createTerminalWriter> | null>(null);
   const callbacksRef = useRef({ onClosed, onCloseError });
@@ -88,6 +91,7 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
       if (!container.offsetWidth || !container.offsetHeight) return;
       fit.fit();
     };
+    fitRef.current = fitAndResize;
     const onResize = terminal.onResize(({ cols, rows }) => {
       if (connected && !exited && !inputFailed) writer.resize(cols, rows);
     });
@@ -176,6 +180,15 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
       terminalRef.current = null;
     };
   }, [id, cwd, restored, reconnectKey]);
+
+  // xterm reads the font once at construction, so a later preference change has to be pushed. The
+  // fit call is what re-measures the cell grid against the new glyph metrics.
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (!terminal || terminal.options.fontFamily === monoStack) return;
+    terminal.options.fontFamily = monoStack;
+    fitRef.current?.();
+  }, [monoStack, reconnectKey]);
 
   useEffect(() => {
     if (active) terminalRef.current?.focus();

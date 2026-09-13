@@ -1019,6 +1019,40 @@
   font-size: 12px;
 }
 
+.settings-font-options {
+  margin-top: 12px;
+}
+
+.settings-font-option {
+  width: 100%;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.settings-font-option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-font-input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.settings-font-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 .settings-chat-switch-option {
   display: flex;
   align-items: center;

@@ -14,6 +14,8 @@ import {
   CHAT_CONTENT_FONT_SIZE_MIN,
   useChatAppearance,
 } from "@/hooks/useChatAppearance";
+import { useFontPreferences } from "@/hooks/useFontPreferences";
+import { fontPresets, type FontRole } from "@/lib/fonts";
 import { sendAgentCommand } from "@/lib/agent-client";
 import type { ShellToolSettingsResponse } from "@/lib/api-types";
 import {
@@ -64,10 +66,61 @@ export function SettingsSectionIcon({ section, size = 16, strokeWidth = 1.8 }: {
   return <svg {...common}><path d="M9 7V2M15 7V2M6 13V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5a6 6 0 0 1-12 0ZM12 19v3" /></svg>;
 }
 
+/** One selectable font: a free-text family with the model's presets as datalist suggestions. */
+function FontField({ role, label, value, placeholder, resetLabel, onChange, onReset }: {
+  role: FontRole;
+  label: string;
+  value: string;
+  placeholder: string;
+  resetLabel: string;
+  onChange: (family: string) => void;
+  onReset: () => void;
+}) {
+  const inputId = `settings-${role}-font`;
+  const presetListId = `${inputId}-presets`;
+  return (
+    <div className="settings-font-option">
+      <div className="settings-font-option-header">
+        <label htmlFor={inputId}>{label}</label>
+        <ConfigButton
+          variant="ghost"
+          size="small"
+          className="settings-chat-reset"
+          title={resetLabel}
+          aria-label={resetLabel}
+          disabled={value === ""}
+          onClick={onReset}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" />
+          </svg>
+        </ConfigButton>
+      </div>
+      <input
+        id={inputId}
+        className="settings-font-input"
+        type="text"
+        list={presetListId}
+        value={value}
+        placeholder={placeholder}
+        spellCheck={false}
+        autoComplete="off"
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <datalist id={presetListId}>
+        {fontPresets(role).map((preset) => (
+          <option key={preset.id} value={preset.family} label={preset.label} />
+        ))}
+      </datalist>
+    </div>
+  );
+}
+
 function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, onQuoteSelectionChange, soundEnabled, onSoundToggle }: Pick<Props, "sessionId" | "onSessionReloaded" | "quoteSelectionEnabled" | "onQuoteSelectionChange" | "soundEnabled" | "onSoundToggle">) {
   const { locale, setLocale, supportedLocales, t } = useI18n();
   const { preference, setThemePreference } = useTheme();
   const { width: chatContentWidth, setWidth: setChatContentWidth, fontSize, setFontSize } = useChatAppearance();
+  const { uiFont, monoFont, setUiFont, setMonoFont, resetFont } = useFontPreferences();
   const [shellSettings, setShellSettings] = useState<ShellToolSettingsResponse | null>(null);
   const [shellSaving, setShellSaving] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
@@ -186,6 +239,27 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
               </label>
             );
           })}
+        </div>
+        <p className="settings-general-description">{t("settings.fontHint")}</p>
+        <div className="settings-chat-options settings-font-options">
+          <FontField
+            role="ui"
+            label={t("settings.uiFont")}
+            value={uiFont ?? ""}
+            placeholder={t("settings.fontPlaceholder")}
+            resetLabel={t("settings.resetUiFont")}
+            onChange={setUiFont}
+            onReset={() => resetFont("ui")}
+          />
+          <FontField
+            role="mono"
+            label={t("settings.monoFont")}
+            value={monoFont ?? ""}
+            placeholder={t("settings.fontPlaceholder")}
+            resetLabel={t("settings.resetMonoFont")}
+            onChange={setMonoFont}
+            onReset={() => resetFont("mono")}
+          />
         </div>
       </section>
 
