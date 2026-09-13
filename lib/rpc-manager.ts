@@ -7,11 +7,6 @@ import { resolve } from "path";
 import { validateAgentImages } from "./image-attachments";
 import { invalidateModelsCache } from "./models-cache";
 import { resolveVisibleModels, selectInitialModelScope } from "./model-scope";
-import {
-  createProjectCommandBashExtension,
-  createProjectCommandBashOperations,
-  preferUserBashExtension,
-} from "./project-command-env";
 import { cacheSessionPath, getLatestModelChange, invalidateSessionListCache, resolveSessionPath } from "./session-reader";
 import { getProjectTrustStatus, projectTrustReloadOptions } from "./project-trust";
 import { persistExplicitStartupPreferences } from "./startup-preferences";
@@ -958,9 +953,6 @@ export class AgentSessionWrapper {
           undefined,
           {
             excludeFromContext: command.excludeFromContext as boolean | undefined,
-            operations: createProjectCommandBashOperations({
-              shellPath: this.inner.settingsManager.getShellPath(),
-            }),
           },
         );
         try {
@@ -1921,17 +1913,13 @@ export async function startRpcSession(
           }
         : {
             extensionFactories: [
-              createProjectCommandBashExtension({
-                cwd: sessionCwd,
-                settings: settingsManager,
-              }),
               createSubagentExtension(
                 SUBAGENT_CONTROLLER.extensionRuntime,
                 () => listSubagentProfiles(sessionCwd),
                 isBuiltInSubagentsEnabled,
               ),
             ],
-            extensionsOverride: (base) => preferUserBashExtension(preferPiWebSubagentExtension(base)),
+            extensionsOverride: (base) => preferPiWebSubagentExtension(base),
           },
       ...(trustReloadOptions ? { resourceLoaderReloadOptions: trustReloadOptions } : {}),
     });
@@ -1975,17 +1963,9 @@ export async function startRpcSession(
       ...(subagentResources ? { excludeTools: [...SUBAGENT_CONTROL_TOOL_NAMES] } : {}),
     });
 
-    // pi decides which built-ins are active: `defaultTools` from settings, else the SDK default.
-    // The project-command bash tool is registered as an *extension* tool, so the SDK activates it
-    // regardless of that setting — strip it when pi's configuration leaves bash out, so a pi-web
-    // session has the same tool surface as the `pi` CLI (subagents pin their own list already).
-    if (!subagentResources) {
-      const configuredTools = settingsManager.getDefaultTools();
-      const active = inner.getActiveToolNames();
-      if (configuredTools && !configuredTools.includes("bash") && active.includes("bash")) {
-        inner.setActiveToolsByName(active.filter((name) => name !== "bash"));
-      }
-    }
+    // pi's own bash tool is used as-is; a normal session's active set comes straight from
+    // `defaultTools` (pi-web no longer registers a same-named tool, which used to be activated
+    // regardless of that setting).
 
     const persistedPreferences = await persistExplicitStartupPreferences(
       services.settingsManager,
