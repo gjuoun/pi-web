@@ -1975,6 +1975,18 @@ export async function startRpcSession(
       ...(subagentResources ? { excludeTools: [...SUBAGENT_CONTROL_TOOL_NAMES] } : {}),
     });
 
+    // pi decides which built-ins are active: `defaultTools` from settings, else the SDK default.
+    // The project-command bash tool is registered as an *extension* tool, so the SDK activates it
+    // regardless of that setting — strip it when pi's configuration leaves bash out, so a pi-web
+    // session has the same tool surface as the `pi` CLI (subagents pin their own list already).
+    if (!subagentResources) {
+      const configuredTools = settingsManager.getDefaultTools();
+      const active = inner.getActiveToolNames();
+      if (configuredTools && !configuredTools.includes("bash") && active.includes("bash")) {
+        inner.setActiveToolsByName(active.filter((name) => name !== "bash"));
+      }
+    }
+
     const persistedPreferences = await persistExplicitStartupPreferences(
       services.settingsManager,
       {
