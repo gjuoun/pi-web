@@ -128,11 +128,19 @@ agent_start ──────────────────────�
 line 3 continuing to come from `ExtensionStatusBar`. No composer markup changes, no control moves,
 so no control is duplicated yet.
 
-**Iteration 2 (see `TODO.md`):** slim the composer to two icons, delete its toolbar, then land the
-clickable control segments (`(provider) model • level`, tools preset, context→compact) in the status
-bar and move the sound toggle into Settings → Chat.
+**Iteration 2 (landed 2026-09-13):** the composer is down to `[attach] [textarea] [send/stop]`, its
+whole toolbar is gone, and the model / reasoning / tools controls now live as clickable status-bar
+segments (disabled rather than hidden while a run is in flight). The completion-sound toggle moved to
+Settings → General. Two corrections against the original sketch:
 
-### Known gaps carried by iteration 1
+- **The context segment stays display-only** — clicking it does not compact; `/compact` is the only
+  entry point (plus `auto`).
+- **Plain Enter queues a *steering* message, not a follow-up.** pi's TUI does the same
+  (`interactive-mode.js:2535` passes `streamingBehavior: "steer"`; `:3398` passes `"followUp"` for
+  Alt+Enter, and `docs/usage.md:63-70` documents both as queues). The composer therefore hints
+  `Enter queues a steer · Alt+Enter queues a follow-up · Esc aborts` instead of showing two buttons.
+
+### Known gaps carried forward
 
 - No ` (sub)` suffix: pi appends it when the model runtime reports a subscription, and pi-web has no
   equivalent signal.
@@ -140,6 +148,8 @@ bar and move the sound toggle into Settings → Chat.
   `getAvailableProviderCount()`.
 - `(auto)` comes from `autoCompactionEnabled`, which `get_state` already returns but the client had
   never consumed.
+- The status bar shows the raw model id (pi's shape) while the model *menu* still lists display names,
+  which is why `ModelSelector` grew a `status` variant with a `triggerLabel` override.
 
 ## Verification
 
