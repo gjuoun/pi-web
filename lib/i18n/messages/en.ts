@@ -361,6 +361,7 @@ export const enLocale: LocalePlugin = {
     "chat.modelError": "Model error",
     "chat.modelScopeWarning": "Model scope warning",
     "chat.modelScopeWarnings": "Model scope warnings",
+    "chat.status": "Session status",
     "chat.send": "Send",
     "chat.askSelection": "Ask about selected text",
     "chat.askInCurrent": "Ask here",

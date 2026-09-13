@@ -361,6 +361,7 @@ export const zhTWLocale: LocalePlugin = {
     "chat.modelError": "模型錯誤",
     "chat.modelScopeWarning": "模型範圍警告",
     "chat.modelScopeWarnings": "模型範圍警告",
+    "chat.status": "工作階段狀態",
     "chat.send": "傳送",
     "chat.askSelection": "詢問選取的文字",
     "chat.askInCurrent": "在目前對話詢問",

@@ -76,6 +76,7 @@ type AgentStateResponse = {
   isPromptRunning?: boolean;
   isBashRunning?: boolean;
   isCompacting?: boolean;
+  autoCompactionEnabled?: boolean;
   extensionStatuses?: ExtensionStatusItem[];
   extensionWidgets?: ExtensionWidgetItem[];
   queuedMessages?: { steering?: string[]; followUp?: string[] } | null;
@@ -314,6 +315,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [pendingModel, setPendingModel] = useState<{ provider: string; modelId: string } | null>(null);
   const [modelSwitching, setModelSwitching] = useState(false);
   const [isCompacting, setIsCompacting] = useState(false);
+  const [autoCompactionEnabled, setAutoCompactionEnabled] = useState(true);
   const [compactError, setCompactError] = useState<string | null>(null);
   const [compactResult, setCompactResult] = useState<CompactResultInfo | null>(null);
   const [agentPhase, setAgentPhase] = useState<AgentPhase>(null);
@@ -407,10 +409,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     : currentModel ?? (data?.context.messages.length === 0 ? newSessionDefaultModel : null);
   const composerDraftKey = session?.id ?? newSessionDraftKey ?? undefined;
 
+  // Called on every server state snapshot. Besides the live model it mirrors the
+  // auto-compaction flag the status bar renders as `(auto)`; `get_state` always
+  // returns it, so leaving it alone while absent only covers pre-fetch renders.
   const syncLiveModel = useCallback((state?: AgentStateResponse) => {
     setLiveModel(state?.model
       ? { provider: state.model.provider, modelId: state.model.id }
       : null);
+    if (state?.autoCompactionEnabled !== undefined) {
+      setAutoCompactionEnabled(state.autoCompactionEnabled);
+    }
   }, []);
 
   const resolveComposerDraftKey = useCallback((key: string | undefined) => {
@@ -2168,7 +2176,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     data, loading, error, activeLeafId, messages, activeToolResults, entryIds, historyCursor, hasEarlierMessages, streamState,
     agentRunning, modelNames, modelList, modelError, modelScopeWarnings, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
     retryInfo, contextUsage, systemPrompt, forkingEntryId,
-    isCompacting, compactError, compactResult, currentModel, displayModel, modelSwitching, sessionStats,
+    isCompacting, autoCompactionEnabled, compactError, compactResult, currentModel, displayModel, modelSwitching, sessionStats,
     slashCommands, slashCommandsLoading, queuedMessages,
     notices: noticeState.visible, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput,
     isAutoModelSelection: isNew && newSessionModel === null,
