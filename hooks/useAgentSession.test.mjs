@@ -116,32 +116,16 @@ test("new-session promotion rekeys drafts before publishing the real session", (
   assert.match(chatWindowSource, /draftKey=\{session\?\.id \?\? newSessionDraftKey \?\? undefined\}/);
 });
 
-test("fresh sessions use the preference while persisted and live sessions restore their selection", () => {
-  const preferenceSource = source.slice(
-    source.indexOf("  const setToolPresetState"),
-    source.indexOf("  const scrollToBottom"),
-  );
+test("tool panels load live tools without deriving a preset", () => {
   const loadToolsSource = source.slice(
     source.indexOf("  const loadTools = useCallback"),
     source.indexOf("  const promoteNewSession"),
   );
-  const changeSource = source.slice(
-    source.indexOf("  const handleToolPresetChange = useCallback"),
-    source.indexOf("  const scrollUserMsgToTop"),
-  );
 
-  assert.match(
-    preferenceSource,
-    /const existingSessionId = session\?\.id;[\s\S]*?useLayoutEffect\(\(\) => \{\s*if \(!existingSessionId && \(!isNew \|\| sessionIdRef\.current\)\) return;\s*setToolPresetState\(getPreferredToolPreset\(\)\)/,
-  );
-  assert.match(source, /if \(agentState\?\.running\) \{\s*loadTools\(session\.id\)/);
-  assert.match(source, /d\.toolNames !== undefined \? getPresetFromToolNames\(d\.toolNames\) : "default"/);
-  assert.match(changeSource, /setPreferredToolPreset\(preset\)/);
-  assert.match(changeSource, /\(sid, \{ type: "set_tools", toolNames \}\)/);
-  assert.match(changeSource, /activeSessionId !== sid \|\| result\?\.recreated/);
-  assert.match(changeSource, /result\?\.recreated[\s\S]*?maintainEventsConnected\(activeSessionId\)/);
-  assert.match(changeSource, /sessionIdRef\.current = activeSessionId/);
-  assert.doesNotMatch(loadToolsSource, /setPreferredToolPreset/);
+  // The Tools panel still reads the live tool list; nothing infers a named preset from it.
+  assert.match(loadToolsSource, /sendAgentCommand<ToolEntry\[\]>\(sid, \{ type: "get_tools" \}\)/);
+  assert.match(loadToolsSource, /onSystemToolsChange\?\.\(tools\)/);
+  assert.doesNotMatch(source, /toolPreset|getPresetFromToolNames|getPresetFromTools|getToolNamesForPreset|setToolPresetState|setPreferredToolPreset|set_tools/);
 });
 
 test("first user messages expose both branch actions and edit before their own entry", () => {
@@ -172,7 +156,7 @@ test("the selector prefers the live wrapper model over persisted response metada
   assert.match(source, /syncLiveModel\(state\);[\s\S]*?const busy = data\.running/);
 });
 
-test("existing-session prompts rely on the persisted tool selection", () => {
+test("prompts never carry a tool selection", () => {
   const sendSource = source.slice(
     source.indexOf("  const handleSend = useCallback"),
     source.indexOf("  const executeBash = useCallback"),
@@ -181,7 +165,7 @@ test("existing-session prompts rely on the persisted tool selection", () => {
 
   assert.match(existingSessionPrompt, /type: "prompt",\s*message,/);
   assert.doesNotMatch(existingSessionPrompt, /toolNames:/);
-  assert.doesNotMatch(sendSource, /restoreSubmission, toolPreset\]\);/);
+  assert.doesNotMatch(source, /toolNames:/);
 });
 
 test("submission recovery updates live refs before a possible session rekey", () => {

@@ -159,8 +159,6 @@ test("renders both lines with the model segments on the right", () => {
     modelOptions: [{ provider: "ollama-cloud", modelId: "deepseek-v4.1-flash", name: "DeepSeek V4.1 Flash" }],
     onModelChange() {},
     onThinkingLevelChange() {},
-    toolPreset: "read-only",
-    onToolPresetChange() {},
   });
 
   assert.match(html, /~/);
@@ -175,7 +173,6 @@ test("renders both lines with the model segments on the right", () => {
   assert.match(html, /\(ollama-cloud\) deepseek-v4\.1-flash/);
   assert.doesNotMatch(html, /DeepSeek V4\.1 Flash/);
   assert.match(html, /• low/);
-  assert.match(html, /tools: read-only/);
   assert.match(html, /class="chat-status-model"/);
   assert.match(html, /role="status"/);
 });
@@ -192,15 +189,12 @@ test("keeps the model selector visible when a model error leaves no options", ()
   assert.match(html, /title="No available models"/);
 });
 
-test("labels the tools segment with the active preset", () => {
-  assert.match(
-    renderBar({ cwd: "/tmp/work", toolPreset: "read-only", onToolPresetChange() {} }),
-    /tools: read-only/,
-  );
+test("renders no tools segment", () => {
+  const html = renderBar({ cwd: "/tmp/work" });
 
-  const chatOnly = renderBar({ cwd: "/tmp/work", toolPreset: "none", onToolPresetChange() {} });
-  assert.match(chatOnly, /tools: Chat only/);
-  assert.match(chatOnly, /aria-label="Change tool preset"/);
+  assert.doesNotMatch(html, /tools:/i);
+  assert.doesNotMatch(html, /Change tool preset/);
+  assert.doesNotMatch(html, /Chat only/);
 });
 
 test("shows and locks the optimistic model while a switch is pending", () => {
@@ -231,12 +225,10 @@ test("disables every segment while the agent is running", () => {
     thinkingLevel: "low",
     supportsReasoning: true,
     onThinkingLevelChange() {},
-    toolPreset: "default",
-    onToolPresetChange() {},
   });
 
-  // model + reasoning + tools
-  assert.equal((html.match(/disabled=""/g) ?? []).length, 3);
+  // model + reasoning
+  assert.equal((html.match(/disabled=""/g) ?? []).length, 2);
 });
 
 test("renders nothing when there is neither a cwd nor usage data", () => {

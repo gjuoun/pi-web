@@ -4,9 +4,9 @@ Pi Web's integrated sub-agent implementation is an inline, hidden extension.
 It is disabled by default and controlled by the global
 `~/.pi/agent/agents/settings.json` setting `builtInEnabled`.
 
-The inline extension factory remains installed in every ordinary, non-Chat-only
-resource loader so an AgentSession reload can enable or disable its tools without
-recreating the wrapper. When disabled, the factory registers no tools. A runtime
+The inline extension factory remains installed in every ordinary resource loader (a subagent profile
+that pins its own resources may opt out) so an AgentSession reload can enable or disable its tools
+without recreating the wrapper. When disabled, the factory registers no tools. A runtime
 guard also rejects stale `Agent` calls after the setting is turned off but before
 the parent session is reloaded.
 

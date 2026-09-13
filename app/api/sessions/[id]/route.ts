@@ -20,7 +20,6 @@ import { computeSessionTotalActiveMs } from "@/lib/session-timing";
 import { computeSessionStats } from "@/lib/session-stats";
 import type { SessionEntry } from "@/lib/types";
 import { readSubagentRun, readSubagentSessionResources, SUBAGENT_META_TYPE } from "@/lib/subagents";
-import { readSessionToolSelection } from "@/lib/session-tool-selection";
 import { jsonResponse } from "@/lib/json-response";
 
 export async function GET(
@@ -70,8 +69,9 @@ export async function GET(
     const subagent = header
       ? readSubagentRun(entries as never, header.id, filePath)
       : null;
-    const toolNames = readSubagentSessionResources(entries as never)?.tools
-      ?? readSessionToolSelection(entries as never);
+    // Only a subagent's profile-frozen tool list is reported here; normal sessions have no
+    // pi-web tool policy any more.
+    const toolNames = readSubagentSessionResources(entries as never)?.tools;
     const info = header ? (await attachSessionProjectInfo([{
       path: filePath,
       id: header.id,

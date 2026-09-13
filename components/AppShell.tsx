@@ -52,12 +52,11 @@ import {
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MIN_WIDTH,
 } from "@/lib/panel-layout";
-import type { BlockingExtensionUiRequest, SessionInfo, SessionTreeNode } from "@/lib/types";
+import type { BlockingExtensionUiRequest, SessionInfo, SessionTreeNode, ToolEntry } from "@/lib/types";
 import type { ProjectTrustStatus } from "@/lib/api-types";
 import type { ChatInputHandle } from "./ChatInput";
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import type { FileViewerState } from "@/lib/file-viewer-state";
-import type { ToolEntry } from "@/lib/tool-presets";
 import { getSessionFamily } from "@/lib/session-family";
 import { getLastSettingsSection, type SettingsSection } from "@/lib/settings-navigation";
 

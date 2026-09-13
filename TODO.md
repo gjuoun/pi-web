@@ -29,8 +29,6 @@ Spec: `docs/plan/2026-09-13/pi-native-composer-status-bar/spec.md`
       models API ever exposes it.
 - [ ] Extension widgets render between line 2 and line 3 (they belong to `ExtensionStatusBar`), so the
       visual order is `line 1, line 2, widgets, line 3`. Revisit if the gap shows in practice.
-- [ ] Tool-preset segment label uses the raw preset value (`read-only`, `default`, `full`) with
-      `chat.chatOnly` as the localised exception. Make the whole set localised if it ever bothers.
 
 ## Dev-server staleness (found 2026-09-13)
 
