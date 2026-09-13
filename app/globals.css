@@ -508,7 +508,9 @@ html.dark .web-login-error {
   flex-shrink: 0;
   max-width: var(--chat-content-max-width, 820px);
   margin: 0 auto;
-  padding: 2px 12px 6px;
+  /* 15px = the composer box's inner inset (1px border + 14px padding), so the footer text starts
+     on the attach icon and ends on the send icon instead of drifting inside the box. */
+  padding: 2px 15px 6px;
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 11px;
