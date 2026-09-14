@@ -363,15 +363,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     eventConnectionRef.current = new AgentEventConnection({
       createSource: (sid) => new EventSource(`/api/agent/${encodeURIComponent(sid)}/events`),
       onEvent: (event) => handleAgentEventRef.current?.(event as AgentEvent),
-      shouldMaintain: (sid) => (
-        sessionHookMountedRef.current
-        && sessionIdRef.current === sid
-        && (
-          agentRunningRef.current
-          || eventStreamGraceActiveRef.current
-          || sessionPropIdRef.current === sid
-        )
-      ),
+      // No `shouldMaintain` predicate: demand is the holder registered by the effect below.
+      // A predicate reading another effect's flag is what made StrictMode's remount close the
+      // stream for good in development (see AGENTS.md, "Event stream ownership").
       readinessTimeoutMs: EVENT_STREAM_READY_TIMEOUT_MS,
       reconnectDelayMs: EVENT_STREAM_RECONNECT_DELAY_MS,
       onUnexpectedError: (error) => {
@@ -709,28 +703,22 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, []);
 
-  const closeEvents = useCallback(() => {
-    eventConnectionRef.current?.close();
+  const closeEvents = useCallback((sid?: string) => {
+    eventConnectionRef.current?.close(sid);
   }, []);
 
   const ensureEventsConnected = useCallback((sid: string) => (
     eventConnectionRef.current!.ensureConnected(sid)
   ), []);
 
-  const maintainEventsConnected = useCallback((sid: string) => {
-    eventConnectionRef.current!.maintain(sid);
-  }, []);
-
-  // Keep the selected session warm even while its agent is idle. The SSE lease
-  // is renewed separately below and expires if the browser disappears.
+  // The selected session owns its event stream for as long as it is selected: one effect, one
+  // holder, released on cleanup. Acquire/release is refcounted and idempotent, so StrictMode's
+  // acquire → release → acquire is churn the manager absorbs instead of a permanent close.
   useEffect(() => {
     const sid = session?.id;
     if (!sid) return;
-    maintainEventsConnected(sid);
-    return () => {
-      if (sessionIdRef.current === sid) eventConnectionRef.current?.close();
-    };
-  }, [maintainEventsConnected, session?.id]);
+    return eventConnectionRef.current!.acquire(sid);
+  }, [session?.id]);
 
   useEffect(() => {
     const sid = session?.id;
@@ -754,8 +742,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           && sessionIdRef.current === sid
           && sessionPropIdRef.current === sid
         ) {
-          closeEvents();
-          maintainEventsConnected(sid);
+          closeEvents(sid);
+          void ensureEventsConnected(sid).catch(() => { /* the holder retries */ });
         }
       } catch {
         // Retry on the next interval; the SSE connection remains the primary path.
@@ -774,7 +762,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [closeEvents, maintainEventsConnected, session?.id]);
+  }, [closeEvents, ensureEventsConnected, session?.id]);
 
   const respondToExtensionUi = useCallback(async (
     request: ExtensionUiDialogRequest,
@@ -940,7 +928,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
         eventStreamGraceActiveRef.current = false;
         eventStreamGraceTimerRef.current = null;
-        closeEvents();
+        closeEvents(sid);
       } catch {
         // Keep the stream alive while state cannot be verified.
         if (
@@ -1471,12 +1459,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         return;
       }
       agentRunningRef.current = false;
-      closeEvents();
+      // No session id means this submission never reached one; any live stream belongs to the
+      // selected session and its holder, so it is not this branch's to close.
       setAgentRunning(false);
       setAgentPhase(null);
       dispatch({ type: "end" });
     }
-  }, [isNew, newSessionCwd, newSessionModel, session, ensureNewSession, ensureEventsConnected, promoteNewSession, waitForPromptSettlement, addNotice, cancelEventStreamGrace, closeEvents, composerDraftKey, reconcileAgentState, restoreSubmission]);
+  }, [isNew, newSessionCwd, newSessionModel, session, ensureNewSession, ensureEventsConnected, promoteNewSession, waitForPromptSettlement, addNotice, cancelEventStreamGrace, composerDraftKey, reconcileAgentState, restoreSubmission]);
 
   const executeBash = useCallback(async (command: string, excludeFromContext: boolean) => {
     if (agentRunningRef.current || bashRunningRef.current) return;
@@ -2001,7 +1990,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       bashRecoveryIdRef.current += 1;
       cancelEventStreamGrace();
-      closeEvents();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
