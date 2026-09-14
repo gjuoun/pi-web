@@ -48,7 +48,7 @@ test("matches response model aliases and otherwise includes the provider", () =>
   assert.equal(getModelDisplayName("gateway", "unknown-model", names), "gateway/unknown-model");
 });
 
-test("previews the first thinking line and reveals the full text with the saved default", () => {
+test("shows the newest thinking line while collapsed and the full text when expanded", () => {
   const previousWindow = globalThis.window;
   try {
     for (const expanded of [false, true]) {
@@ -63,15 +63,26 @@ test("previews the first thinking line and reveals the full text with the saved 
         }),
       ));
       assert.match(html, new RegExp(`aria-expanded="${expanded}"`));
-      assert.equal((html.match(/>[^<]*Independent reasoning[^<]*</g) ?? []).length, 1);
-      assert.equal(html.includes("Detailed second line."), expanded);
-      assert.match(html, /aria-label="Thinking: /);
+      // The chip reports the line the model is on now, not the one it started with.
+      assert.match(html, /aria-label="Thinking: Detailed second line\."/);
+      assert.equal(html.includes("Independent reasoning"), expanded);
+      assert.equal((html.match(/>[^<]*Detailed second line\.[^<]*</g) ?? []).length, 1);
       assert.match(html, /3s/);
     }
   } finally {
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;
   }
+});
+
+test("pins the collapsed chip to the newest characters instead of the first", async () => {
+  const source = await readFile(new URL("./MessageView.tsx", import.meta.url), "utf8");
+
+  // A one-line chip cannot wrap, so the head has to overflow and be clipped while its end stays in
+  // view — that is what makes a streaming block read as motion rather than a frozen first line.
+  assert.match(source, /element\.scrollLeft = element\.scrollWidth/);
+  assert.match(source, /ref=\{tailRef\} style=\{\{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" \}\}/);
+  assert.match(source, /const tail = getThinkingTail\(block\.thinking\) \|\| preview;/);
 });
 
 test("shows deferred thinking previews without loading the full content", () => {
