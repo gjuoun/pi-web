@@ -24,10 +24,14 @@ test("uses a compact narrow-mobile toolbar with a floating action layer", () => 
   }
 });
 
-test("only renders the Agents switcher when the active session family has subagents", () => {
+test("renders one Agents switcher, for sessions on disk and for runs not attached yet", () => {
   assert.match(source, /const hasSubagentSessions = Boolean\(activeSessionFamily\?\.subagents\.length\)/);
-  assert.match(source, /\{hasSubagentSessions && \(\s*<button[\s\S]*?toggleTopPanel\("agents", mobile\)/);
-  assert.match(source, /activeTopPanel === "agents" && activeSessionFamily && selectedSession/);
+  assert.match(source, /const hasAgentSurface = hasSubagentSessions \|\| piSubagentRuns\.length > 0/);
+  assert.match(source, /\{hasAgentSurface && \(\s*<button[\s\S]*?toggleTopPanel\("agents", mobile\)/);
+  assert.match(source, /activeTopPanel === "agents" && selectedSession/);
+  // The duplicated package tab is gone: one sub-agent surface only (docs/adr/0006).
+  assert.doesNotMatch(source, /pi-subagents"/);
+  assert.doesNotMatch(source, /PiSubagentsRunsPanel/);
 });
 
 test("keeps the Agents panel open while switching sessions and positions it at the left", () => {

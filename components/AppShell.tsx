@@ -15,7 +15,8 @@ import { BranchNavigator, hasSessionBranches } from "./BranchNavigator";
 import { SystemPromptPanel } from "./SystemPromptPanel";
 import { ToolDefinitionsPanel } from "./ToolDefinitionsPanel";
 import { AgentSessionPanel } from "./AgentSessionPanel";
-import { PiSubagentsRunsPanel } from "./PiSubagentsRunsPanel";
+// Type-only: the bridge reaches the pi SDK, which must never enter the browser bundle.
+import type { PiSubagentRun } from "@/lib/pi-subagents-bridge";
 import { TerminalPanel } from "./TerminalPanel";
 import { newTerminalTab, restoreTerminalTabs, TERMINAL_TABS_KEY, type TerminalTab } from "./terminal-tab-state";
 import { useTheme } from "@/hooks/useTheme";
@@ -69,8 +70,8 @@ type AutoNameStatus =
   | { kind: "error"; message: string };
 
 const TOP_BAR_ICON_BUTTON_SIZE = 36;
-/** The top-bar dropdowns. `pi-subagents` is the sibling of `agents` that lists runs on the package. */
-type TopPanelId = "agents" | "branches" | "system" | "tools" | "session" | "pi-subagents";
+/** The top-bar dropdowns. `agents` is the one sub-agent surface (docs/adr/0006). */
+type TopPanelId = "agents" | "branches" | "system" | "tools" | "session";
 const AGENT_PANEL_WIDTH = 420;
 
 function parkedNewSessionDraftKey(cwd: string): string {
@@ -139,14 +140,14 @@ export function AppShell() {
   const hasSubagentSessions = Boolean(activeSessionFamily?.subagents.length);
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
   /**
-   * Badge for the package-runs tab. The panel fetches the same route when it is open; the tab needs
-   * the count while it is closed, so this polls lightly for the selected session only.
+   * The single Agents tab's live feed: runs of the `pi-subagents` engine for the selected session
+   * (docs/adr/0006). Polled while the tab is closed too, because the badge needs the count.
    */
-  const [piSubagentRuns, setPiSubagentRuns] = useState<{ total: number; running: number }>({ total: 0, running: 0 });
+  const [piSubagentRuns, setPiSubagentRuns] = useState<readonly PiSubagentRun[]>([]);
   const piSubagentSessionId = selectedSession?.id;
   useEffect(() => {
     if (!piSubagentSessionId) {
-      setPiSubagentRuns({ total: 0, running: 0 });
+      setPiSubagentRuns([]);
       return;
     }
     let cancelled = false;
@@ -158,19 +159,22 @@ export function AppShell() {
           signal: controller.signal,
         });
         if (!response.ok) return;
-        const data = await response.json() as { runs?: Array<{ status?: string }> };
-        const runs = Array.isArray(data.runs) ? data.runs : [];
+        const data = await response.json() as { runs?: PiSubagentRun[] };
         if (cancelled) return;
-        setPiSubagentRuns({
-          total: runs.length,
-          running: runs.filter((run) => run.status === "running" || run.status === "starting" || run.status === "steered").length,
-        });
+        setPiSubagentRuns(Array.isArray(data.runs) ? data.runs : []);
       } catch { /* keep the previous count; the next tick retries */ }
     };
     void load();
     const timer = setInterval(() => { void load(); }, 3000);
     return () => { cancelled = true; controller.abort(); clearInterval(timer); };
   }, [piSubagentSessionId]);
+  const runningPiSubagentRuns = piSubagentRuns.filter((run) =>
+    run.status === "running" || run.status === "starting" || run.status === "steered").length;
+  // A run the bridge has not attached yet has no session on disk, so the tab must count it too.
+  const pendingPiSubagentRuns = piSubagentRuns.filter((run) => !run.childSessionId).length;
+  const agentTabCount = (activeSessionFamily?.subagents.length ?? 0) + pendingPiSubagentRuns;
+  const hasAgentSurface = hasSubagentSessions || piSubagentRuns.length > 0;
+
   const handleRunningSessionIdsChange = useCallback((ids: Set<string>) => {
     setRunningSessionIds((previous) => {
       if (previous.size === ids.size && [...ids].every((id) => previous.has(id))) return previous;
@@ -357,10 +361,10 @@ export function AppShell() {
   }, [sessionHasBranches]);
 
   useEffect(() => {
-    if (!hasSubagentSessions) {
+    if (!hasAgentSurface) {
       setActiveTopPanel((panel) => panel === "agents" ? null : panel);
     }
-  }, [hasSubagentSessions]);
+  }, [hasAgentSurface]);
 
   const toggleTopPanel = useCallback((
     panel: TopPanelId,
@@ -813,17 +817,6 @@ export function AppShell() {
       })
       .catch(() => {});
   }, []);
-
-  const handleOpenSession = useCallback(async (sessionId: string) => {
-    try {
-      const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, { cache: "no-store" });
-      const data = await response.json() as { info?: SessionInfo; error?: string };
-      if (!response.ok || !data.info) throw new Error(data.error ?? `HTTP ${response.status}`);
-      handleSelectSession(data.info);
-    } catch (error) {
-      console.error("[pi-web] failed to open session:", error instanceof Error ? error.message : error);
-    }
-  }, [handleSelectSession]);
 
   // Called by ChatWindow when a new session gets its real id from pi
   const handleSessionCreated = useCallback((session: SessionInfo, sourceDraftKey: string) => {
@@ -1387,7 +1380,7 @@ export function AppShell() {
             </button>
           );
         })()}
-        {hasSubagentSessions && (
+        {hasAgentSurface && (
           <button
             type="button"
             onClick={() => toggleTopPanel("agents", mobile)}
@@ -1407,6 +1400,7 @@ export function AppShell() {
               cursor: "pointer", flexShrink: 0, fontSize: 11, whiteSpace: "nowrap",
               transition: "color 0.1s, background 0.1s",
             }}
+            data-top-panel="agents"
             data-mobile-toolbar-action={mobile ? "agents" : undefined}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1417,62 +1411,17 @@ export function AppShell() {
               aria-hidden="true"
               style={{
                 minWidth: 15, height: 15, padding: "0 4px", display: "grid", placeItems: "center",
-                borderRadius: 7, background: "var(--bg-selected)", color: "var(--accent)",
+                borderRadius: 7,
+                background: runningPiSubagentRuns > 0 ? "var(--accent)" : "var(--bg-selected)",
+                color: runningPiSubagentRuns > 0 ? "var(--bg-panel)" : "var(--accent)",
                 fontSize: 10, lineHeight: 1, fontVariantNumeric: "tabular-nums",
                 ...(mobile ? { position: "absolute", top: 2, right: 2, minWidth: 13, height: 13, padding: "0 3px", fontSize: 9 } : {}),
               }}
             >
-              {activeSessionFamily!.subagents.length}
+              {agentTabCount}
             </span>
           </button>
         )}
-        {/*
-          The second Agents surface: runs started on the `pi-subagents` package (see
-          docs/adr/0003). Unlike the toggle above it is always rendered, because "the engine is not
-          enabled in this session" is a state worth being able to open and read.
-        */}
-        <button
-          type="button"
-          onClick={() => toggleTopPanel("pi-subagents", mobile)}
-          title={translate("piSubagents.title")}
-          aria-label={translate("piSubagents.title")}
-          aria-pressed={activeTopPanel === "pi-subagents"}
-          data-top-panel="pi-subagents"
-          data-mobile-toolbar-action={mobile ? "pi-subagents" : undefined}
-          style={{
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            width: mobile ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
-            height: "100%", padding: mobile ? 0 : "0 12px",
-            background: activeTopPanel === "pi-subagents" ? "var(--bg-selected)" : "none",
-            border: "none",
-            borderTop: activeTopPanel === "pi-subagents" ? "2px solid var(--accent)" : "2px solid transparent",
-            borderRight: "1px solid var(--border)",
-            color: activeTopPanel === "pi-subagents" ? "var(--text)" : "var(--text-muted)",
-            cursor: "pointer", flexShrink: 0, fontSize: 11, whiteSpace: "nowrap",
-            transition: "color 0.1s, background 0.1s",
-          }}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" />
-          </svg>
-          {!mobile && <span>{translate("piSubagents.title")}</span>}
-          {piSubagentRuns.total > 0 && (
-            <span
-              data-testid="pi-subagents-badge"
-              aria-hidden="true"
-              style={{
-                minWidth: 15, height: 15, padding: "0 4px", display: "grid", placeItems: "center",
-                borderRadius: 7,
-                background: piSubagentRuns.running > 0 ? "var(--accent)" : "var(--bg-selected)",
-                color: piSubagentRuns.running > 0 ? "var(--bg-panel)" : "var(--accent)",
-                fontSize: 10, lineHeight: 1, fontVariantNumeric: "tabular-nums",
-                ...(mobile ? { position: "absolute", top: 2, right: 2, minWidth: 13, height: 13, padding: "0 3px", fontSize: 9 } : {}),
-              }}
-            >
-              {piSubagentRuns.total}
-            </span>
-          )}
-        </button>
         {sessionHasBranches && (mobile ? (
           <button
             type="button"
@@ -2057,26 +2006,14 @@ export function AppShell() {
               overflowY: "auto",
               zIndex: 500,
             }}>
-              {activeTopPanel === "agents" && activeSessionFamily && selectedSession && (
+              {activeTopPanel === "agents" && selectedSession && (
                 <AgentSessionPanel
-                  rootSession={activeSessionFamily.root}
-                  subagents={activeSessionFamily.subagents}
+                  rootSession={activeSessionFamily?.root ?? selectedSession}
+                  subagents={activeSessionFamily?.subagents ?? []}
                   selectedSessionId={selectedSession.id}
                   runningSessionIds={runningSessionIds}
+                  runs={piSubagentRuns}
                   onSelectSession={handleSelectSession}
-                />
-              )}
-              {activeTopPanel === "pi-subagents" && selectedSession && (
-                <PiSubagentsRunsPanel
-                  sessionId={selectedSession.id}
-                  selectedSessionId={selectedSession.id}
-                  onSelectSessionId={(sessionId) => {
-                    // The child is classified as a subagent of this session once the bridge stamps
-                    // it, so it is in the family; resolve the SessionInfo the select handler wants.
-                    const target = activeSessionFamily?.subagents.find((session) => session.id === sessionId)
-                      ?? (activeSessionFamily?.root.id === sessionId ? activeSessionFamily.root : undefined);
-                    if (target) handleSelectSession(target);
-                  }}
                 />
               )}
               {activeTopPanel === "system" && (
@@ -2333,7 +2270,6 @@ export function AppShell() {
               onSessionStatsPanelOpen={openSessionStatsPanel}
               onContextUsageChange={handleContextUsageChange}
               onOpenFile={handleOpenLinkedFile}
-              onOpenSession={handleOpenSession}
               onAskInNewChat={handleAskInNewChat}
               quoteSelectionEnabled={quoteSelectionEnabled}
               initialPrompt={pendingQuotePrompt?.sessionId === selectedSession?.id ? pendingQuotePrompt?.text : undefined}

@@ -1,5 +1,9 @@
 # Built-in sub-agent activation and extension coexistence
 
+> **Superseded by 0006** (`docs/adr/0006-single-subagent-engine.md`). Pi Web no longer has a
+> built-in engine or a `builtInEnabled` switch; the `pi-subagents` package is the only engine.
+> Kept for the history of how the two engines coexisted.
+
 Pi Web's integrated sub-agent implementation is an inline, hidden extension.
 It is disabled by default and controlled by the global
 `~/.pi/agent/agents/settings.json` setting `builtInEnabled`.

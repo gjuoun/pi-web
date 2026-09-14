@@ -3,6 +3,9 @@
 import { useMemo, useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import type { SessionInfo, SubagentSessionStatus } from "@/lib/types";
+// Type-only: `lib/pi-subagents-bridge` reaches the pi SDK, and a value import from a client
+// component drags it into the browser bundle (see lib/pi-subagents-details.ts).
+import type { PiSubagentRun } from "@/lib/pi-subagents-bridge";
 
 interface Props {
   rootSession: SessionInfo;
@@ -10,6 +13,31 @@ interface Props {
   selectedSessionId: string;
   runningSessionIds: ReadonlySet<string>;
   onSelectSession: (session: SessionInfo) => void;
+  /**
+   * Live runs of the `pi-subagents` engine for this parent session. The single Agents tab shows
+   * both what is on disk (the family) and what the engine is doing right now: a run that already
+   * has a child session enriches that row, one that does not yet renders as a pending row.
+   */
+  runs?: readonly PiSubagentRun[];
+}
+
+function formatTokens(tokens: number | undefined): string | null {
+  if (tokens === undefined) return null;
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  return String(tokens);
+}
+
+/** The metrics line a package run contributes to a row: tool uses, tokens, cost. */
+function runMetrics(run: PiSubagentRun | undefined, t: (key: string) => string): string | null {
+  if (!run) return null;
+  const tokens = formatTokens(run.tokens);
+  const parts = [
+    run.toolUses !== undefined ? `${run.toolUses} ${t("piSubagents.tools")}` : null,
+    tokens ? `${tokens} ${t("piSubagents.tokens")}` : null,
+    run.cost ? `$${run.cost.toFixed(4)}` : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 function sessionTitle(session: SessionInfo): string {
@@ -72,21 +100,27 @@ function AgentRow({
   main,
   selected,
   running,
+  run,
   onSelect,
 }: {
   session: SessionInfo;
   main?: boolean;
   selected: boolean;
   running: boolean;
+  run?: PiSubagentRun;
   onSelect: () => void;
 }) {
   const { locale, t } = useI18n();
   const relation = session.relation?.kind === "subagent" ? session.relation : null;
   const status: SubagentSessionStatus = running ? "running" : relation?.status ?? "completed";
   const primary = main ? t("agentSwitcher.main") : relation?.description || sessionTitle(session);
+  const metrics = runMetrics(run, t);
   const secondary = main
     ? sessionTitle(session)
-    : `${relation?.profile ?? t("agentSwitcher.subagent")} · ${formatRelativeTime(session.modified, locale)}`;
+    : [
+        `${relation?.profile ?? t("agentSwitcher.subagent")} · ${formatRelativeTime(session.modified, locale)}`,
+        metrics,
+      ].filter(Boolean).join(" · ");
 
   return (
     <button
@@ -163,7 +197,7 @@ function AgentRow({
   );
 }
 
-export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, runningSessionIds, onSelectSession }: Props) {
+export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, runningSessionIds, onSelectSession, runs = [] }: Props) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const sortedSubagents = useMemo(() => [...subagents].sort((a, b) => {
@@ -180,6 +214,13 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
           .some((value) => value?.toLowerCase().includes(normalizedQuery));
       })
     : sortedSubagents;
+  const runByChild = useMemo(() => {
+    const map = new Map<string, PiSubagentRun>();
+    for (const run of runs) if (run.childSessionId) map.set(run.childSessionId, run);
+    return map;
+  }, [runs]);
+  // A run the bridge has not attached yet owns no session file, so the family cannot show it.
+  const pendingRuns = useMemo(() => runs.filter((run) => !run.childSessionId), [runs]);
   const runningCount = subagents.filter((session) => runningSessionIds.has(session.id)).length;
 
   return (
@@ -238,10 +279,38 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
               session={session}
               selected={session.id === selectedSessionId}
               running={runningSessionIds.has(session.id)}
+              run={runByChild.get(session.id)}
               onSelect={() => onSelectSession(session)}
             />
           ))}
-          {visibleSubagents.length === 0 && (
+          {pendingRuns.map((run) => (
+            <button
+              key={run.runId}
+              type="button"
+              disabled
+              data-testid="agent-pending-run"
+              title={t("piSubagents.sessionPending")}
+              style={{
+                width: "100%", minHeight: 44, display: "grid",
+                gridTemplateColumns: "28px minmax(0, 1fr) auto",
+                alignItems: "center", gap: 9, padding: "7px 12px",
+                border: "none", borderBottom: "1px solid var(--border)",
+                borderLeft: "2px solid transparent", background: "transparent",
+                color: "var(--text-muted)", textAlign: "left", cursor: "default",
+              }}
+            >
+              <span style={{ width: 28, display: "grid", placeItems: "center", color: "var(--accent)" }}>
+                <StatusIcon status="starting" />
+              </span>
+              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>
+                {run.description || run.profile}
+              </span>
+              <span style={{ color: "var(--text-dim)", fontSize: 11, whiteSpace: "nowrap" }}>
+                {t("piSubagents.sessionPending")}
+              </span>
+            </button>
+          ))}
+          {visibleSubagents.length === 0 && pendingRuns.length === 0 && (
             <div style={{ padding: "22px 12px", color: "var(--text-dim)", fontSize: 12, textAlign: "center" }}>
               {t("agentSwitcher.noMatches")}
             </div>

@@ -7,7 +7,7 @@ import { resolve } from "path";
 import { validateAgentImages } from "./image-attachments";
 import { invalidateModelsCache } from "./models-cache";
 import { resolveVisibleModels, selectInitialModelScope } from "./model-scope";
-import { cacheSessionPath, getLatestModelChange, invalidateSessionListCache, resolveSessionPath } from "./session-reader";
+import { cacheSessionPath, getLatestModelChange, invalidateSessionListCache } from "./session-reader";
 import { getProjectTrustStatus, projectTrustReloadOptions } from "./project-trust";
 import { persistExplicitStartupPreferences } from "./startup-preferences";
 import { notifySessionComplete } from "./web-push";
@@ -24,18 +24,11 @@ import type {
 } from "./types";
 import { createHeadlessCustomUiTui, DEFAULT_CUSTOM_UI_COLUMNS, type HeadlessCustomUiTui } from "./custom-ui-terminal";
 import {
-  createSubagentExtension,
-  suppressExpectedSubagentConflicts,
-} from "./subagent-extension";
-import {
-  listSubagentProfiles,
   readSubagentRun,
   readSubagentSessionResources,
   SUBAGENT_CONTROL_TOOL_NAMES,
 } from "./subagents";
-import { createSubagentController } from "./subagent-runtime";
 import { createPiSubagentsBridgeExtension, spawnPiSubagent } from "./pi-subagents-bridge";
-import { isBuiltInSubagentsEnabled } from "./subagent-settings";
 
 // ============================================================================
 // Types
@@ -1668,37 +1661,6 @@ function registerRpcWrapper(wrapper: AgentSessionWrapper): void {
   if (!wrapper.isChatOnly()) wrapper.beginExtensionBinding();
 }
 
-const SUBAGENT_CONTROLLER = createSubagentController({
-  getSession: (sessionId) => getRegistry().get(sessionId),
-  registerSession: (inner, options) => {
-    const wrapper = new AgentSessionWrapper(inner, {
-      ...(options?.exactSystemPrompt !== undefined
-        ? { exactSystemPrompt: () => options.exactSystemPrompt! }
-        : {}),
-      chatOnly: options?.chatOnly,
-      suppressCompletionNotifications: true,
-    });
-    registerRpcWrapper(wrapper);
-  },
-  reopenSession: async (sessionId, sessionFile) =>
-    (await startRpcSession(sessionId, sessionFile, undefined)).session,
-  resolveSessionPath,
-  invalidateSessionList: invalidateSessionListCache,
-  isBuiltInSubagentsEnabled,
-});
-
-export function getSubagentRun(sessionId: string) {
-  return SUBAGENT_CONTROLLER.get(sessionId);
-}
-
-export function steerSubagent(sessionId: string, message: string) {
-  return SUBAGENT_CONTROLLER.steer(sessionId, message);
-}
-
-export function abortSubagent(sessionId: string) {
-  return SUBAGENT_CONTROLLER.abort(sessionId);
-}
-
 function getLocks(): Map<string, Promise<{ session: AgentSessionWrapper; realSessionId: string }>> {
   if (!globalThis.__piStartLocks) globalThis.__piStartLocks = new Map();
   return globalThis.__piStartLocks;
@@ -1803,6 +1765,9 @@ export function getRpcSessionInfos(options: { includeTransient?: boolean } = {})
           profile: subagent.profile,
           description: subagent.description,
           status: session.isRunning() ? "running" as const : subagent.status,
+          // Mirrors lib/session-reader.ts: without this a live child reports no engine and only
+          // gains one once it settles and is read back from its file.
+          ...(subagent.engine ? { engine: subagent.engine } : {}),
         },
       } : {}),
       transient: !persisted,
@@ -1932,13 +1897,8 @@ export async function startRpcSession(
           }
         : {
             extensionFactories: [
-              createSubagentExtension(
-                SUBAGENT_CONTROLLER.extensionRuntime,
-                () => listSubagentProfiles(sessionCwd),
-                isBuiltInSubagentsEnabled,
-              ),
-              // Observes the `pi-subagents` package pi loads from its enabled package entry; see
-              // lib/pi-subagents-bridge.ts and docs/adr/0003.
+              // The only sub-agent engine: the `pi-subagents` package pi loads from its enabled
+              // package entry. Pi Web observes it, never runs children itself — docs/adr/0006.
               createPiSubagentsBridgeExtension({
                 getParentSessionId: () => bridgeBinding.sessionId,
                 getParentSessionFile: () => bridgeBinding.sessionFile,
@@ -1948,7 +1908,6 @@ export async function startRpcSession(
                 )),
               }),
             ],
-            extensionsOverride: (base) => suppressExpectedSubagentConflicts(base),
           },
       ...(trustReloadOptions ? { resourceLoaderReloadOptions: trustReloadOptions } : {}),
     });
@@ -1989,7 +1948,8 @@ export async function startRpcSession(
       ...(initial?.thinkingLevel ? { thinkingLevel: initial.thinkingLevel } : {}),
       ...(scope.scopedModels.length > 0 ? { scopedModels: [...scope.scopedModels] } : {}),
       ...(toolsOption !== undefined ? { tools: toolsOption } : {}),
-      ...(subagentResources ? { excludeTools: [...SUBAGENT_CONTROL_TOOL_NAMES] } : {}),
+      // A reopened child keeps the no-nesting policy, against the package's full tool set.
+      ...(subagentResources ? { excludeTools: [...SUBAGENT_CONTROL_TOOL_NAMES, "SubagentWorkflow"] } : {}),
     });
     bridgeBinding.sessionId = inner.sessionId;
     bridgeBinding.sessionFile = inner.sessionFile ?? sessionManager.getSessionFile() ?? undefined;

@@ -1,14 +1,4 @@
 import type { ResourceDiagnostic } from "@earendil-works/pi-coding-agent";
-import type { SubagentProfile } from "./subagents";
-
-export interface SubagentProfilesResponse {
-  profiles: SubagentProfile[];
-}
-
-export interface SubagentSettingsResponse {
-  enabled: boolean;
-  maxConcurrent: number;
-}
 
 export interface ShellToolSettingsResponse {
   isWindows: boolean;

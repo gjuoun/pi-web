@@ -72,7 +72,7 @@ app/api/
   skills/route.ts                 GET/PATCH loaded skills and disable-model-invocation
   skills/install/route.ts         POST install skills through npx skills add
   skills/search/route.ts          GET/POST skills.sh search
-  subagents/settings/route.ts     GET/PUT built-in subagent feature setting
+  pi-subagents/runs/route.ts      GET runs of the pi-subagents engine for one session
   worktrees/route.ts              GET/POST/DELETE git worktrees
 
 lib/
@@ -85,7 +85,8 @@ lib/
   pi-types.ts          local structural types for pi SDK objects
   rpc-manager.ts      AgentSessionWrapper + registry + startRpcSession
   session-reader.ts   SessionManager wrappers + path cache + buildSessionContext adapter
-  subagent-settings.ts  read/write ~/.pi/agent/agents/settings.json
+  subagents.ts        reader for the pi-web:subagent* session markers
+  pi-subagents-bridge.ts  observes the pi-subagents engine: runs, attach, marker stamping
   types.ts            shared TypeScript types
   normalize.ts        normalizeToolCalls() — field name mismatch between file format and our types
   worktree.ts         project/worktree resolution and git worktree operations
@@ -98,9 +99,9 @@ components/
   MessageView.tsx     renders one message (user/assistant/toolCall/toolResult)
   BranchNavigator.tsx in-session branch switcher
   ChatMinimap.tsx     scroll minimap alongside the message list
+  AgentSessionPanel.tsx  the single Agents tab: session family + live pi-subagents runs
   MarkdownBody.tsx    markdown renderer
   ModelsConfig.tsx    modal for editing models.json (opened from sidebar bottom)
-  AgentsConfig.tsx    built-in subagent toggle + agent profile editor
   PluginsConfig.tsx   modal for installed package plugins
   SkillsConfig.tsx    modal for loaded/search/installable skills
   FileExplorer.tsx    file tree inside sidebar
@@ -155,8 +156,14 @@ exist; the read-only Tools panel still shows live tool state from `get_tools`. S
 ### `enabledModels` scoping
 The `enabledModels` setting uses pi's `--models` syntax: minimatch globs against `provider/modelId` or a bare `modelId`, fuzzy matching for non-glob patterns, and an optional `:thinkingLevel` suffix. Never compare those patterns as literal strings — `lib/model-scope.ts` delegates to the SDK's `resolveModelScopeWithDiagnostics()` so pi-web and the TUI agree on the visible model list, and falls back to all available models when patterns resolve to nothing. `startRpcSession()` resolves that scope before creating an AgentSession and passes the selected initial model, thinking pin, and SDK-native `scopedModels` atomically; `GET /api/models` reuses the helper only for selector data, `thinkingLevelPins`, and `modelScopeWarnings` display.
 
-### SSE reconnect on page refresh mid-stream
-On `ChatWindow` mount, `GET /api/agent/[id]` is called. If `state.isStreaming === true`, SSE is reconnected automatically. `thinkingLevel` and `isCompacting` are also synced from this response.
+### Event stream ownership
+The selected session owns its SSE stream through **one** effect in `useAgentSession`: `acquire(sessionId)` on `AgentEventConnection` registers a holder and returns an idempotent `release` used as the cleanup. Acquire/release is refcounted, so React's StrictMode remount (acquire → release → acquire) is churn the manager absorbs, and the release grace window keeps the same `EventSource` alive across it.
+
+No effect predicate may read a flag another effect owns. The connection used to be gated by a `shouldMaintain` that read `sessionHookMountedRef`, which a *later* effect set — in `next dev` the remount pass ran the connect effect while that flag was still `false`, so a sub-agent session opened from the Agents tab connected, closed, and never reconnected (prod was unaffected: effects run once). React does not specify effect/cleanup ordering and StrictMode's order differs from a real unmount, so ownership lives in the manager, never in a sibling ref.
+
+`close(sessionId?)` is session-scoped: a late caller holding a stale id cannot drop the stream a newer session already opened. `EventSource.close()` is terminal, so switching sessions always constructs a new source. On `ChatWindow` mount, `GET /api/agent/[id]` still syncs `isStreaming`, `thinkingLevel` and `isCompacting`.
+
+Verify with the plan probe, which must pass against **both** servers: `node ./scripts/probe-child-stream.mjs <baseUrl>` and `… --reload` (`~/.notebook/project/gjuoun/pi-web/plan/2026-09-14/dev-stream-parity/`).
 
 ### Compaction SSE events
 Newer pi emits `compaction_start` / `compaction_end`; older versions emitted `auto_compaction_start` / `auto_compaction_end`. `handleAgentEvent` accepts both sets to keep `isCompacting` in sync. Manual compact is a blocking POST — the button stays disabled until the response returns.
@@ -186,14 +193,15 @@ Newer pi emits `compaction_start` / `compaction_end`; older versions emitted `au
 - Skill toggling edits only the `disable-model-invocation` frontmatter key on the target `SKILL.md`; keep that surgical so user formatting survives.
 - `/api/skills/install` shells through `npx skills add ... --agent pi`; project installs run with the selected cwd.
 
-### Built-in subagents
-- The global `builtInEnabled` switch is persisted in `~/.pi/agent/agents/settings.json` and defaults to `false` when the file or field is absent. Malformed settings fail closed; atomic updates preserve unknown fields.
-- The inline built-in extension factory is always present so reloading an existing wrapper can apply setting changes, but it registers no tools while disabled. After changing the switch, the user must explicitly reload the current session.
-- When enabled, only a recognized legacy `pi-subagents` extension that registers any reserved tool (`Agent`, `get_subagent_result`, or `steer_subagent`) is removed. Unrelated extensions remain loaded, and resolved conflict diagnostics are discarded.
-- Runtime `Agent` dispatch checks the setting again so a stale tool call cannot start a subagent after the feature is switched off.
-- See `docs/adr/0003-built-in-subagent-toggle.md` for the precedence and persistence rationale.
-- Agent profile files (`~/.pi/agent/agents/*.md`, project `.pi/agents/*.md`) are shared with other runtimes, so a save round-trips the frontmatter keys this app does not own (`name`, `allowed_subagents`, `exclude_extensions`, `disallowed_tools`, …) and carries foreign `ext:` tool selectors through. Managed keys are exactly `description`, `display_name`, `tools`, `load_skills`, `load_extensions`, `enabled`, `inherit_context`, `run_in_background`, `model`, `thinking`, `max_turns`.
-- The `skills` / `extensions` spellings pi-subagents reads are seeded on first save and kept in step while they are booleans; a hand-authored whitelist such as `extensions: pi-advisor-flow` is never rewritten, and the two flags fall back to those aliases when `load_skills` / `load_extensions` are absent.
+### Sub-agents
+- Pi Web runs no sub-agents of its own. The only engine is the `pi-subagents` package pi loads from its `packages` entry in `~/.pi/agent/settings.json`; Pi Web observes and displays it (`docs/adr/0006-single-subagent-engine.md`, superseding `0003`).
+- Configuration is a machine concern: `~/.pi/agent/subagents.json` plus agent profile `.md` files under `~/.pi/agent/agents/` and project `.pi/agents/`. There is no UI for editing them — `Settings` has no Agents section, and `/api/subagents/*` no longer exists.
+- `lib/pi-subagents-bridge.ts` subscribes to the package's bus, attaches the live child `AgentSession` to the wrapper registry (so `/api/agent/<child>/events` streams the real run), and stamps `pi-web:subagent`, `pi-web:subagent-status` and `pi-web:subagent-result` into the child's own session file with `engine: "pi-subagents"`. Never open a running child's file a second time.
+- `lib/subagents.ts` only reads those markers back: `readSubagentRun` (session relations, sidebar family) and `readSubagentSessionResources` (reopening a child with the resource policy it ran under). Files written by the removed engine carry `engine: "pi-web"` or no engine field and still parse.
+- Both session-list paths must report `relation.engine`: `lib/session-reader.ts` (file read) and `lib/rpc-manager.ts` (live in-process runtime). Dropping it in the live path makes a running child lose its engine label until it settles.
+- One Agents tab (`components/AgentSessionPanel.tsx`) shows the family plus the live runs from `GET /api/pi-subagents/runs`; a run with no child session yet renders as a pending row. That feed is in-memory per process — after a restart, only the on-disk markers remain.
+- A reopened child excludes `Agent`, `get_subagent_result`, `steer_subagent` and `SubagentWorkflow`, so children cannot nest.
+- Deleting a session shuts down an attached child wrapper; a detached package run keeps going and is stopped through the package's own `subagents:rpc:stop`.
 
 ### Auth and model config
 - `ModelsConfig` combines models from `~/.pi/agent/models.json` with provider auth status from pi's `AuthStorage`/`ModelRegistry`.
