@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { useHomeDir } from "@/hooks/useHomeDir";
 import { collapseHomePath } from "@/lib/path-display";
@@ -202,6 +202,9 @@ function StatusMenu({
 }) {
   const open = openKey === menuKey;
   const rootRef = useRef<HTMLSpanElement>(null);
+  // The popover lives outside the scrolling row, so it is anchored from the trigger's viewport rect
+  // on open instead of from an absolutely-positioned ancestor (ModelSelector does the same).
+  const [anchorRect, setAnchorRect] = useState<{ top: number; right: number; bottom: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -231,37 +234,64 @@ function StatusMenu({
         aria-haspopup="listbox"
         aria-expanded={open}
         disabled={disabled}
-        onClick={() => onOpenChange(open ? null : menuKey)}
+        onClick={(event) => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
+          onOpenChange(open ? null : menuKey);
+        }}
       >
         {label}
       </button>
-      {open && (
-        <div className="chat-status-menu-popover" role="listbox" aria-label={title}>
-          {items.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              role="option"
-              aria-selected={item.active}
-              className={`chat-status-menu-item${item.active ? " is-active" : ""}`}
-              onClick={() => {
-                onOpenChange(null);
-                if (!item.active) item.onSelect();
-              }}
-            >
-              <span className="chat-status-menu-check">
-                {item.active ? (
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="1.5 5 4 7.5 8.5 2.5" />
-                  </svg>
-                ) : null}
-              </span>
-              <span className="chat-status-menu-label">{item.label}</span>
-              {item.description && <span className="chat-status-menu-desc">{item.description}</span>}
-            </button>
-          ))}
-        </div>
-      )}
+      {open && anchorRect && (() => {
+        const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+        const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+        const spaceAbove = anchorRect.top - 8;
+        const spaceBelow = viewportHeight - anchorRect.bottom - 8;
+        // Prefer opening downwards; flip above only when the row is close enough to the bottom
+        // that the menu no longer fits below it.
+        const openAbove = spaceBelow < Math.min(320, viewportHeight * 0.5);
+        const maxHeight = Math.max(120, Math.min(openAbove ? spaceAbove : spaceBelow, viewportHeight * 0.6));
+        const verticalPosition = openAbove
+          ? { bottom: viewportHeight - anchorRect.top + 6 }
+          : { top: anchorRect.bottom + 6 };
+        const horizontalPosition: CSSProperties = {
+          right: Math.max(8, viewportWidth - anchorRect.right),
+          maxWidth: Math.max(anchorRect.width, viewportWidth - anchorRect.left - 8),
+        };
+
+        return (
+          <div
+            className="chat-status-menu-popover"
+            role="listbox"
+            aria-label={title}
+            style={{ ...verticalPosition, ...horizontalPosition, maxHeight }}
+          >
+            {items.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                role="option"
+                aria-selected={item.active}
+                className={`chat-status-menu-item${item.active ? " is-active" : ""}`}
+                onClick={() => {
+                  onOpenChange(null);
+                  if (!item.active) item.onSelect();
+                }}
+              >
+                <span className="chat-status-menu-check">
+                  {item.active ? (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="1.5 5 4 7.5 8.5 2.5" />
+                    </svg>
+                  ) : null}
+                </span>
+                <span className="chat-status-menu-label">{item.label}</span>
+                {item.description && <span className="chat-status-menu-desc">{item.description}</span>}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
     </span>
   );
 }
@@ -369,33 +399,31 @@ export function ChatStatusBar({
 
   return (
     <div className="chat-status-bar" role="status" aria-label={t("chat.status")}>
-      {pwdLine && <div className="chat-status-line">{pwdLine}</div>}
-      <div className="chat-status-line">
-        <span className="chat-status-stats">
-          {items.map((item) => {
-            const tint = item.kind === "context" ? contextColor(item.percent) : undefined;
-            return (
-              <span key={item.kind} style={tint ? { color: tint } : undefined}>{item.text}</span>
-            );
-          })}
-        </span>
-        <span className="chat-status-model">
-          {modelSegment}
-          {thinkingSuffix && (
-            onThinkingLevelChange ? (
-              <StatusMenu
-                label={thinkingSuffix}
-                title={t("chat.changeReasoningLabel")}
-                disabled={busy}
-                items={thinkingItems}
-                openKey={openMenu}
-                menuKey="thinking"
-                onOpenChange={setOpenMenu}
-              />
-            ) : <span>{thinkingSuffix}</span>
-          )}
-        </span>
-      </div>
+      {pwdLine && <span className="chat-status-pwd">{pwdLine}</span>}
+      <span className="chat-status-stats">
+        {items.map((item) => {
+          const tint = item.kind === "context" ? contextColor(item.percent) : undefined;
+          return (
+            <span key={item.kind} style={tint ? { color: tint } : undefined}>{item.text}</span>
+          );
+        })}
+      </span>
+      <span className="chat-status-model">
+        {modelSegment}
+        {thinkingSuffix && (
+          onThinkingLevelChange ? (
+            <StatusMenu
+              label={thinkingSuffix}
+              title={t("chat.changeReasoningLabel")}
+              disabled={busy}
+              items={thinkingItems}
+              openKey={openMenu}
+              menuKey="thinking"
+              onOpenChange={setOpenMenu}
+            />
+          ) : <span>{thinkingSuffix}</span>
+        )}
+      </span>
     </div>
   );
 }

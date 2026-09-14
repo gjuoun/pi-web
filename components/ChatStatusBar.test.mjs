@@ -142,7 +142,7 @@ test("tints the context segment by band and nothing else", () => {
   assert.equal(contextColor(null), undefined);
 });
 
-test("renders both lines with the model segments on the right", () => {
+test("renders one row with cwd, stats and the model cluster in that order", () => {
   const html = renderBar({
     cwd: "/Users/junguo/code/gjuoun/pi-web",
     home: "/Users/junguo",
@@ -161,6 +161,12 @@ test("renders both lines with the model segments on the right", () => {
     onThinkingLevelChange() {},
   });
 
+  assert.match(html, /class="chat-status-bar"/);
+  // The two-line block is gone: every segment is a child of the single row.
+  assert.doesNotMatch(html, /chat-status-line/);
+  // Line 3 is no longer injected here — it is its own bar in ChatWindow.
+  assert.doesNotMatch(html, /chat-status-ext/);
+
   assert.match(html, /~/);
   assert.match(html, /\(main\)/);
   assert.match(html, /接入 pi-subagents/);
@@ -173,8 +179,15 @@ test("renders both lines with the model segments on the right", () => {
   assert.match(html, /\(ollama-cloud\) deepseek-v4\.1-flash/);
   assert.doesNotMatch(html, /DeepSeek V4\.1 Flash/);
   assert.match(html, /• low/);
-  assert.match(html, /class="chat-status-model"/);
   assert.match(html, /role="status"/);
+
+  const pwdAt = html.indexOf("chat-status-pwd");
+  const statsAt = html.indexOf("chat-status-stats");
+  const modelAt = html.indexOf("chat-status-model");
+  assert.ok(
+    pwdAt >= 0 && statsAt > pwdAt && modelAt > statsAt,
+    `segments must be row children in [cwd][stats][model] order: pwd=${pwdAt} stats=${statsAt} model=${modelAt}`,
+  );
 });
 
 test("keeps the model selector visible when a model error leaves no options", () => {
@@ -259,24 +272,51 @@ test("closes a segment menu on Escape like the model selector", async () => {
   assert.match(source, /event\.stopPropagation\(\);[\s\S]{0,80}onOpenChange\(null\)/);
 });
 
-test("styles the bar as mono, dim footer text aligned with the composer", async () => {
+test("styles the bar as one scrollable mono row with a fixed popover", async () => {
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   const barRule = css.match(/\.chat-status-bar\s*\{([^}]*)\}/)?.[1] ?? "";
-  const lineRule = css.match(/\.chat-status-line\s*\{([^}]*)\}/)?.[1] ?? "";
+  const statsRule = css.match(/\.chat-status-stats\s*\{([^}]*)\}/)?.[1] ?? "";
   const modelRule = css.match(/\.chat-status-model\s*\{([^}]*)\}/)?.[1] ?? "";
   const segmentRule = css.match(/\.chat-status-segment\s*\{([^}]*)\}/)?.[1] ?? "";
   const popoverRule = css.match(/\.chat-status-menu-popover\s*\{([^}]*)\}/)?.[1] ?? "";
+  const extRule = css.match(/\.chat-status-ext\s*\{([^}]*)\}/)?.[1] ?? "";
 
+  assert.match(barRule, /display:\s*flex/);
+  assert.match(barRule, /align-items:\s*baseline/);
+  assert.match(barRule, /justify-content:\s*space-between/);
+  assert.match(barRule, /overflow-x:\s*auto/);
+  assert.match(barRule, /overflow-y:\s*auto/);
+  assert.match(barRule, /max-height:\s*min\(144px,\s*18dvh\)/);
   assert.match(barRule, /font-family:\s*var\(--font-mono\)/);
   assert.match(barRule, /font-size:\s*11px/);
-  assert.match(barRule, /max-width:\s*var\(--chat-content-max-width, 820px\)/);
-  assert.match(lineRule, /flex-wrap:\s*wrap/);
+  // Even top/bottom padding: the row and the line-3 bar share one vertical rhythm.
+  assert.match(barRule, /padding:\s*2px 15px/);
+  // The bar spans the full bottom-bar width instead of the composer's 820px column, and keeps the
+  // horizontal separator above the footer.
+  assert.match(barRule, /width:\s*100%/);
+  assert.doesNotMatch(barRule, /max-width/);
+  assert.match(barRule, /border-top:\s*1px solid var\(--border\)/);
+  // The old two-line block is gone from the stylesheet.
+  assert.doesNotMatch(css, /\.chat-status-line\s*\{/);
+
   assert.match(modelRule, /margin-left:\s*auto/);
+  // A narrow window must not squeeze the row: segments keep their natural width and it scrolls.
+  assert.match(statsRule, /flex-wrap:\s*nowrap/);
+  assert.match(statsRule, /flex:\s*0 0 auto/);
+  assert.match(modelRule, /flex:\s*0 0 auto/);
+  assert.doesNotMatch(modelRule, /min-width:\s*0/);
   // A segment must read as footer text, not as a button.
   assert.match(segmentRule, /background:\s*none/);
   assert.match(segmentRule, /font:\s*inherit/);
-  // The menu opens upwards and stays inside the status bar's right edge.
-  assert.match(popoverRule, /position:\s*absolute/);
-  assert.match(popoverRule, /right:\s*0/);
-  assert.match(popoverRule, /bottom:\s*calc\(100% \+ 6px\)/);
+
+  // The menu escapes the scrolling row: fixed to the viewport, above every panel.
+  assert.match(popoverRule, /position:\s*fixed/);
+  const zIndex = Number(popoverRule.match(/z-index:\s*(\d+)/)?.[1] ?? "0");
+  assert.ok(zIndex >= 500, `popover z-index ${zIndex} must be >= 500`);
+
+  // Line 3 lives in its own bar below the row: whitespace preserved, never truncated with an ellipsis.
+  assert.match(extRule, /white-space:\s*pre\s*;/);
+  assert.match(extRule, /overflow:\s*auto/);
+  assert.doesNotMatch(extRule, /text-overflow:\s*ellipsis/);
+  assert.doesNotMatch(extRule, /overflow[^:]*:\s*hidden/);
 });
