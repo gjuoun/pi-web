@@ -228,6 +228,7 @@ export function createSubagentController(
         task: request.task,
         runInBackground,
         createdAt,
+        engine: "pi-web",
         resourceSnapshot: {
           version: 1,
           appendSystemPrompt: [...appendSystemPrompt],

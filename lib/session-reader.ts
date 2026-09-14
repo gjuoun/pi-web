@@ -19,7 +19,17 @@ export { getAgentDir };
 
 const SESSION_HEADER_MAX_BYTES = 64 * 1024;
 const SESSION_RELATION_MAX_BYTES = 256 * 1024;
-const SESSION_RELATION_MAX_LINES = 2;
+/**
+ * How far into a session file the sub-agent marker is looked for.
+ *
+ * Pi Web's own children write `pi-web:subagent` as line 2 (straight after the header), which is why
+ * this used to be 2. Children created by the `pi-subagents` package cannot: their session file is
+ * opened by the package's own SessionManager, so the stamp the bridge writes lands after the
+ * entries that manager writes first (`model_change`, `thinking_level_change`, `session_info`, and
+ * possibly a first message) — typically line 3-6. The window is widened rather than the check
+ * loosened, so a fork (header parent, no marker anywhere near the head) is still a fork.
+ */
+const SESSION_RELATION_MAX_LINES = 32;
 const SESSION_RESULT_MAX_BYTES = 256 * 1024;
 
 function readBoundedLines(filePath: string, maxBytes: number, maxLines: number): string[] {
@@ -165,7 +175,7 @@ async function loadAllSessions(): Promise<SessionInfo[]> {
       firstMessage: s.firstMessage || "(no messages)",
       parentSessionId: originSessionId,
       ...(subagent
-        ? { relation: { kind: "subagent" as const, parentSessionId: subagent.parentSessionId, profile: subagent.profile, description: subagent.description, status: subagent.status } }
+        ? { relation: { kind: "subagent" as const, parentSessionId: subagent.parentSessionId, profile: subagent.profile, description: subagent.description, status: subagent.status, ...(subagent.engine ? { engine: subagent.engine } : {}) } }
         : s.parentSessionPath
           ? { relation: { kind: "fork" as const, ...(originSessionId ? { originSessionId } : {}) } }
           : {}),

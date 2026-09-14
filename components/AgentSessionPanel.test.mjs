@@ -21,6 +21,14 @@ test("sorts running subagents first and enables search only for larger families"
   assert.match(source, /maxHeight: "min\(58dvh, 480px\)"/);
 });
 
+test("labels a child by the engine that ran it", () => {
+  // Both engines' children carry the same `pi-web:subagent` marker, so the family panel cannot tell
+  // them apart without the engine field the writer now stamps.
+  assert.match(source, /relation\?\.engine === "pi-subagents" && \(/);
+  assert.match(source, /t\("agentSwitcher\.enginePackage"\)/);
+  assert.match(source, /data-testid="agent-engine-tag"/);
+});
+
 test("renders as a compact left-positioned dropdown without a centered inner width", () => {
   assert.match(source, /borderLeft: "1px solid var\(--border\)"/);
   assert.match(source, /borderRadius: "0 0 6px 6px"/);

@@ -133,6 +133,19 @@ function AgentRow({
           {primary}
         </span>
         <span style={{ display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-dim)", fontSize: 11 }} title={secondary}>
+          {relation?.engine === "pi-subagents" && (
+            // Origin tag: without it a package run reads exactly like one of Pi Web's own children.
+            <span
+              data-testid="agent-engine-tag"
+              style={{
+                display: "inline-block", marginRight: 5, padding: "0 4px",
+                border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg-subtle)",
+                color: "var(--accent)", fontSize: 10, lineHeight: "14px", verticalAlign: "1px",
+              }}
+            >
+              {t("agentSwitcher.enginePackage")}
+            </span>
+          )}
           {secondary}
         </span>
       </span>

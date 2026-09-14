@@ -18,6 +18,12 @@ export const SUBAGENT_CONTROL_TOOL_NAMES = ["Agent", "get_subagent_result", "ste
 
 export type SubagentStatus = SubagentSessionStatus;
 export type SubagentScope = "builtin" | "global" | "workspace" | "project";
+/**
+ * Which engine ran a subagent session. Pi Web's own runtime marks its children `pi-web`; the
+ * bridge that attaches `pi-subagents` runs marks them `pi-subagents`. Absent on files written
+ * before the field existed — read that as `pi-web`.
+ */
+export type SubagentEngine = "pi-web" | "pi-subagents";
 export type SubagentWritableScope = Extract<SubagentScope, "global" | "project">;
 
 export interface SubagentProfile {
@@ -53,6 +59,7 @@ export interface SubagentMetadata {
   task: string;
   runInBackground: boolean;
   createdAt: string;
+  engine?: SubagentEngine;
   resourceSnapshot: SubagentResourceSnapshot;
   worktreePath?: string;
   worktreeBranch?: string;
@@ -100,6 +107,7 @@ export interface SubagentRunInfo {
   runInBackground: boolean;
   status: SubagentStatus;
   createdAt: string;
+  engine?: SubagentEngine;
   completedAt?: string;
   result?: string;
   error?: string;
@@ -595,6 +603,7 @@ export function readSubagentRun(entries: readonly SessionEntry[], sessionId: str
     runInBackground: data.runInBackground === true,
     status: persistedStatus,
     createdAt: typeof data.createdAt === "string" ? data.createdAt : "",
+    ...(data.engine === "pi-subagents" || data.engine === "pi-web" ? { engine: data.engine } : {}),
     ...(result && typeof result.completedAt === "string" ? { completedAt: result.completedAt } : {}),
     ...(result && typeof result.result === "string" ? { result: result.result } : {}),
     ...(result && typeof result.error === "string" ? { error: result.error } : {}),

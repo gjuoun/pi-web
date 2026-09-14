@@ -130,6 +130,61 @@ test("keeps streamed tool input out of collapsed markup while counting it", () =
   assert.equal(getTokenEstimateText(block), block.rawInput);
 });
 
+test("renders a pi-subagents run from the package's own Agent tool result", () => {
+  // The package's `Agent` tool returns its own details shape (no `kind`, no session id) — the
+  // strip must show the run's status and stats instead of falling back to raw JSON.
+  const block = {
+    type: "toolCall",
+    toolCallId: "tc-pkg-1",
+    toolName: "Agent",
+    input: { subagent_type: "finder", prompt: "go", description: "explore" },
+  };
+  const result = {
+    role: "toolResult",
+    toolCallId: "tc-pkg-1",
+    content: [{ type: "text", text: "OK" }],
+    details: {
+      displayName: "finder",
+      description: "explore",
+      subagentType: "finder",
+      status: "completed",
+      toolUses: 4,
+      tokens: "12.4k token",
+      durationMs: 95_000,
+      turnCount: 3,
+      maxTurns: 8,
+      modelName: "deepseek-v4-flash",
+      cost: 0.0123,
+      agentId: "run-9",
+    },
+  };
+  const html = renderMessage({
+    role: "assistant",
+    provider: "anthropic",
+    model: "claude-test",
+    content: [block],
+  }, {
+    toolResults: new Map([[block.toolCallId, result]]),
+  });
+
+  assert.match(html, /data-testid="pi-subagents-agent-card"/);
+  assert.match(html, /data-testid="pi-subagents-agent-status"[^>]*>Completed</);
+  assert.match(html, /3\/8 turns/);
+  assert.match(html, /1m 35s/);
+  assert.match(html, /12\.4k token/);
+  assert.match(html, /deepseek-v4-flash/);
+  assert.match(html, /\$0\.0123/);
+});
+
+test("does not mistake Pi Web's own subagent details for the package's", async () => {
+  const source = await readFile(new URL("./MessageView.tsx", import.meta.url), "utf8");
+  // pi-web's own details carry `kind`; the guard rejects anything that has one.
+  const { isPiSubagentsAgentDetails } = await jiti.import("@/lib/pi-subagents-details");
+  assert.equal(isPiSubagentsAgentDetails({ kind: "pi-web-subagent", sessionId: "s", subagentType: "x", agentId: "y", status: "running", toolUses: 1 }), false);
+  assert.equal(isPiSubagentsAgentDetails({ subagentType: "finder", agentId: "run-1", status: "running", toolUses: 2 }), true);
+  assert.match(source, /isPiSubagentsAgentDetails\(result\?\.details\)/);
+});
+
 test("treats jun_code as a built-in tool whose argument is code", () => {
   // `jun_code` is this fork's own code-mode tool. The chat view knows it by
   // name, the way the host knows its inline subagent tool — no schema lookup,

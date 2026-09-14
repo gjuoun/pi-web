@@ -12,6 +12,9 @@ import { parseCompactionSummary } from "@/lib/compaction-summary";
 import { getAssistantErrorMessage, getThinkingPreview, isEmptyThinkingBlock } from "@/lib/message-display";
 import { parseUnifiedPatch, type SplitDiffCell } from "@/lib/patch";
 import { isEditToolName, isJunCodeToolName } from "@/lib/tool-names";
+// Value import, so it must come from a client-safe module: the bridge is server-side and pulls the
+// pi SDK in with it (lib/pi-subagents-details.ts explains the failure mode).
+import { isPiSubagentsAgentDetails } from "@/lib/pi-subagents-details";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
 import type { WrittenFile } from "@/lib/turn-written-files";
@@ -1023,6 +1026,9 @@ function ToolCallBlock({ block, result, duration, onOpenSession }: { block: Tool
   const resultIsEmpty = resultText === null ? false : (resultText.trim() === "(no output)" || resultText.trim() === "");
   const isError = result?.isError ?? false;
   const subagent = isSubagentToolDetails(result?.details) ? result.details : null;
+  // The `pi-subagents` package's own Agent tool result: same idea, different shape, no session id
+  // in it (see lib/pi-subagents-bridge.ts).
+  const packageAgent = isPiSubagentsAgentDetails(result?.details) ? result.details : null;
 
   return (
     <div
@@ -1078,6 +1084,38 @@ function ToolCallBlock({ block, result, duration, onOpenSession }: { block: Tool
           </button>
         )}
       </div>
+
+      {/* ── The pi-subagents package's run, at a glance ── */}
+      {packageAgent && (
+        <div
+          data-testid="pi-subagents-agent-card"
+          style={{
+            display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+            padding: "5px 10px",
+            borderTop: "1px solid var(--border)",
+            background: "var(--bg-subtle)",
+            color: "var(--text-muted)",
+            fontSize: 11, lineHeight: 1.4, fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          <span data-testid="pi-subagents-agent-status" style={{ color: packageAgentStatusColor(packageAgent.status), fontWeight: 600 }}>
+            {t(`piSubagents.status.${packageAgentStatusKey(packageAgent.status)}`)}
+          </span>
+          {packageAgent.modelName && <span>{packageAgent.modelName}</span>}
+          {typeof packageAgent.turnCount === "number" && (
+            <span>
+              {packageAgent.turnCount}
+              {typeof packageAgent.maxTurns === "number" && packageAgent.maxTurns > 0 ? `/${packageAgent.maxTurns}` : ""}
+              {" "}{t("piSubagents.turns")}
+            </span>
+          )}
+          <span>{packageAgent.toolUses} {t("piSubagents.tools")}</span>
+          {packageAgent.tokens && <span>{packageAgent.tokens}</span>}
+          {typeof packageAgent.durationMs === "number" && <span>{formatPackageDuration(packageAgent.durationMs)}</span>}
+          {typeof packageAgent.cost === "number" && packageAgent.cost > 0 && <span>${packageAgent.cost.toFixed(4)}</span>}
+          {packageAgent.error && <span style={{ color: "#dc2626" }}>{packageAgent.error}</span>}
+        </div>
+      )}
 
       {/* ── Expanded: input args ── */}
       {expanded && (isStreamingInput || !isEditTool) && (
@@ -1711,6 +1749,50 @@ export function getToolCallInputText(block: ToolCallContent): string {
 
 function formatCustomType(type: string): string {
   return type || "extension";
+}
+
+/** Map the package's status vocabulary onto the `piSubagents.status.*` keys. */
+function packageAgentStatusKey(status: string): string {
+  switch (status) {
+    case "queued": return "starting";
+    case "completed": return "completed";
+    case "steered": return "steered";
+    case "aborted": return "aborted";
+    case "stopped": return "stopped";
+    case "error":
+    case "failed":
+      return "error";
+    case "running":
+    case "background":
+      return "running";
+    default: return "unknown";
+  }
+}
+
+function packageAgentStatusColor(status: string): string {
+  switch (packageAgentStatusKey(status)) {
+    case "running":
+    case "steered":
+    case "starting":
+      return "var(--accent)";
+    case "completed": return "#16a34a";
+    case "error": return "#dc2626";
+    case "aborted":
+    case "stopped":
+      return "#d97706";
+    default: return "var(--text-muted)";
+  }
+}
+
+/** Compact duration for the run strip: 850ms, 12s, 3m 05s, 1h 04m. */
+function formatPackageDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
 }
 
 function previewText(text: string): string {

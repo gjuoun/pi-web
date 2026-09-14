@@ -25,7 +25,7 @@ import type {
 import { createHeadlessCustomUiTui, DEFAULT_CUSTOM_UI_COLUMNS, type HeadlessCustomUiTui } from "./custom-ui-terminal";
 import {
   createSubagentExtension,
-  preferPiWebSubagentExtension,
+  suppressExpectedSubagentConflicts,
 } from "./subagent-extension";
 import {
   listSubagentProfiles,
@@ -34,6 +34,7 @@ import {
   SUBAGENT_CONTROL_TOOL_NAMES,
 } from "./subagents";
 import { createSubagentController } from "./subagent-runtime";
+import { createPiSubagentsBridgeExtension, spawnPiSubagent } from "./pi-subagents-bridge";
 import { isBuiltInSubagentsEnabled } from "./subagent-settings";
 
 // ============================================================================
@@ -544,6 +545,21 @@ export class AgentSessionWrapper {
       }
 
       switch (type) {
+      case "spawn_subagent": {
+        // Starts a run on the `pi-subagents` package rather than on pi-web's own engine. It exists
+        // for the drive script and for a future panel button; the model reaches whichever engine
+        // won the `Agent` name (see docs/adr/0003).
+        const profile = typeof command.profile === "string" ? command.profile : "";
+        const task = typeof command.task === "string" ? command.task : "";
+        if (!profile || !task) throw new Error("spawn_subagent requires profile and task");
+        const { runId } = await spawnPiSubagent(this.sessionId, profile, task, {
+          ...(typeof command.description === "string" ? { description: command.description } : {}),
+          ...(typeof command.maxTurns === "number" ? { maxTurns: command.maxTurns } : {}),
+          ...(typeof command.runInBackground === "boolean" ? { runInBackground: command.runInBackground } : {}),
+          ...(typeof command.model === "string" ? { model: command.model } : {}),
+        });
+        return { runId };
+      }
       case "prompt": {
         // Serialize only admission. Once the preceding prompt has either
         // passed or failed preflight, the SDK can atomically decide whether
@@ -1892,6 +1908,9 @@ export async function startRpcSession(
       ? undefined
       : projectTrustReloadOptions(sessionCwd, agentDir);
     const settingsManager = SettingsManager.create(sessionCwd, agentDir);
+    // Filled in once the session exists; the bridge factory is built before that, and the events it
+    // listens for only start flowing when a run is spawned, which is later still.
+    const bridgeBinding: { sessionId?: string; sessionFile?: string } = {};
     const services = await createAgentSessionServices({
       cwd: sessionCwd,
       agentDir,
@@ -1918,8 +1937,18 @@ export async function startRpcSession(
                 () => listSubagentProfiles(sessionCwd),
                 isBuiltInSubagentsEnabled,
               ),
+              // Observes the `pi-subagents` package pi loads from its enabled package entry; see
+              // lib/pi-subagents-bridge.ts and docs/adr/0003.
+              createPiSubagentsBridgeExtension({
+                getParentSessionId: () => bridgeBinding.sessionId,
+                getParentSessionFile: () => bridgeBinding.sessionFile,
+                attachSession: (inner) => registerRpcWrapper(new AgentSessionWrapper(
+                  inner as AgentSessionLike,
+                  { suppressCompletionNotifications: true },
+                )),
+              }),
             ],
-            extensionsOverride: (base) => preferPiWebSubagentExtension(base),
+            extensionsOverride: (base) => suppressExpectedSubagentConflicts(base),
           },
       ...(trustReloadOptions ? { resourceLoaderReloadOptions: trustReloadOptions } : {}),
     });
@@ -1962,6 +1991,8 @@ export async function startRpcSession(
       ...(toolsOption !== undefined ? { tools: toolsOption } : {}),
       ...(subagentResources ? { excludeTools: [...SUBAGENT_CONTROL_TOOL_NAMES] } : {}),
     });
+    bridgeBinding.sessionId = inner.sessionId;
+    bridgeBinding.sessionFile = inner.sessionFile ?? sessionManager.getSessionFile() ?? undefined;
 
     // pi's own bash tool is used as-is; a normal session's active set comes straight from
     // `defaultTools` (pi-web no longer registers a same-named tool, which used to be activated

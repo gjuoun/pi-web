@@ -277,33 +277,44 @@ export function createSubagentExtension(
   };
 }
 
-/** Keep Pi Web's integrated implementation when the legacy package is loaded. */
-export function preferPiWebSubagentExtension(base: LoadExtensionsResult): LoadExtensionsResult {
-  const host = base.extensions.find((extension) => extension.path === HOST_SUBAGENT_EXTENSION_PATH);
-  if (!host?.tools.has("Agent")) return base;
-  const legacyPaths = new Set(base.extensions
-    .filter((extension) => extension.path !== HOST_SUBAGENT_EXTENSION_PATH)
-    .filter((extension) => {
-      const source = extension.sourceInfo?.source ?? "";
-      const sourcePackage = source.replace(/^npm:/, "").split("@")[0];
-      const pathSegments = extension.path.replaceAll("\\", "/").split("/");
-      return sourcePackage === LEGACY_SUBAGENT_PACKAGE_NAME
-        || pathSegments.some((segment) => segment === LEGACY_SUBAGENT_PACKAGE_NAME);
-    })
-    .filter((extension) => [...SUBAGENT_TOOL_NAMES].some((name) => extension.tools.has(name)))
-    .map((extension) => extension.path));
-  if (legacyPaths.size === 0) return base;
-  return {
-    ...base,
-    extensions: base.extensions.filter((extension) => !legacyPaths.has(extension.path)),
-    errors: base.errors.filter((error) => {
-      if (legacyPaths.has(error.path)) return false;
-      if (error.path !== HOST_SUBAGENT_EXTENSION_PATH) return true;
-      return ![...legacyPaths].some((legacyPath) =>
-        [...SUBAGENT_TOOL_NAMES].some((name) =>
-          error.error === `Tool "${name}" conflicts with ${legacyPath}`
-        )
-      );
-    }),
-  };
+/**
+ * True when an extension is the `pi-subagents` package itself — the copy pi loads from the
+ * enabled package entry, or a vendored copy of the same package.
+ *
+ * The source is matched after stripping the npm prefix *and* the scope: `npm:@tintinweb/pi-subagents`
+ * otherwise splits to an empty package name, leaving only the path check to recognise it.
+ */
+export function isPiSubagentsPackageExtension(extension: {
+  path: string;
+  sourceInfo?: { source?: string };
+}): boolean {
+  const source = extension.sourceInfo?.source ?? "";
+  const sourcePackage = source.replace(/^npm:/, "").replace(/^@[^/]+\//, "");
+  const pathSegments = extension.path.replaceAll("\\", "/").split("/");
+  return sourcePackage === LEGACY_SUBAGENT_PACKAGE_NAME
+    || pathSegments.some((segment) => segment === LEGACY_SUBAGENT_PACKAGE_NAME);
+}
+
+/**
+ * Both sub-agent engines are expected to run at once: pi-web's inline extension and the
+ * `pi-subagents` package pi loads from the enabled package entry (see docs/adr/0003). The SDK then
+ * reports a name collision for every tool they share, and each one is about a tool the model
+ * already reaches through whichever extension registered first — an error the user cannot act on.
+ *
+ * This drops exactly those diagnostics and nothing else. No extension is ever removed: the package
+ * keeps its tools, its bus and its runtime. A duplicated package copy stays visible on purpose —
+ * it surfaces as a `Flag "--subagents-workflow-file" conflicts with …` error, which is the signal
+ * that two copies are loaded and every RPC would be answered twice.
+ */
+export function suppressExpectedSubagentConflicts(base: LoadExtensionsResult): LoadExtensionsResult {
+  if (base.errors.length === 0) return base;
+  const packagePaths = new Set(base.extensions.filter(isPiSubagentsPackageExtension).map((e) => e.path));
+  if (packagePaths.size === 0) return base;
+  const errors = base.errors.filter((error) => {
+    const involvesHost = error.path === HOST_SUBAGENT_EXTENSION_PATH || packagePaths.has(error.path);
+    if (!involvesHost) return true;
+    if (![...packagePaths].some((path) => error.error.endsWith(path))) return true;
+    return ![...SUBAGENT_TOOL_NAMES].some((name) => error.error.startsWith(`Tool "${name}" conflicts with `));
+  });
+  return errors.length === base.errors.length ? base : { ...base, errors };
 }
