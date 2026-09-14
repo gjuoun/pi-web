@@ -1678,6 +1678,11 @@ function ExtensionDialog({
                     textAlign: "left",
                     fontSize: 13,
                     overflowWrap: "anywhere",
+                    // `focus({preventScroll})` + `scrollIntoView({block: "nearest"})` aligns the option
+                    // edge to the scrollport edge, which with the dialog's fractional offsets leaves a
+                    // sub-pixel of the option clipped (measured 0.4px). A 2px scroll margin keeps the
+                    // focused option strictly inside the scrollport.
+                    scrollMarginBlock: 2,
                   }}
                 >
                   <div inert>
