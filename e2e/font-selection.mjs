@@ -55,15 +55,36 @@ export async function checkFontSelection(page) {
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.locator(".markdown-code-block pre").waitFor();
   await openGeneralSettings(page);
-  const uiField = page.getByLabel("Interface font", { exact: true });
-  const monoField = page.getByLabel("Monospace font", { exact: true });
+
+  // Real keystrokes, not fill(): the field is a controlled input, and a trimming round-trip once
+  // swallowed the space in a multi-word font name.
+  const uiField = page.getByRole("combobox", { name: "Interface font", exact: true });
+  const monoField = page.getByRole("combobox", { name: "Monospace font", exact: true });
   assert.equal(await uiField.inputValue(), "", "A fresh browser starts on the built-in stacks");
   assert.equal(await monoField.inputValue(), "");
   assert.equal(await page.getByRole("button", { name: "Reset interface font", exact: true }).isDisabled(), true);
   assert.equal(await page.getByRole("button", { name: "Reset monospace font", exact: true }).isDisabled(), true);
 
-  await uiField.fill(UI_FONT);
-  await monoField.fill(MONO_FONT);
+  await uiField.click();
+  await page.keyboard.type(UI_FONT);
+  assert.equal(await uiField.inputValue(), UI_FONT, "Typing must keep the spaces in the font name");
+  await monoField.click();
+  await page.keyboard.type(MONO_FONT);
+  assert.equal(await monoField.inputValue(), MONO_FONT);
+
+  // The suggestion list must be reachable without typing, and must escape the clipped settings pane.
+  await uiField.fill("");
+  await page.locator("#settings-chat-content-width").click();
+  await page.getByRole("button", { name: "Show font suggestions", exact: true }).first().click();
+  const options = page.locator('[role="option"]:visible');
+  await options.first().waitFor({ state: "visible" });
+  assert.ok(await options.count() >= 6, "An empty field still offers the preset list");
+  await page.getByRole("option", { name: /IBM Plex Sans/ }).first().click();
+  assert.equal(await uiField.inputValue(), "IBM Plex Sans", "Choosing a suggestion inserts its family");
+  assert.equal(await options.count(), 0, "Choosing a suggestion closes the list");
+  await page.getByRole("button", { name: "Reset interface font", exact: true }).click();
+  await uiField.click();
+  await page.keyboard.type(UI_FONT);
   await closeSettings(page);
 
   let state = await readFonts(page);

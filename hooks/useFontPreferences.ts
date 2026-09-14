@@ -5,8 +5,8 @@ import {
   composeFontStack,
   fontStorageKey,
   fontVariableValues,
+  normalizeFontFamilyInput,
   resolveStoredFont,
-  sanitizeFontFamily,
   type FontRole,
 } from "@/lib/fonts";
 
@@ -58,13 +58,18 @@ function subscribe(listener: () => void): () => void {
   return () => { listeners.delete(listener); };
 }
 
-/** Persist one role and re-apply. An empty or unusable family resets the role to its default. */
+/**
+ * Persist one role and re-apply. The value kept here is the field's draft text (whitespace
+ * collapsed, dangerous characters gone, but not trimmed) so the input round-trips exactly what was
+ * typed; the CSS stack is sanitized separately when it is composed. An empty draft means "built-in
+ * default".
+ */
 export function setFont(role: FontRole, family: string): void {
-  const cleaned = sanitizeFontFamily(family);
-  preferences = { ...getSnapshot(), [role]: cleaned };
+  const draft = normalizeFontFamilyInput(family);
+  preferences = { ...getSnapshot(), [role]: draft === "" ? null : draft };
   applyFontPreferences(preferences);
   try {
-    window.localStorage.setItem(fontStorageKey(role), cleaned ?? "");
+    window.localStorage.setItem(fontStorageKey(role), draft);
   } catch {
     // Best-effort browser preference persistence.
   }

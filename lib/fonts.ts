@@ -116,18 +116,27 @@ const WHITESPACE = /\s+/g;
 const SIMPLE_FONT_FAMILY = /^[A-Za-z0-9_-]+$/;
 
 /**
+ * What the settings field round-trips: dangerous characters removed and whitespace collapsed, but
+ * deliberately NOT trimmed. A controlled input that trimmed on every keystroke would swallow the
+ * space in "Comic Sans MS" — the trailing space is stripped, the value snaps back, and the next
+ * character lands immediately after the previous word.
+ */
+export function normalizeFontFamilyInput(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  return raw
+    .replace(CSS_COMMENT, " ")
+    .replace(UNSAFE_FONT_CHARACTERS, " ")
+    .replace(WHITESPACE, " ")
+    .slice(0, FONT_FAMILY_MAX_LENGTH);
+}
+
+/**
  * Reduce arbitrary user input to a family list that cannot break out of a `font-family` value.
  * Quotes are dropped rather than escaped — `quoteFontFamily` adds them back where they are needed,
  * so a stray quote can never pair with the one we emit.
  */
 export function sanitizeFontFamily(raw: unknown): string | null {
-  if (typeof raw !== "string") return null;
-  const cleaned = raw
-    .replace(CSS_COMMENT, " ")
-    .replace(UNSAFE_FONT_CHARACTERS, " ")
-    .replace(WHITESPACE, " ")
-    .trim()
-    .slice(0, FONT_FAMILY_MAX_LENGTH);
+  const cleaned = normalizeFontFamilyInput(raw).trim();
   return cleaned.length > 0 ? cleaned : null;
 }
 

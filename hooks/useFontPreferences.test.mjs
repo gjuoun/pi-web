@@ -64,6 +64,15 @@ test("the preference pair resolves to the two root variables", () => {
   assert.equal(fontVariableValues({ ui: "  " })["--font-ui"], UI_FONT_DEFAULT);
 });
 
+test("the store keeps the field's draft text so spaces round-trip", () => {
+  assert.match(fontHook, /normalizeFontFamilyInput/);
+  assert.match(fontHook, /const draft = normalizeFontFamilyInput\(family\)/);
+  assert.match(fontHook, /localStorage\.setItem\(fontStorageKey\(role\), draft\)/);
+  assert.doesNotMatch(fontHook, /sanitizeFontFamily/, "a trimming sanitiser in the store is what swallowed the space in a font name");
+  assert.equal(fontVariableValues({ ui: "Comic Sans " })["--font-ui"], `"Comic Sans", ${UI_FONT_FALLBACK_TAIL}`);
+  assert.equal(fontVariableValues({ ui: " Comic Sans" })["--font-ui"], `"Comic Sans", ${UI_FONT_FALLBACK_TAIL}`);
+});
+
 test("the store writes both variables, persists both keys, and resets to the defaults", () => {
   assert.match(fontHook, /useSyncExternalStore/);
   assert.match(fontHook, /fontVariableValues\(state\)/);
@@ -72,7 +81,7 @@ test("the store writes both variables, persists both keys, and resets to the def
   assert.match(fontHook, /storageKey|fontStorageKey/);
   assert.match(fontHook, /export function resetFont\(role: FontRole\): void \{\n  setFont\(role, ""\);/);
   assert.match(fontHook, /export function setFont\(role: FontRole, family: string\)/);
-  assert.match(fontHook, /sanitizeFontFamily\(family\)/);
+  assert.match(fontHook, /normalizeFontFamilyInput\(family\)/);
   assert.match(fontHook, /catch \{[\s\S]{0,120}\}/);
   assert.equal(UI_FONT_STORAGE_KEY, "pi-font-ui");
   assert.equal(MONO_FONT_STORAGE_KEY, "pi-font-mono");

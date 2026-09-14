@@ -4,6 +4,7 @@ import test from "node:test";
 import { createJiti } from "jiti";
 
 const settingsPanel = await readFile(new URL("./SettingsPanel.tsx", import.meta.url), "utf8");
+const picker = await readFile(new URL("./FontFamilyPicker.tsx", import.meta.url), "utf8");
 const settingsCss = await readFile(new URL("../app/settings.css", import.meta.url), "utf8");
 const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const jiti = createJiti(import.meta.url);
@@ -16,6 +17,9 @@ const FONT_KEYS = [
   "settings.resetMonoFont",
   "settings.fontPlaceholder",
   "settings.fontHint",
+  "settings.fontSuggestions",
+  "settings.fontNoMatches",
+  "settings.fontDefaultBadge",
 ];
 
 const locales = Object.fromEntries(await Promise.all(
@@ -25,10 +29,11 @@ const locales = Object.fromEntries(await Promise.all(
   ]),
 ));
 
-test("General settings render one labelled field per font role", () => {
+test("General settings render one picker per font role", () => {
   assert.match(settingsPanel, /useFontPreferences\(\)/);
-  assert.match(settingsPanel, /role="ui"/);
-  assert.match(settingsPanel, /role="mono"/);
+  assert.match(settingsPanel, /<FontFamilyPicker/);
+  assert.match(settingsPanel, /presets=\{fontPresets\("ui"\)\}/);
+  assert.match(settingsPanel, /presets=\{fontPresets\("mono"\)\}/);
   assert.match(settingsPanel, /label=\{t\("settings\.uiFont"\)\}/);
   assert.match(settingsPanel, /label=\{t\("settings\.monoFont"\)\}/);
   assert.match(settingsPanel, /resetLabel=\{t\("settings\.resetUiFont"\)\}/);
@@ -39,17 +44,36 @@ test("General settings render one labelled field per font role", () => {
   assert.match(settingsPanel, /onChange=\{setMonoFont\}/);
 });
 
-test("each field is a free-text input backed by a datalist of presets", () => {
-  assert.match(settingsPanel, /const inputId = `settings-\$\{role\}-font`/);
-  assert.match(settingsPanel, /list=\{presetListId\}/);
-  assert.match(settingsPanel, /<datalist id=\{presetListId\}>/);
-  assert.match(settingsPanel, /fontPresets\(role\)\.map/);
-  assert.match(settingsPanel, /value=\{preset\.family\} label=\{preset\.label\}/);
-  assert.match(settingsPanel, /type="text"/);
-  assert.match(settingsPanel, /disabled=\{value === ""\}/);
-  assert.match(settingsPanel, /spellCheck=\{false\}/);
-  assert.match(settingsPanel, /autoComplete="off"/);
+test("each field is a combobox backed by a visible listbox, not a native datalist", () => {
+  assert.match(picker, /const inputId = `settings-\$\{role\}-font`/);
+  assert.match(picker, /role="combobox"/);
+  assert.match(picker, /aria-expanded=\{open\}/);
+  assert.match(picker, /aria-controls=\{listId\}/);
+  assert.match(picker, /aria-autocomplete="list"/);
+  assert.match(picker, /role="listbox"/);
+  assert.match(picker, /role="option"/);
+  assert.match(picker, /presets\.filter/);
+  assert.match(settingsCss, /\.settings-font-picker-popover \{[^}]*position: fixed/, "the settings pane clips, so the list must escape it");
+  assert.match(picker, /t\("settings\.fontSuggestions"\)/);
+  assert.match(picker, /t\("settings\.fontNoMatches"\)/);
+  assert.match(picker, /t\("settings\.fontDefaultBadge"\)/);
+  assert.match(picker, /onKeyDown=\{handleKeyDown\}/);
+  assert.doesNotMatch(picker, /\blist=\{/, "a native datalist cannot be styled, revealed, or asserted");
+  assert.doesNotMatch(settingsPanel, /\blist=\{/);
   assert.ok(UI_FONT_PRESETS.length >= 5 && MONO_FONT_PRESETS.length >= 5);
+});
+
+test("the picker keeps free text usable and dismissable", () => {
+  assert.match(picker, /type="text"/);
+  assert.match(picker, /spellCheck=\{false\}/);
+  assert.match(picker, /autoComplete="off"/);
+  assert.match(picker, /event\.key === "ArrowDown"/);
+  assert.match(picker, /event\.key === "ArrowUp"/);
+  assert.match(picker, /event\.key === "Enter"/);
+  assert.match(picker, /event\.key === "Escape" && open/);
+  assert.match(picker, /event\.stopPropagation\(\)/, "Escape must close the list, not the settings dialog");
+  assert.match(picker, /onMouseDown=\{\(event\) => event\.preventDefault\(\)\}/);
+  assert.match(picker, /disabled=\{isDefaultFont\(value\)\}/);
 });
 
 test("the hint explains fallback and the monospace blast radius", () => {
@@ -61,6 +85,8 @@ test("the hint explains fallback and the monospace blast radius", () => {
 test("the field styles exist and reuse the settings row layout", () => {
   assert.match(settingsCss, /\.settings-font-option-header \{/);
   assert.match(settingsCss, /\.settings-font-input \{/);
+  assert.match(settingsCss, /\.settings-font-picker-popover \{/);
+  assert.match(settingsCss, /\.settings-font-picker-option \{/);
   assert.match(settingsCss, /font-family: var\(--font-mono\)/);
 });
 
@@ -76,7 +102,7 @@ test("every locale carries all six font keys", () => {
 });
 
 test("the reset control keeps its accessible name for the browser drives", () => {
-  assert.match(settingsPanel, /aria-label=\{resetLabel\}/);
+  assert.match(picker, /aria-label=\{resetLabel\}/);
   assert.match(locales.en, /"settings\.resetUiFont": "Reset interface font"/);
   assert.match(locales.en, /"settings\.resetMonoFont": "Reset monospace font"/);
   assert.match(locales.en, /"settings\.uiFont": "Interface font"/);
