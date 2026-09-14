@@ -15,6 +15,7 @@ import { BranchNavigator, hasSessionBranches } from "./BranchNavigator";
 import { SystemPromptPanel } from "./SystemPromptPanel";
 import { ToolDefinitionsPanel } from "./ToolDefinitionsPanel";
 import { AgentSessionPanel } from "./AgentSessionPanel";
+import { PiSubagentsRunsPanel } from "./PiSubagentsRunsPanel";
 import { TerminalPanel } from "./TerminalPanel";
 import { newTerminalTab, restoreTerminalTabs, TERMINAL_TABS_KEY, type TerminalTab } from "./terminal-tab-state";
 import { useTheme } from "@/hooks/useTheme";
@@ -68,6 +69,8 @@ type AutoNameStatus =
   | { kind: "error"; message: string };
 
 const TOP_BAR_ICON_BUTTON_SIZE = 36;
+/** The top-bar dropdowns. `pi-subagents` is the sibling of `agents` that lists runs on the package. */
+type TopPanelId = "agents" | "branches" | "system" | "tools" | "session" | "pi-subagents";
 const AGENT_PANEL_WIDTH = 420;
 
 function parkedNewSessionDraftKey(cwd: string): string {
@@ -311,7 +314,7 @@ export function AppShell() {
   }, []);
 
   // Single active panel — only one dropdown open at a time
-  const [activeTopPanel, setActiveTopPanel] = useState<"agents" | "branches" | "system" | "tools" | "session" | null>(null);
+  const [activeTopPanel, setActiveTopPanel] = useState<TopPanelId | null>(null);
   const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
@@ -327,7 +330,7 @@ export function AppShell() {
   }, [hasSubagentSessions]);
 
   const toggleTopPanel = useCallback((
-    panel: "agents" | "branches" | "system" | "tools" | "session",
+    panel: TopPanelId,
     keepMobileToolbarOpen = false,
   ) => {
     if (isMobile) setSidebarOpen(false);
@@ -1390,6 +1393,37 @@ export function AppShell() {
             </span>
           </button>
         )}
+        {/*
+          The second Agents surface: runs started on the `pi-subagents` package (see
+          docs/adr/0003). Unlike the toggle above it is always rendered, because "the engine is not
+          enabled in this session" is a state worth being able to open and read.
+        */}
+        <button
+          type="button"
+          onClick={() => toggleTopPanel("pi-subagents", mobile)}
+          title={translate("piSubagents.title")}
+          aria-label={translate("piSubagents.title")}
+          aria-pressed={activeTopPanel === "pi-subagents"}
+          data-top-panel="pi-subagents"
+          data-mobile-toolbar-action={mobile ? "pi-subagents" : undefined}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            width: mobile ? TOP_BAR_ICON_BUTTON_SIZE : undefined,
+            height: "100%", padding: mobile ? 0 : "0 12px",
+            background: activeTopPanel === "pi-subagents" ? "var(--bg-selected)" : "none",
+            border: "none",
+            borderTop: activeTopPanel === "pi-subagents" ? "2px solid var(--accent)" : "2px solid transparent",
+            borderRight: "1px solid var(--border)",
+            color: activeTopPanel === "pi-subagents" ? "var(--text)" : "var(--text-muted)",
+            cursor: "pointer", flexShrink: 0, fontSize: 11, whiteSpace: "nowrap",
+            transition: "color 0.1s, background 0.1s",
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" />
+          </svg>
+          {!mobile && <span>{translate("piSubagents.title")}</span>}
+        </button>
         {sessionHasBranches && (mobile ? (
           <button
             type="button"
@@ -1981,6 +2015,19 @@ export function AppShell() {
                   selectedSessionId={selectedSession.id}
                   runningSessionIds={runningSessionIds}
                   onSelectSession={handleSelectSession}
+                />
+              )}
+              {activeTopPanel === "pi-subagents" && selectedSession && (
+                <PiSubagentsRunsPanel
+                  sessionId={selectedSession.id}
+                  selectedSessionId={selectedSession.id}
+                  onSelectSessionId={(sessionId) => {
+                    // The child is classified as a subagent of this session once the bridge stamps
+                    // it, so it is in the family; resolve the SessionInfo the select handler wants.
+                    const target = activeSessionFamily?.subagents.find((session) => session.id === sessionId)
+                      ?? (activeSessionFamily?.root.id === sessionId ? activeSessionFamily.root : undefined);
+                    if (target) handleSelectSession(target);
+                  }}
                 />
               )}
               {activeTopPanel === "system" && (
