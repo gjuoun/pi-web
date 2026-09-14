@@ -21,35 +21,38 @@ export function formatExtensionStatusLine(statuses: ExtensionStatusItem[]): stri
     .join(" ");
 }
 
-export function ExtensionStatusBar({
-  statuses,
-  widgets = [],
-}: {
-  statuses: ExtensionStatusItem[];
-  widgets?: ExtensionWidgetItem[];
-}) {
-  if (statuses.length === 0 && widgets.length === 0) return null;
+/**
+ * Line 3 of pi's footer — the ANSI extension status text as a single, unwrapped block that rides
+ * inside the status row. The row's `max-height` + `overflow-y: auto` is the only cap, so a tall or
+ * multi-line status scrolls instead of being truncated.
+ */
+export function ExtensionStatusLine({ statuses }: { statuses: ExtensionStatusItem[] }) {
+  if (statuses.length === 0) return null;
 
   const statusLine = formatExtensionStatusLine(statuses);
   const plainStatusLine = stripAnsi(statusLine);
 
   return (
     <div
-      className={`extension-status-shelf${widgets.length > 0 ? " has-widgets" : ""}${statuses.length > 0 ? " has-status" : ""}`}
+      role="status"
+      className="chat-status-ext"
+      aria-label={plainStatusLine}
+      title={plainStatusLine}
     >
-      {widgets.length > 0 && <ExtensionWidgets widgets={widgets} />}
-      {statuses.length > 0 && (
-        <div
-          role="status"
-          className="extension-status-line"
-          aria-label={plainStatusLine}
-          title={plainStatusLine}
-        >
-          <span className="extension-status-text">
-            <AnsiText text={statusLine} />
-          </span>
-        </div>
-      )}
+      <span className="extension-status-text">
+        <AnsiText text={statusLine} />
+      </span>
+    </div>
+  );
+}
+
+/** The extension widget shelf: a sibling row above the status row, carrying widgets only. */
+export function ExtensionStatusBar({ widgets = [] }: { widgets?: ExtensionWidgetItem[] }) {
+  if (widgets.length === 0) return null;
+
+  return (
+    <div className="extension-status-shelf has-widgets">
+      <ExtensionWidgets widgets={widgets} />
     </div>
   );
 }

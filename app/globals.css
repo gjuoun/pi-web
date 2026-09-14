@@ -507,39 +507,64 @@ html.dark .web-login-error {
 
 .chat-status-bar {
   flex-shrink: 0;
-  max-width: var(--chat-content-max-width, 820px);
-  margin: 0 auto;
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 12px;
+  /* Full-width separator between the chat column and the bottom bar. */
+  border-top: 1px solid var(--border);
   /* 15px = the composer box's inner inset (1px border + 14px padding), so the footer text starts
      on the attach icon and ends on the send icon instead of drifting inside the box. */
-  padding: 2px 15px 6px;
+  padding: 2px 15px;
+  /* The row itself stays one line; it scrolls rather than wrapping if a segment ever grows. */
+  max-height: min(144px, 18dvh);
+  overflow-x: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.5;
 }
 
-.chat-status-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 10px;
-  min-width: 0;
+.chat-status-pwd {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Line 3's own bar below the status row — it exists only when an extension publishes a status.
+   Whitespace is preserved and nothing is truncated; the bar scrolls instead. */
+.chat-status-ext {
+  display: block;
+  width: 100%;
+  max-height: min(144px, 18dvh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 2px 15px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre;
 }
 
 .chat-status-stats {
   display: inline-flex;
-  flex-wrap: wrap;
+  /* One line, never compressed: when the row runs out of room it scrolls instead. */
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   gap: 0 5px;
-  min-width: 0;
 }
 
 .chat-status-model {
+  /* The model cluster keeps its full label; the row scrolls rather than squeezing an ellipsis. */
+  flex: 0 0 auto;
   margin-left: auto;
   white-space: nowrap;
   display: inline-flex;
   align-items: baseline;
   gap: 0 6px;
-  min-width: 0;
 }
 
 /* Segments inherit the footer's mono text — they read as pi's footer, not as buttons. */
@@ -570,10 +595,8 @@ html.dark .web-login-error {
 }
 
 .chat-status-menu-popover {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 6px);
-  z-index: 120;
+  position: fixed;
+  z-index: 500;
   display: flex;
   flex-direction: column;
   min-width: 200px;
@@ -637,7 +660,6 @@ html.dark .web-login-error {
   flex-wrap: wrap;
   align-items: stretch;
   min-width: 0;
-  border-top: 1px solid var(--border);
   background: transparent;
 }
 
@@ -687,12 +709,6 @@ html.dark .web-login-error {
 
 .extension-widget-triggers::-webkit-scrollbar {
   display: none;
-}
-
-.extension-status-shelf.has-widgets.has-status .extension-widget-triggers {
-  flex: 0 0 auto;
-  max-width: 70%;
-  border-right: 1px solid var(--border);
 }
 
 .extension-widget-trigger {
@@ -811,20 +827,6 @@ button.extension-widget-trigger:focus-visible {
   line-height: 1.45;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-}
-
-.extension-status-line {
-  display: flex;
-  flex: 1 1 0;
-  align-items: flex-start;
-  min-width: 0;
-  min-height: 35px;
-  max-height: min(144px, 18dvh);
-  padding: 8px 12px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
 }
 
 .extension-status-text {

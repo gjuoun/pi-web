@@ -13,7 +13,7 @@ import { MarkdownBody } from "./MarkdownBody";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
 import { ChatStatusBar } from "./ChatStatusBar";
-import { ExtensionStatusBar } from "./ExtensionStatusBar";
+import { ExtensionStatusBar, ExtensionStatusLine } from "./ExtensionStatusBar";
 import { AnsiText } from "./AnsiText";
 import { useI18n } from "@/hooks/useI18n";
 import { useAgentSession, type AgentPhase, type NoticeItem } from "@/hooks/useAgentSession";
@@ -1337,6 +1337,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
           </div>
         )}
         {chatInputElement}
+        <ExtensionStatusBar widgets={extensionWidgets} />
         {/* Same horizontal frame as the composer box: the fieldset in ChatInput reserves 16px plus the
             36px minimap rail on the right (:1499-1510), so a centred 820px box lands 18px left of this
             column's centre. The footer follows that frame instead of the raw column. */}
@@ -1362,8 +1363,9 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
             availableThinkingLevels={availableThinkingLevels}
             thinkingLevelMap={currentThinkingLevelMap}
           />
+          {/* Line 3 keeps its own bar below the status row: the row stays a single line. */}
+          <ExtensionStatusLine statuses={extensionStatuses} />
         </div>
-        <ExtensionStatusBar statuses={extensionStatuses} widgets={extensionWidgets} />
       </div>
       {isEmptyNew && <div className="min-h-0 flex-1" />}
     </div>
