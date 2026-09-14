@@ -9,7 +9,7 @@ import { ThinkingIcon } from "./ThinkingIcon";
 import { copyText } from "@/lib/clipboard";
 import { useI18n } from "@/hooks/useI18n";
 import { parseCompactionSummary } from "@/lib/compaction-summary";
-import { getAssistantErrorMessage, getThinkingPreview, isEmptyThinkingBlock } from "@/lib/message-display";
+import { getAssistantErrorMessage, getThinkingPreview, getThinkingTail, isEmptyThinkingBlock } from "@/lib/message-display";
 import { parseUnifiedPatch, type SplitDiffCell } from "@/lib/patch";
 import { isEditToolName, isJunCodeToolName } from "@/lib/tool-names";
 // Value import, so it must come from a client-safe module: the bridge is server-side and pulls the
@@ -896,7 +896,18 @@ export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex 
   const [error, setError] = useState<string | null>(null);
   const tRef = useRef(t);
   tRef.current = t;
+  // Deferred history blocks carry a first-line preview instead of the full text, so the tail falls
+  // back to it and the chip reads the same for a block that has not been loaded yet.
   const preview = getThinkingPreview(block.thinking);
+  const tail = getThinkingTail(block.thinking) || preview;
+  const tailRef = useRef<HTMLSpanElement>(null);
+
+  // The chip is one line tall: keep its end — the newest characters — in view instead of letting a
+  // long line sit there showing the words it started with.
+  useEffect(() => {
+    const element = tailRef.current;
+    if (element && !expanded) element.scrollLeft = element.scrollWidth;
+  }, [tail, expanded]);
 
   // Keep already-mounted blocks in sync when the preference changes.
   useEffect(() => {
@@ -950,7 +961,7 @@ export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex 
       <button
         type="button"
         aria-expanded={expanded}
-        aria-label={`${t("i18n.thinking")}${preview ? `: ${preview}` : ""}`}
+        aria-label={`${t("i18n.thinking")}${tail ? `: ${tail}` : ""}`}
         title={t("i18n.thinking")}
         onClick={() => setExpanded((v) => !v)}
         style={{
@@ -972,8 +983,8 @@ export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex 
       >
         <ThinkingIcon active={expanded} />
         {!expanded && (
-          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {preview ? <ReactMarkdown allowedElements={[]} unwrapDisallowed skipHtml>{preview}</ReactMarkdown> : "..."}
+          <span ref={tailRef} style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" }}>
+            {tail ? <ReactMarkdown allowedElements={[]} unwrapDisallowed skipHtml>{tail}</ReactMarkdown> : "..."}
           </span>
         )}
       </button>

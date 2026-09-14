@@ -8,6 +8,28 @@ export function getThinkingPreview(thinking: string): string {
   return thinking.trimStart().match(/^[^\r\n]{0,240}/u)?.[0].trimEnd() ?? "";
 }
 
+/**
+ * Far wider than any collapsed chip, so the cap only bounds the markdown work while a block streams —
+ * the chip scrolls to the end of whatever it is given.
+ */
+export const THINKING_TAIL_MAX_CHARS = 400;
+
+/**
+ * The newest line of a thinking block. A block streams from its first line down, so the last
+ * non-blank line is what the model is working through right now; the collapsed chip shows it so the
+ * text keeps moving while the model thinks. The head of an over-long line is dropped — the chip is
+ * scrolled to the end anyway — and the result is never split mid code point.
+ */
+export function getThinkingTail(thinking: string, maxChars: number = THINKING_TAIL_MAX_CHARS): string {
+  const lines = thinking.split("\n");
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index].trim();
+    if (!line) continue;
+    return line.length > maxChars ? [...line].slice(-maxChars).join("") : line;
+  }
+  return "";
+}
+
 export function isMessageGroupAnchor(message: { role?: AgentMessage["role"]; customType?: string }): boolean {
   return message.role === "user"
     || (message.role === "custom" && message.customType === "compaction");
