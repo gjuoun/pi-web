@@ -217,7 +217,7 @@ test("renders that argument through CodeBlock, with no schema machinery", async 
   assert.doesNotMatch(source, /tool-schema|useToolSchemas|codeArgumentOf/);
 });
 
-test("renders subagents as standard tool calls with only an extra session button", () => {
+test("renders a package Agent call as a standard tool call with no session link", () => {
   const block = {
     type: "toolCall",
     toolCallId: "call-agent-1",
@@ -228,6 +228,8 @@ test("renders subagents as standard tool calls with only an extra session button
       description: "Find parser",
     },
   };
+  // The built-in engine's `pi-web-subagent` details no longer exist (docs/adr/0006): a run that
+  // still carries them renders as an ordinary tool call, with no open-session affordance.
   const result = {
     role: "toolResult",
     toolCallId: block.toolCallId,
@@ -236,10 +238,7 @@ test("renders subagents as standard tool calls with only an extra session button
       kind: "pi-web-subagent",
       sessionId: "child-session",
       profile: "Explore",
-      description: "Find parser",
       status: "completed",
-      runInBackground: false,
-      createdAt: "2026-01-01T00:00:00.000Z",
     },
   };
   const html = renderMessage({
@@ -249,26 +248,12 @@ test("renders subagents as standard tool calls with only an extra session button
     content: [block],
   }, {
     toolResults: new Map([[block.toolCallId, result]]),
-    onOpenSession() {},
   });
 
   assert.match(html, /border:1px solid rgba\(34,197,94,0\.25\)/);
   assert.match(html, />Agent</);
   assert.match(html, />Explore</);
-  assert.match(html, /aria-label="Open sub-agent session"/);
-  assert.doesNotMatch(html, />completed</);
-  assert.doesNotMatch(html, />Find parser</);
-
-  const ordinaryHtml = renderMessage({
-    role: "assistant",
-    provider: "anthropic",
-    model: "claude-test",
-    content: [{ ...block, toolCallId: "call-extension-1", toolName: "extension_tool" }],
-  }, {
-    toolResults: new Map(),
-    onOpenSession() {},
-  });
-  assert.doesNotMatch(ordinaryHtml, /Open sub-agent session/);
+  assert.doesNotMatch(html, /Open sub-agent session/);
 });
 
 const COMPLETE_SKILL_EXPANSION = `<skill name="review" location="/skills/review/SKILL.md">

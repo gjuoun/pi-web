@@ -26,10 +26,14 @@ test("opens one settings panel from the single sidebar shortcut", () => {
 });
 
 test("keeps every requested configuration surface inside the settings panel", () => {
-  for (const section of ["general", "models", "skills", "agents", "plugins"]) {
+  for (const section of ["general", "models", "skills", "plugins"]) {
     assert.match(panelSource, new RegExp(`id: "${section}"`));
   }
-  for (const component of ["ModelsConfig", "SkillsConfig", "AgentsConfig", "PluginsConfig"]) {
+  // Sub-agents are configured on the machine (~/.pi/agent/subagents.json + profile .md files),
+  // never in this UI — docs/adr/0006.
+  assert.doesNotMatch(panelSource, /id: "agents"/);
+  assert.doesNotMatch(panelSource, /AgentsConfig/);
+  for (const component of ["ModelsConfig", "SkillsConfig", "PluginsConfig"]) {
     assert.match(panelSource, new RegExp(`<${component} embedded`));
   }
 });
@@ -38,7 +42,7 @@ test("restores the settings section and each list detail selection", async () =>
   assert.match(shellSource, /getLastSettingsSection\(projectTrustCwd\)/);
   assert.match(panelSource, /setLastSettingsSection\(initialSection\)/);
   assert.match(panelSource, /setLastSettingsSection\(nextSection\)/);
-  for (const name of ["ModelsConfig", "SkillsConfig", "AgentsConfig", "PluginsConfig"]) {
+  for (const name of ["ModelsConfig", "SkillsConfig", "PluginsConfig"]) {
     assert.match(
       await readFile(new URL(`./${name}.tsx`, import.meta.url), "utf8"),
       /getLastSettingsSelection/,
@@ -119,19 +123,17 @@ test("uses top navigation on desktop and one compact section picker on mobile", 
   assert.doesNotMatch(panelSource, /style=\{\{/);
 });
 
-test("labels agent profiles as sub-agents", () => {
-  assert.match(enSource, /"common\.agents": "Sub-agents"/);
-  assert.match(enSource, /"agents\.new": "New sub-agent"/);
-  assert.match(zhSource, /"common\.agents": "子代理"/);
-  assert.match(zhSource, /"agents\.new": "新建子代理"/);
+test("drops every sub-agent configuration message with the panel", () => {
+  for (const source of [enSource, zhSource]) {
+    assert.doesNotMatch(source, /"common\.agents":/);
+    assert.doesNotMatch(source, /"agents\./);
+  }
 });
 
-test("uses the child-session robot glyph for the sub-agents tab", () => {
+test("keeps the child-session robot glyph for the sidebar's sub-agent rows", () => {
   const robotGlyph = /<rect x="5" y="7" width="14" height="11" rx="2" \/>\s*<path d="M9 11h\.01M15 11h\.01M9 15h6M12 7V4M10 4h4" \/>/;
-  assert.match(panelSource, robotGlyph);
   assert.match(sidebarSource, robotGlyph);
-  assert.match(panelSource, /section === "agents"[\s\S]*?className="settings-section-icon is-agent"/);
-  assert.match(cssSource, /\.settings-section-icon\.is-agent \{[\s\S]*?transform: scale\(1\.25\)/);
+  assert.doesNotMatch(panelSource, /is-agent/);
 });
 
 test("uses the compact controls glyph for General", () => {

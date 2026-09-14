@@ -41,3 +41,20 @@ test("shows persisted completion states while live running state takes precedenc
   assert.match(source, /status === "failed"/);
   assert.match(source, /status === "aborted" \|\| status === "interrupted"/);
 });
+
+test("enriches a family row with the package run that produced it", () => {
+  // One tab, fed by the engine that actually ran the child (docs/adr/0006): the live feed's
+  // metrics land on the row whose session the run created.
+  assert.match(source, /runs\?: readonly PiSubagentRun\[\]/);
+  assert.match(source, /run\.childSessionId/);
+  assert.match(source, /piSubagents\.tools/);
+  assert.match(source, /piSubagents\.tokens/);
+  assert.match(source, /run\.cost/);
+});
+
+test("lists a run that has no child session yet as a pending, unselectable row", () => {
+  assert.match(source, /pendingRuns/);
+  assert.match(source, /data-testid="agent-pending-run"/);
+  assert.match(source, /disabled/);
+  assert.match(source, /piSubagents\.sessionPending/);
+});

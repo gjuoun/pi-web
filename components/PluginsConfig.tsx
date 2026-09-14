@@ -788,7 +788,7 @@ export function PluginsConfig({
       setUpdateStatuses({});
       setActionMessage(t("i18n.packagesUpdated"));
       if (sessionId) {
-        setActionMessage(`${t("i18n.packagesUpdated")} ${t("agents.reloadRequired")}`);
+        setActionMessage(`${t("i18n.packagesUpdated")} ${t("settings.reloadRequired")}`);
       }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
