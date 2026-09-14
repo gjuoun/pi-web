@@ -528,9 +528,25 @@ html.dark .web-login-error {
   line-height: 1.5;
 }
 
-.chat-status-pwd {
+/* Fresh session: the row is the composer's own footer, so it takes the composer's content box and its
+   edges land on the input's edges. A session in progress keeps the full bottom-bar width. */
+.chat-status-bar.is-fresh {
+  max-width: var(--chat-content-max-width, 820px);
+  margin: 0 auto;
+  /* No session running yet, so there is no footer to divide off from the composer above it. */
+  border-top: none;
+}
+
+.chat-status-project {
   flex: 0 0 auto;
   white-space: nowrap;
+}
+
+/* The session name is separate from the project line, and reads as a caption beside it. */
+.chat-status-name {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  color: var(--text-dim);
 }
 
 /* Line 3's own bar below the status row — it exists only when an extension publishes a status.
@@ -551,6 +567,8 @@ html.dark .web-login-error {
 
 .chat-status-stats {
   display: inline-flex;
+  /* The model leads the row now, so the counters are what gets pushed to the right. */
+  margin-left: auto;
   /* One line, never compressed: when the row runs out of room it scrolls instead. */
   flex: 0 0 auto;
   flex-wrap: nowrap;
@@ -560,7 +578,6 @@ html.dark .web-login-error {
 .chat-status-model {
   /* The model cluster keeps its full label; the row scrolls rather than squeezing an ellipsis. */
   flex: 0 0 auto;
-  margin-left: auto;
   white-space: nowrap;
   display: inline-flex;
   align-items: baseline;

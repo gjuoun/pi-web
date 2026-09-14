@@ -32,3 +32,18 @@ test("renders the extension status line as its own bar below the status row", ()
   // Line 3 is not injected into the row any more — the row stays one line.
   assert.doesNotMatch(source, /rowSlot/);
 });
+
+test("feeds the status row the fresh predicate and the project root", () => {
+  const call = source.slice(source.indexOf("<ChatStatusBar"), source.indexOf("<ExtensionStatusLine"));
+  assert.ok(call.length > 0, "ChatStatusBar is not rendered before ExtensionStatusLine");
+
+  // The fresh state is the same predicate that gates the empty-state banner, not a second definition.
+  assert.match(
+    source,
+    /const isEmptyNew = isNew && messages\.length === 0 && !streamState\.isStreaming && !sessionBusy;/,
+  );
+  assert.match(call, /fresh=\{isEmptyNew\}/);
+
+  // A linked worktree must read as its main repo, so the bar needs projectRoot, not just cwd.
+  assert.match(call, /projectRoot=\{session\?\.projectRoot \?\? null\}/);
+});
