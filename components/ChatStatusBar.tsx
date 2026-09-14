@@ -152,18 +152,26 @@ export function formatModelLabel(input: {
   return [formatModelName(input), formatThinkingSuffix(input)].filter(Boolean).join(" ");
 }
 
-/** `~/path (branch) • name` — pi's line 1 (`footer.js:100-111`). */
-export function formatPwdLine(input: {
+/** `~/path (branch)` — pi's line 1 (`footer.js:100-111`), minus the session name, which is its own segment. */
+export function formatProjectLine(input: {
   cwd?: string | null;
+  projectRoot?: string | null;
   home?: string | null;
   branch?: string | null;
-  sessionName?: string | null;
 }): string {
-  if (!input.cwd) return "";
-  let line = collapseHomePath(input.cwd, input.home);
+  // A linked worktree shows its main repo; cwd is the fallback for the transient sessions the client
+  // builds before its first refresh, where projectRoot is not set yet.
+  const target = input.projectRoot || input.cwd;
+  if (!target) return "";
+  let line = collapseHomePath(target, input.home);
   if (input.branch) line = `${line} (${input.branch})`;
-  if (input.sessionName) line = `${line} • ${input.sessionName}`;
   return line;
+}
+
+/** `• name` — the session-name segment, empty while the session has no name. */
+export function formatSessionName(name?: string | null): string {
+  const trimmed = name?.trim();
+  return trimmed ? `• ${trimmed}` : "";
 }
 
 /** pi colours the context segment by band: `>90` error, `>70` warning. */
@@ -298,8 +306,15 @@ function StatusMenu({
 
 interface Props {
   cwd?: string | null;
+  /** Main repo of a linked worktree; falls back to `cwd` when absent. */
+  projectRoot?: string | null;
   branch?: string | null;
   sessionName?: string | null;
+  /**
+   * True while the session has no messages yet. The row narrows to `[model] [project]` — the
+   * project justifies against the model — and drops the name and token segments entirely.
+   */
+  fresh?: boolean;
   /** Test/embedding override; otherwise the home directory is fetched once per tab. */
   home?: string;
   usage?: SessionStatsInfo | null;
@@ -325,8 +340,10 @@ interface Props {
 
 export function ChatStatusBar({
   cwd,
+  projectRoot,
   branch,
   sessionName,
+  fresh = false,
   home,
   usage,
   messages,
@@ -355,7 +372,8 @@ export function ChatStatusBar({
     if (busy) setOpenMenu(null);
   }, [busy]);
 
-  const pwdLine = formatPwdLine({ cwd, home: homeDir, branch, sessionName });
+  const projectLine = formatProjectLine({ cwd, projectRoot, home: homeDir, branch });
+  const nameLine = formatSessionName(sessionName);
   const stats = usage
     ? { tokens: usage.tokens, cost: usage.cost ?? 0, cacheHitRate: latestCacheHitRate(messages) }
     : null;
@@ -375,7 +393,8 @@ export function ChatStatusBar({
     };
   });
 
-  if (!pwdLine && items.length === 0) return null;
+  // Without a project line there is nothing to anchor the row; the fresh state is exactly this pair.
+  if (!projectLine) return null;
 
   let modelSegment: ReactNode = modelName;
   if (onModelChange) {
@@ -398,16 +417,11 @@ export function ChatStatusBar({
   }
 
   return (
-    <div className="chat-status-bar" role="status" aria-label={t("chat.status")}>
-      {pwdLine && <span className="chat-status-pwd">{pwdLine}</span>}
-      <span className="chat-status-stats">
-        {items.map((item) => {
-          const tint = item.kind === "context" ? contextColor(item.percent) : undefined;
-          return (
-            <span key={item.kind} style={tint ? { color: tint } : undefined}>{item.text}</span>
-          );
-        })}
-      </span>
+    <div
+      className={`chat-status-bar${fresh ? " is-fresh" : ""}`}
+      role="status"
+      aria-label={t("chat.status")}
+    >
       <span className="chat-status-model">
         {modelSegment}
         {thinkingSuffix && (
@@ -424,6 +438,19 @@ export function ChatStatusBar({
           ) : <span>{thinkingSuffix}</span>
         )}
       </span>
+      <span className="chat-status-project">{projectLine}</span>
+      {!fresh && nameLine && <span className="chat-status-name">{nameLine}</span>}
+      {/* The fresh state shows no counters at all — there is nothing to count yet. */}
+      {!fresh && (
+        <span className="chat-status-stats">
+          {items.map((item) => {
+            const tint = item.kind === "context" ? contextColor(item.percent) : undefined;
+            return (
+              <span key={item.kind} style={tint ? { color: tint } : undefined}>{item.text}</span>
+            );
+          })}
+        </span>
+      )}
     </div>
   );
 }

@@ -13,7 +13,8 @@ const {
   ChatStatusBar,
   contextColor,
   formatModelLabel,
-  formatPwdLine,
+  formatProjectLine,
+  formatSessionName,
   formatTokens,
   formatUsageStats,
   latestCacheHitRate,
@@ -126,13 +127,39 @@ test("prefixes the provider only when several providers are available", () => {
   assert.equal(formatModelLabel({ model: null, providerCount: 0, supportsReasoning: false }), "no-model");
 });
 
-test("composes line 1 as cwd (branch) • session name", () => {
+test("composes the project line from projectRoot, falling back to cwd", () => {
   assert.equal(
-    formatPwdLine({ cwd: "/Users/junguo/code/gjuoun/pi-web", home: "/Users/junguo", branch: "main", sessionName: "接入 pi-subagents" }),
-    "~/code/gjuoun/pi-web (main) • 接入 pi-subagents",
+    formatProjectLine({ cwd: "/Users/junguo/code/gjuoun/pi-web", home: "/Users/junguo", branch: "main" }),
+    "~/code/gjuoun/pi-web (main)",
   );
-  assert.equal(formatPwdLine({ cwd: "/tmp/work", home: "/Users/junguo" }), "/tmp/work");
-  assert.equal(formatPwdLine({ cwd: null }), "");
+  // A linked worktree reads as its main repo, not as its own path.
+  assert.equal(
+    formatProjectLine({
+      cwd: "/Users/junguo/code/gjuoun/pi-web-worktrees/status-bar",
+      projectRoot: "/Users/junguo/code/gjuoun/pi-web",
+      home: "/Users/junguo",
+    }),
+    "~/code/gjuoun/pi-web",
+  );
+  // projectRoot is optional on the transient sessions the client builds before its first refresh.
+  assert.equal(
+    formatProjectLine({ cwd: "/tmp/work", projectRoot: null, home: "/Users/junguo" }),
+    "/tmp/work",
+  );
+  assert.equal(formatProjectLine({ cwd: null }), "");
+  // The session name is its own segment now, never part of the project line.
+  assert.equal(
+    formatProjectLine({ cwd: "/tmp/work", home: "/Users/junguo", sessionName: "ignored" }),
+    "/tmp/work",
+  );
+});
+
+test("composes the session name as its own segment", () => {
+  assert.equal(formatSessionName("接入 pi-subagents"), "• 接入 pi-subagents");
+  assert.equal(formatSessionName(""), "");
+  assert.equal(formatSessionName("   "), "");
+  assert.equal(formatSessionName(null), "");
+  assert.equal(formatSessionName(undefined), "");
 });
 
 test("tints the context segment by band and nothing else", () => {
@@ -142,7 +169,7 @@ test("tints the context segment by band and nothing else", () => {
   assert.equal(contextColor(null), undefined);
 });
 
-test("renders one row with cwd, stats and the model cluster in that order", () => {
+test("renders one full-width row in [model][project][name][stats] order while a session is ongoing", () => {
   const html = renderBar({
     cwd: "/Users/junguo/code/gjuoun/pi-web",
     home: "/Users/junguo",
@@ -162,6 +189,8 @@ test("renders one row with cwd, stats and the model cluster in that order", () =
   });
 
   assert.match(html, /class="chat-status-bar"/);
+  // Only the fresh state narrows to the composer width.
+  assert.doesNotMatch(html, /is-fresh/);
   // The two-line block is gone: every segment is a child of the single row.
   assert.doesNotMatch(html, /chat-status-line/);
   // Line 3 is no longer injected here — it is its own bar in ChatWindow.
@@ -181,13 +210,48 @@ test("renders one row with cwd, stats and the model cluster in that order", () =
   assert.match(html, /• low/);
   assert.match(html, /role="status"/);
 
-  const pwdAt = html.indexOf("chat-status-pwd");
-  const statsAt = html.indexOf("chat-status-stats");
   const modelAt = html.indexOf("chat-status-model");
+  const projectAt = html.indexOf("chat-status-project");
+  const nameAt = html.indexOf("chat-status-name");
+  const statsAt = html.indexOf("chat-status-stats");
   assert.ok(
-    pwdAt >= 0 && statsAt > pwdAt && modelAt > statsAt,
-    `segments must be row children in [cwd][stats][model] order: pwd=${pwdAt} stats=${statsAt} model=${modelAt}`,
+    modelAt >= 0 && projectAt >= 0 && nameAt >= 0 && statsAt >= 0,
+    `every segment must exist: model=${modelAt} project=${projectAt} name=${nameAt} stats=${statsAt}`,
   );
+  assert.ok(
+    modelAt < projectAt && projectAt < nameAt && nameAt < statsAt,
+    `segments must be row children in [model][project][name][stats] order: model=${modelAt} project=${projectAt} name=${nameAt} stats=${statsAt}`,
+  );
+});
+
+test("narrows the fresh state to [model] [project] and drops the rest", () => {
+  const html = renderBar({
+    fresh: true,
+    cwd: "/Users/junguo/code/gjuoun/pi-web",
+    home: "/Users/junguo",
+    branch: "main",
+    // Supplied on purpose: the fresh state must ignore them rather than lay them out.
+    sessionName: "接入 pi-subagents",
+    usage: USAGE,
+    contextUsage: { percent: 26, contextWindow: 1000000, tokens: 260000 },
+    model: { provider: "ollama-cloud", modelId: "deepseek-v4.1-flash" },
+    providerCount: 2,
+  });
+
+  assert.match(html, /class="chat-status-bar is-fresh"/);
+  assert.doesNotMatch(html, /chat-status-stats/);
+  assert.doesNotMatch(html, /chat-status-name/);
+  assert.doesNotMatch(html, /↑1\.2M/);
+  assert.doesNotMatch(html, /接入 pi-subagents/);
+
+  const modelAt = html.indexOf("chat-status-model");
+  const projectAt = html.indexOf("chat-status-project");
+  assert.ok(
+    modelAt >= 0 && projectAt >= 0 && modelAt < projectAt,
+    `fresh state must be [model][project]: model=${modelAt} project=${projectAt}`,
+  );
+  // Only those two segments share the row.
+  assert.equal((html.match(/class="chat-status-(model|project)(")/g) ?? []).length, 2);
 });
 
 test("keeps the model selector visible when a model error leaves no options", () => {
@@ -277,6 +341,9 @@ test("styles the bar as one scrollable mono row with a fixed popover", async () 
   const barRule = css.match(/\.chat-status-bar\s*\{([^}]*)\}/)?.[1] ?? "";
   const statsRule = css.match(/\.chat-status-stats\s*\{([^}]*)\}/)?.[1] ?? "";
   const modelRule = css.match(/\.chat-status-model\s*\{([^}]*)\}/)?.[1] ?? "";
+  const projectRule = css.match(/\.chat-status-project\s*\{([^}]*)\}/)?.[1] ?? "";
+  const nameRule = css.match(/\.chat-status-name\s*\{([^}]*)\}/)?.[1] ?? "";
+  const freshRule = css.match(/\.chat-status-bar\.is-fresh\s*\{([^}]*)\}/)?.[1] ?? "";
   const segmentRule = css.match(/\.chat-status-segment\s*\{([^}]*)\}/)?.[1] ?? "";
   const popoverRule = css.match(/\.chat-status-menu-popover\s*\{([^}]*)\}/)?.[1] ?? "";
   const extRule = css.match(/\.chat-status-ext\s*\{([^}]*)\}/)?.[1] ?? "";
@@ -291,19 +358,32 @@ test("styles the bar as one scrollable mono row with a fixed popover", async () 
   assert.match(barRule, /font-size:\s*11px/);
   // Even top/bottom padding: the row and the line-3 bar share one vertical rhythm.
   assert.match(barRule, /padding:\s*2px 15px/);
-  // The bar spans the full bottom-bar width instead of the composer's 820px column, and keeps the
-  // horizontal separator above the footer.
+  // The bar spans the full bottom-bar width by default and keeps the horizontal separator above it.
   assert.match(barRule, /width:\s*100%/);
   assert.doesNotMatch(barRule, /max-width/);
   assert.match(barRule, /border-top:\s*1px solid var\(--border\)/);
+  // Only the fresh state narrows the row to the composer's own content box, so the bar's edges land
+  // on the input's edges. 820px is the same variable the composer's inline-styled box reads.
+  assert.match(freshRule, /max-width:\s*var\(--chat-content-max-width,\s*820px\)/);
+  assert.match(freshRule, /margin:\s*0 auto/);
+  // ...and it drops the separator: with no session running there is no footer to divide off.
+  assert.match(freshRule, /border-top:\s*none/);
   // The old two-line block is gone from the stylesheet.
   assert.doesNotMatch(css, /\.chat-status-line\s*\{/);
+  // ...and so is the single project-plus-name span it used to share.
+  assert.doesNotMatch(css, /\.chat-status-pwd\s*\{/);
 
-  assert.match(modelRule, /margin-left:\s*auto/);
+  // Model leads the row now, so the token cluster is what gets pushed to the right.
+  assert.match(statsRule, /margin-left:\s*auto/);
+  assert.doesNotMatch(modelRule, /margin-left:\s*auto/);
   // A narrow window must not squeeze the row: segments keep their natural width and it scrolls.
   assert.match(statsRule, /flex-wrap:\s*nowrap/);
   assert.match(statsRule, /flex:\s*0 0 auto/);
   assert.match(modelRule, /flex:\s*0 0 auto/);
+  assert.match(projectRule, /flex:\s*0 0 auto/);
+  assert.match(projectRule, /white-space:\s*nowrap/);
+  assert.match(nameRule, /flex:\s*0 0 auto/);
+  assert.match(nameRule, /white-space:\s*nowrap/);
   assert.doesNotMatch(modelRule, /min-width:\s*0/);
   // A segment must read as footer text, not as a button.
   assert.match(segmentRule, /background:\s*none/);

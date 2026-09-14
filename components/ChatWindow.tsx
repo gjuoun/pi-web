@@ -1343,6 +1343,8 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
         <div style={{ paddingLeft: 16, paddingRight: isMobile ? 16 : 52 }}>
           <ChatStatusBar
             cwd={session?.cwd ?? newSessionCwd}
+            projectRoot={session?.projectRoot ?? null}
+            fresh={isEmptyNew}
             branch={session?.branch ?? null}
             sessionName={session?.name ?? null}
             usage={sessionStats}
