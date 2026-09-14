@@ -64,35 +64,13 @@ export interface PiSubagentSpawnOptions {
  * The `details` the package attaches to its own `Agent` tool result — the shape a host renders when
  * the model (rather than the panel) started the run. It carries no session identity, so a card
  * built from it links to the child session only through the bridge's run map.
+ *
+ * The type and its guard live in `lib/pi-subagents-details.ts`: this module is server-side (it
+ * reaches the pi SDK through `./subagents`), and a client component importing a *value* from here
+ * drags the SDK into the browser bundle. Re-exported for callers that are already server-side.
  */
-export interface PiSubagentsAgentDetails {
-  displayName: string;
-  description: string;
-  subagentType: string;
-  status: string;
-  toolUses: number;
-  tokens: string;
-  durationMs: number;
-  activity?: string;
-  modelName?: string;
-  tags?: string[];
-  turnCount?: number;
-  maxTurns?: number;
-  cost?: number;
-  agentId?: string;
-  error?: string;
-}
-
-/** Recognize the package's tool-result details without mistaking Pi Web's own for them. */
-export function isPiSubagentsAgentDetails(value: unknown): value is PiSubagentsAgentDetails {
-  if (typeof value !== "object" || value === null) return false;
-  const details = value as Partial<PiSubagentsAgentDetails> & { kind?: unknown };
-  if (details.kind !== undefined) return false; // pi-web's own subagent details carry `kind`
-  return typeof details.subagentType === "string"
-    && typeof details.agentId === "string"
-    && typeof details.status === "string"
-    && typeof details.toolUses === "number";
-}
+export type { PiSubagentsAgentDetails } from "./pi-subagents-details";
+export { isPiSubagentsAgentDetails } from "./pi-subagents-details";
 
 export interface PiSubagentsBridgeDeps {
   /** Parent pi-web session id, filled in once the wrapper exists (the factory runs earlier). */

@@ -179,7 +179,7 @@ test("renders a pi-subagents run from the package's own Agent tool result", () =
 test("does not mistake Pi Web's own subagent details for the package's", async () => {
   const source = await readFile(new URL("./MessageView.tsx", import.meta.url), "utf8");
   // pi-web's own details carry `kind`; the guard rejects anything that has one.
-  const { isPiSubagentsAgentDetails } = await jiti.import("@/lib/pi-subagents-bridge");
+  const { isPiSubagentsAgentDetails } = await jiti.import("@/lib/pi-subagents-details");
   assert.equal(isPiSubagentsAgentDetails({ kind: "pi-web-subagent", sessionId: "s", subagentType: "x", agentId: "y", status: "running", toolUses: 1 }), false);
   assert.equal(isPiSubagentsAgentDetails({ subagentType: "finder", agentId: "run-1", status: "running", toolUses: 2 }), true);
   assert.match(source, /isPiSubagentsAgentDetails\(result\?\.details\)/);

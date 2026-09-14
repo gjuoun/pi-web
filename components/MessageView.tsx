@@ -12,7 +12,9 @@ import { parseCompactionSummary } from "@/lib/compaction-summary";
 import { getAssistantErrorMessage, getThinkingPreview, isEmptyThinkingBlock } from "@/lib/message-display";
 import { parseUnifiedPatch, type SplitDiffCell } from "@/lib/patch";
 import { isEditToolName, isJunCodeToolName } from "@/lib/tool-names";
-import { isPiSubagentsAgentDetails } from "@/lib/pi-subagents-bridge";
+// Value import, so it must come from a client-safe module: the bridge is server-side and pulls the
+// pi SDK in with it (lib/pi-subagents-details.ts explains the failure mode).
+import { isPiSubagentsAgentDetails } from "@/lib/pi-subagents-details";
 import { isThinkingExpandedByDefault, THINKING_EXPANDED_EVENT } from "@/lib/thinking-expansion-preference";
 import { TurnWrittenFiles } from "./TurnWrittenFiles";
 import type { WrittenFile } from "@/lib/turn-written-files";
