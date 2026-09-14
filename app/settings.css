@@ -1019,6 +1019,112 @@
   font-size: 12px;
 }
 
+.settings-font-options {
+  margin-top: 12px;
+}
+
+.settings-font-option {
+  width: 100%;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.settings-font-option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-font-picker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.settings-font-picker-toggle {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  padding: 0;
+  color: var(--text-muted);
+}
+
+.settings-font-picker-toggle[aria-expanded="true"] {
+  color: var(--text);
+}
+
+.settings-font-picker-popover {
+  position: fixed;
+  z-index: 400;
+  min-width: 180px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+}
+
+.settings-font-picker-option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settings-font-picker-option:hover,
+.settings-font-picker-option.is-active {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.settings-font-picker-label {
+  color: var(--text);
+}
+
+.settings-font-picker-family {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-font-picker-empty {
+  padding: 6px 8px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.settings-font-input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.settings-font-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 .settings-chat-switch-option {
   display: flex;
   align-items: center;

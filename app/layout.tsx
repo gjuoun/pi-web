@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Mono } from "next/font/google";
 import { PwaRegistration } from "@/components/PwaRegistration";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { FONT_INIT_SCRIPT } from "@/lib/fonts";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 import "./settings.css";
@@ -66,6 +67,13 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: THEME_INIT_SCRIPT,
+          }}
+        />
+        {/* Applies the stored interface/monospace fonts before hydration, so a reload never flashes
+            the built-in stacks. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: FONT_INIT_SCRIPT,
           }}
         />
       </head>

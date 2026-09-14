@@ -14,6 +14,9 @@ import {
   CHAT_CONTENT_FONT_SIZE_MIN,
   useChatAppearance,
 } from "@/hooks/useChatAppearance";
+import { useFontPreferences } from "@/hooks/useFontPreferences";
+import { fontPresets } from "@/lib/fonts";
+import { FontFamilyPicker } from "./FontFamilyPicker";
 import { sendAgentCommand } from "@/lib/agent-client";
 import type { ShellToolSettingsResponse } from "@/lib/api-types";
 import {
@@ -68,6 +71,7 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
   const { locale, setLocale, supportedLocales, t } = useI18n();
   const { preference, setThemePreference } = useTheme();
   const { width: chatContentWidth, setWidth: setChatContentWidth, fontSize, setFontSize } = useChatAppearance();
+  const { uiFont, monoFont, setUiFont, setMonoFont, resetFont } = useFontPreferences();
   const [shellSettings, setShellSettings] = useState<ShellToolSettingsResponse | null>(null);
   const [shellSaving, setShellSaving] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
@@ -186,6 +190,29 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
               </label>
             );
           })}
+        </div>
+        <p className="settings-general-description">{t("settings.fontHint")}</p>
+        <div className="settings-chat-options settings-font-options">
+          <FontFamilyPicker
+            role="ui"
+            label={t("settings.uiFont")}
+            value={uiFont ?? ""}
+            presets={fontPresets("ui")}
+            placeholder={t("settings.fontPlaceholder")}
+            resetLabel={t("settings.resetUiFont")}
+            onChange={setUiFont}
+            onReset={() => resetFont("ui")}
+          />
+          <FontFamilyPicker
+            role="mono"
+            label={t("settings.monoFont")}
+            value={monoFont ?? ""}
+            presets={fontPresets("mono")}
+            placeholder={t("settings.fontPlaceholder")}
+            resetLabel={t("settings.resetMonoFont")}
+            onChange={setMonoFont}
+            onReset={() => resetFont("mono")}
+          />
         </div>
       </section>
 
