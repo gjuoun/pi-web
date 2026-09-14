@@ -117,6 +117,7 @@ export const enLocale: LocalePlugin = {
     "piSubagents.status.stopped": "Stopped",
     "piSubagents.status.unknown": "Unknown",
     "agentSwitcher.title": "Agents",
+    "agentSwitcher.enginePackage": "package",
     "agentSwitcher.main": "Main agent",
     "agentSwitcher.subagent": "Sub-agent",
     "agentSwitcher.current": "Current",

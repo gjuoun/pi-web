@@ -117,6 +117,7 @@ export const zhCNLocale: LocalePlugin = {
     "piSubagents.status.stopped": "已停止",
     "piSubagents.status.unknown": "未知",
     "agentSwitcher.title": "Agents",
+    "agentSwitcher.enginePackage": "插件",
     "agentSwitcher.main": "主 Agent",
     "agentSwitcher.subagent": "子 Agent",
     "agentSwitcher.current": "当前",

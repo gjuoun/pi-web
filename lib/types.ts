@@ -329,6 +329,8 @@ export interface SessionInfo {
         profile: string;
         description: string;
         status: SubagentSessionStatus;
+        /** Which engine ran it; declared as a literal union so the client never imports server code. */
+        engine?: "pi-web" | "pi-subagents";
       };
   /** Main repo root shared by all worktrees of this cwd (cwd itself for non-git dirs).
    *  Always set by the server; optional because the client builds transient

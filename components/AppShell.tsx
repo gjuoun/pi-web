@@ -138,6 +138,39 @@ export function AppShell() {
   );
   const hasSubagentSessions = Boolean(activeSessionFamily?.subagents.length);
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
+  /**
+   * Badge for the package-runs tab. The panel fetches the same route when it is open; the tab needs
+   * the count while it is closed, so this polls lightly for the selected session only.
+   */
+  const [piSubagentRuns, setPiSubagentRuns] = useState<{ total: number; running: number }>({ total: 0, running: 0 });
+  const piSubagentSessionId = selectedSession?.id;
+  useEffect(() => {
+    if (!piSubagentSessionId) {
+      setPiSubagentRuns({ total: 0, running: 0 });
+      return;
+    }
+    let cancelled = false;
+    const controller = new AbortController();
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/pi-subagents/runs?sessionId=${encodeURIComponent(piSubagentSessionId)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const data = await response.json() as { runs?: Array<{ status?: string }> };
+        const runs = Array.isArray(data.runs) ? data.runs : [];
+        if (cancelled) return;
+        setPiSubagentRuns({
+          total: runs.length,
+          running: runs.filter((run) => run.status === "running" || run.status === "starting" || run.status === "steered").length,
+        });
+      } catch { /* keep the previous count; the next tick retries */ }
+    };
+    void load();
+    const timer = setInterval(() => { void load(); }, 3000);
+    return () => { cancelled = true; controller.abort(); clearInterval(timer); };
+  }, [piSubagentSessionId]);
   const handleRunningSessionIdsChange = useCallback((ids: Set<string>) => {
     setRunningSessionIds((previous) => {
       if (previous.size === ids.size && [...ids].every((id) => previous.has(id))) return previous;
@@ -1423,6 +1456,22 @@ export function AppShell() {
             <rect x="5" y="7" width="14" height="11" rx="2" /><path d="M9 11h.01M15 11h.01M9 15h6M12 7V4M10 4h4" />
           </svg>
           {!mobile && <span>{translate("piSubagents.title")}</span>}
+          {piSubagentRuns.total > 0 && (
+            <span
+              data-testid="pi-subagents-badge"
+              aria-hidden="true"
+              style={{
+                minWidth: 15, height: 15, padding: "0 4px", display: "grid", placeItems: "center",
+                borderRadius: 7,
+                background: piSubagentRuns.running > 0 ? "var(--accent)" : "var(--bg-selected)",
+                color: piSubagentRuns.running > 0 ? "var(--bg-panel)" : "var(--accent)",
+                fontSize: 10, lineHeight: 1, fontVariantNumeric: "tabular-nums",
+                ...(mobile ? { position: "absolute", top: 2, right: 2, minWidth: 13, height: 13, padding: "0 3px", fontSize: 9 } : {}),
+              }}
+            >
+              {piSubagentRuns.total}
+            </span>
+          )}
         </button>
         {sessionHasBranches && (mobile ? (
           <button

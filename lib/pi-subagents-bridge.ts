@@ -224,6 +224,9 @@ export function createPiSubagentsBridgeExtension(deps: PiSubagentsBridgeDeps): I
           task: "",
           runInBackground: true,
           createdAt: run.startedAt,
+          // Marks the origin so the session-family panel can label a package run as such instead of
+          // looking like a Pi Web engine run (lib/subagents.ts SubagentEngine).
+          engine: "pi-subagents",
         });
         // Without a status entry the reader can only report "interrupted" for a child that has no
         // result yet, so a live run has to say so explicitly.
