@@ -52,7 +52,7 @@ test("each field is a combobox backed by a visible listbox, not a native datalis
   assert.match(picker, /aria-autocomplete="list"/);
   assert.match(picker, /role="listbox"/);
   assert.match(picker, /role="option"/);
-  assert.match(picker, /presets\.filter/);
+  assert.match(picker, /options\.filter/);
   assert.match(settingsCss, /\.settings-font-picker-popover \{[^}]*position: fixed/, "the settings pane clips, so the list must escape it");
   assert.match(picker, /t\("settings\.fontSuggestions"\)/);
   assert.match(picker, /t\("settings\.fontNoMatches"\)/);
@@ -61,6 +61,19 @@ test("each field is a combobox backed by a visible listbox, not a native datalis
   assert.doesNotMatch(picker, /\blist=\{/, "a native datalist cannot be styled, revealed, or asserted");
   assert.doesNotMatch(settingsPanel, /\blist=\{/);
   assert.ok(UI_FONT_PRESETS.length >= 5 && MONO_FONT_PRESETS.length >= 5);
+  // macOS does not hand a page SF Mono by name (atsutil and CoreText both return zero matches), so the
+  // preset must point at the CSS generic instead of a family that silently falls back.
+  assert.equal(MONO_FONT_PRESETS.some((preset) => preset.family === "SF Mono"), false);
+  assert.equal(MONO_FONT_PRESETS.some((preset) => preset.family === "ui-monospace"), true);
+});
+
+test("the picker leads with the fonts installed on this machine", () => {
+  assert.match(picker, /useInstalledFonts\(\)/);
+  assert.match(picker, /void loadInstalledFonts\(\)/);
+  assert.match(picker, /pickerFamilies\(installedFonts, role\)/);
+  assert.match(picker, /id: `installed:\$\{family\}`/);
+  assert.match(picker, /seen\.has\(preset\.family\)/, "a preset must not repeat an installed family");
+  assert.match(picker, /const options = useMemo/);
 });
 
 test("the picker keeps free text usable and dismissable", () => {

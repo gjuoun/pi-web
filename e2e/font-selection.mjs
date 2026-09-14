@@ -79,6 +79,19 @@ export async function checkFontSelection(page) {
   const options = page.locator('[role="option"]:visible');
   await options.first().waitFor({ state: "visible" });
   assert.ok(await options.count() >= 6, "An empty field still offers the preset list");
+
+  // The picker leads with the families the server enumerated from the OS; when enumeration is
+  // unavailable (CI, unusual host) the presets are the whole list, so this check is conditional.
+  const enumerated = await page.evaluate(async () => {
+    const response = await fetch("/api/fonts");
+    if (!response.ok) return [];
+    const body = await response.json();
+    return (body.fonts ?? []).filter((font) => !font.mono).map((font) => font.family);
+  });
+  if (enumerated.length > 0) {
+    const families = await options.evaluateAll((nodes) => nodes.map((node) => node.dataset.family));
+    assert.ok(families.includes(enumerated[0]), `The installed families must lead the list (${enumerated[0]})`);
+  }
   await page.getByRole("option", { name: /IBM Plex Sans/ }).first().click();
   assert.equal(await uiField.inputValue(), "IBM Plex Sans", "Choosing a suggestion inserts its family");
   assert.equal(await options.count(), 0, "Choosing a suggestion closes the list");

@@ -2,11 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
+import { loadInstalledFonts, useInstalledFonts } from "@/hooks/useInstalledFonts";
 import { isDefaultFont, type FontPreset, type FontRole } from "@/lib/fonts";
+import { pickerFamilies } from "@/lib/fonts-installed";
 import { ConfigButton } from "./SettingsUi";
 
 /**
  * One selectable font role: a free-text family field plus a visible list of suggestions.
+ *
+ * The list leads with the families actually installed on this machine (`/api/fonts`, enumerated by the
+ * server from the OS) and keeps the built-in presets as the tail for anything enumeration did not
+ * report — the presets double as the fallback when the route is unavailable.
  *
  * The suggestions are a real listbox rather than a native `<datalist>`: Chrome only reveals a
  * datalist after a keystroke or through its own caret, so nothing told the user which presets
@@ -32,6 +38,7 @@ export function FontFamilyPicker({
   onReset: () => void;
 }) {
   const { t } = useI18n();
+  const { fonts: installedFonts } = useInstalledFonts();
   const inputId = `settings-${role}-font`;
   const listId = `${inputId}-presets`;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -41,9 +48,28 @@ export function FontFamilyPicker({
   const [anchor, setAnchor] = useState<{ top: number; bottom: number; left: number; width: number } | null>(null);
 
   const query = value.trim().toLocaleLowerCase();
+  const options = useMemo(() => {
+    const seen = new Set<string>();
+    const list: FontPreset[] = [];
+    for (const preset of presets) {
+      if (preset.family !== "") continue;
+      list.push(preset);
+    }
+    for (const family of pickerFamilies(installedFonts, role)) {
+      if (seen.has(family)) continue;
+      seen.add(family);
+      list.push({ id: `installed:${family}`, label: family, family });
+    }
+    for (const preset of presets) {
+      if (preset.family === "" || seen.has(preset.family)) continue;
+      seen.add(preset.family);
+      list.push(preset);
+    }
+    return list;
+  }, [installedFonts, presets, role]);
   const visible = useMemo(
-    () => presets.filter((preset) => !query || `${preset.label} ${preset.family}`.toLocaleLowerCase().includes(query)),
-    [presets, query],
+    () => options.filter((option) => !query || `${option.label} ${option.family}`.toLocaleLowerCase().includes(query)),
+    [options, query],
   );
 
   useEffect(() => {
@@ -75,6 +101,13 @@ export function FontFamilyPicker({
     };
   }, [open]);
 
+  const openPicker = () => {
+    setOpen(true);
+    // Enumerated once per page and only when the list is actually wanted: opening Settings is not a
+    // reason to shell out to the OS.
+    void loadInstalledFonts();
+  };
+
   const choose = (preset: FontPreset) => {
     setOpen(false);
     setActiveIndex(-1);
@@ -87,7 +120,7 @@ export function FontFamilyPicker({
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setOpen(true);
+      openPicker();
       setActiveIndex((index) => Math.min(index + 1, visible.length - 1));
       return;
     }
@@ -143,7 +176,7 @@ export function FontFamilyPicker({
           autoComplete="off"
           onChange={(event) => {
             onChange(event.target.value);
-            setOpen(true);
+            openPicker();
             setActiveIndex(-1);
           }}
         />
@@ -156,7 +189,8 @@ export function FontFamilyPicker({
           aria-haspopup="listbox"
           aria-expanded={open}
           onClick={() => {
-            setOpen((current) => !current);
+            if (open) setOpen(false);
+            else openPicker();
             inputRef.current?.focus();
           }}
         >
@@ -189,9 +223,12 @@ export function FontFamilyPicker({
               <li
                 key={preset.id}
                 role="option"
+                data-family={preset.family}
                 aria-selected={index === activeIndex}
                 className={`settings-font-picker-option${index === activeIndex ? " is-active" : ""}${preset.family === "" ? " is-default" : ""}`}
-                onMouseEnter={() => setActiveIndex(index)}
+                // onMouseMove, not onMouseEnter: a list that renders under a stationary cursor must not
+                // steal the keyboard's highlighted item before the first arrow key.
+                onMouseMove={() => setActiveIndex(index)}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(preset)}
               >

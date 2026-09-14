@@ -59,7 +59,9 @@ export const MONO_FONT_PRESETS: FontPreset[] = [
   { id: "jetbrains-mono", label: "JetBrains Mono", family: "JetBrains Mono" },
   { id: "fira-code", label: "Fira Code", family: "Fira Code" },
   { id: "ibm-plex-mono", label: "IBM Plex Mono", family: "IBM Plex Mono" },
-  { id: "sf-mono", label: "SF Mono", family: "SF Mono" },
+  // macOS does not let a page reach SF Mono by name (neither atsutil nor CoreText lists it; fontconfig
+  // only knows `.SF NS Mono`), so the family is reached through the CSS generic instead.
+  { id: "ui-monospace", label: "ui-monospace", family: "ui-monospace" },
   { id: "menlo", label: "Menlo", family: "Menlo" },
   { id: "consolas", label: "Consolas", family: "Consolas" },
   { id: "noto-sans-mono", label: "Noto Sans Mono", family: "Noto Sans Mono" },
