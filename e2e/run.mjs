@@ -13,6 +13,7 @@ import { checkExtensionDialogs, extensionSource } from "./extension-dialog.mjs";
 import { checkChatAppearance } from "./chat-appearance.mjs";
 import { checkFontSelection } from "./font-selection.mjs";
 import { checkStatusBar } from "./status-bar.mjs";
+import { checkMinimalChrome } from "./minimal-chrome.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const mode = process.env.E2E_SERVER_MODE || "dev";
@@ -362,6 +363,7 @@ try {
       await checkFontSelection(page);
       // Last: it navigates away, so anything with an expected starting location runs before it.
       await checkStatusBar(page, { base, cwd: project, sessionId: RICH });
+      await checkMinimalChrome(page, { base, cwd: project, sessionId: RICH });
     }
     assert.deepEqual(errors, [], `Browser errors at width ${viewport.width}`);
     console.log(`PASS: ${viewport.width}px browser pagination, branch, markdown, code, tool call, and compaction navigation`);

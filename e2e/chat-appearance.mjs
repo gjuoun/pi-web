@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 
 export async function checkChatAppearanceReset(page) {
-  const width = page.getByRole("slider", { name: "Chat content width", exact: true });
+  const width = page.getByRole("slider", { name: "Message width", exact: true });
   const fontSize = page.getByRole("slider", { name: "Chat font size", exact: true });
-  const resetWidth = page.getByRole("button", { name: "Reset chat content width", exact: true });
+  const resetWidth = page.getByRole("button", { name: "Reset message width", exact: true });
   const resetFontSize = page.getByRole("button", { name: "Reset chat font size", exact: true });
   await width.press("End");
   await fontSize.press("End");
@@ -36,7 +36,7 @@ export async function checkChatAppearance(page) {
   const textarea = page.locator(".chat-input-textarea");
   const openSettings = () => page.getByRole("button", { name: "Settings", exact: true }).click();
   const closeSettings = () => page.keyboard.press("Escape");
-  const width = page.getByRole("slider", { name: "Chat content width", exact: true });
+  const width = page.getByRole("slider", { name: "Message width", exact: true });
   const fontSize = page.getByRole("slider", { name: "Chat font size", exact: true });
   const font = (locator) => locator.evaluate((el) => getComputedStyle(el).fontSize);
   const fittedHeight = async () => {
@@ -59,19 +59,28 @@ export async function checkChatAppearance(page) {
   await width.press("Home");
   await closeSettings();
   const narrowHeight = await fittedHeight();
-  assert.ok(narrowHeight > wideHeight, "Narrowing must grow the draft without another keystroke");
+  // The width preference now governs the message column only: the composer spans the full column, so
+  // moving this slider must NOT reflow a draft. That decoupling is the assertion.
+  assert.equal(
+    narrowHeight,
+    wideHeight,
+    "The message-width preference must not resize the composer",
+  );
+  await openSettings();
+  await width.press("End");
+  await closeSettings();
 
   await openSettings();
   await fontSize.press("End");
   await closeSettings();
-  assert.ok(await fittedHeight() > narrowHeight, "Increasing the font must grow the draft");
+  const largerFontHeight = await fittedHeight();
+  assert.ok(largerFontHeight > wideHeight, "Increasing the font must grow the draft");
   await openSettings();
-  await width.press("End");
   await fontSize.press("Home");
   for (let i = 12; i < 18; i++) await fontSize.press("ArrowRight");
   await closeSettings();
   assert.equal(await textarea.inputValue(), draft);
-  assert.ok(await fittedHeight() < narrowHeight, "Widening must shrink the existing draft");
+  assert.ok(await fittedHeight() < largerFontHeight, "Reducing the font must shrink the existing draft");
   await page.reload({ waitUntil: "networkidle" });
   await page.locator(".markdown-code-block pre").waitFor();
   assert.equal(await font(textarea), "18px");

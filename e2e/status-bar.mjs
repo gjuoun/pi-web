@@ -1,118 +1,97 @@
 import assert from "node:assert/strict";
 
 /**
- * The chat status row has two display states:
+ * The chat status row's two display states.
  *
- *   fresh    `[provider/model] ⟷ [project]`, sized to the composer's own content box
- *   ongoing  `[provider/model] [project] [session name]` left, `[token info]` right, full width
+ * Covers the row only: `e2e/minimal-chrome.mjs` owns the composer's geometry, the rail and the
+ * toggles. The row's states are:
  *
- * The fresh state is asserted geometrically — the bar's border box must land on the composer's
- * `max-width`-bearing ancestor box — because that is the actual "same width as the input" claim and a
- * class-name assertion would pass on a bar that merely looks right.
+ *   fresh      `[model] ⟷ [project]`, no name, no tokens, no fold control
+ *   ongoing    `[model] [project] [session name]` left, `[token cluster]` right, foldable
  *
  * Model *content* is deliberately not asserted: this suite runs against a temp agent dir with no
- * models configured, so the cluster legitimately renders its "No models" placeholder here.
+ * models configured, so the cluster legitimately renders its "No models" placeholder. The session
+ * name is not asserted either — the fixtures are nameless.
  */
 
 const snapshot = (page) => page.evaluate(() => {
   const bar = document.querySelector(".chat-status-bar");
   const textarea = document.querySelector("textarea.chat-input-textarea");
-
-  // The composer's own content box: the nearest ancestor of the textarea that declares a max-width.
-  let composer = null;
-  for (let node = textarea; node; node = node.parentElement) {
-    const maxWidth = getComputedStyle(node).maxWidth;
-    if (maxWidth && maxWidth !== "none" && maxWidth !== "0px") {
-      const rect = node.getBoundingClientRect();
-      composer = { left: rect.left, width: rect.width };
-      break;
-    }
-  }
-
-  const rect = bar ? bar.getBoundingClientRect() : null;
   const fieldset = textarea ? textarea.closest("fieldset") : null;
-
-  // The full bottom-bar width: the composer frame's own content box. This — not the composer's 820px
-  // box — is what "full width" means, and unlike the composer box it does not move when the
-  // chat-content-width preference changes.
-  let available = null;
+  let frame = null;
   if (fieldset) {
     const style = getComputedStyle(fieldset);
-    const frame = fieldset.getBoundingClientRect();
-    const left = frame.left + parseFloat(style.paddingLeft);
-    const right = frame.right - parseFloat(style.paddingRight);
-    available = { left, width: right - left };
+    const rect = fieldset.getBoundingClientRect();
+    const left = rect.left + Number.parseFloat(style.paddingLeft);
+    const right = rect.right - Number.parseFloat(style.paddingRight);
+    frame = { left, width: right - left };
   }
-
+  const rect = bar ? bar.getBoundingClientRect() : null;
   return {
+    hasBar: Boolean(bar),
     className: bar ? bar.className : null,
-    segments: bar
-      ? Array.from(bar.children).map((child) => child.className)
-      : null,
+    hasStats: Boolean(bar && bar.querySelector(".chat-status-stats")),
+    hasName: Boolean(bar && bar.querySelector(".chat-status-name")),
+    hasFold: Boolean(bar && bar.querySelector('[data-chrome-toggle="status-fold"]')),
+    borderTopWidth: bar ? getComputedStyle(bar).borderTopWidth : null,
+    segments: bar ? Array.from(bar.children).map((child) => child.className) : null,
+    text: bar ? (bar.innerText || "").replace(/\s+/g, " ").trim() : null,
     bar: rect ? { left: rect.left, width: rect.width } : null,
-    composer,
-    available,
+    frame,
   };
 });
 
 const near = (a, b) => Math.abs(a - b) <= 1;
+const at = (segments, cls) => segments.findIndex((value) => value.split(/\s+/).includes(cls));
 
 export async function checkStatusBar(page, { base, cwd, sessionId }) {
-  await page.goto(`${base}/?cwd=${encodeURIComponent(cwd)}`, { waitUntil: "domcontentloaded" });
-  await page.locator(".chat-status-bar.is-fresh").waitFor();
-  const fresh = await snapshot(page);
-  assert.ok(fresh.className.split(/\s+/).includes("is-fresh"), `Fresh row must carry is-fresh: ${fresh.className}`);
-  assert.deepEqual(
-    fresh.segments,
-    ["chat-status-model", "chat-status-project"],
-    "The fresh row must be exactly [model][project] — no name and no token segment",
-  );
-  assert.ok(fresh.composer, "The composer's content box must be measurable");
-  assert.ok(
-    near(fresh.bar.left, fresh.composer.left),
-    `Fresh row must start on the composer box: bar=${fresh.bar.left} composer=${fresh.composer.left}`,
-  );
-  assert.ok(
-    near(fresh.bar.width, fresh.composer.width),
-    `Fresh row must match the composer box width: bar=${fresh.bar.width} composer=${fresh.composer.width}`,
-  );
-  console.log("PASS: fresh status row narrows to the composer box and shows only [model][project]");
-
   await page.goto(`${base}/?session=${sessionId}`, { waitUntil: "domcontentloaded" });
   await page.locator(".chat-status-bar").waitFor();
-  await page.waitForFunction(() => {
-    const bar = document.querySelector(".chat-status-bar");
-    return Boolean(bar && (bar.innerText || "").trim().length > 0);
-  });
+  await page.waitForFunction(() => (document.querySelector(".chat-status-bar")?.innerText ?? "").trim().length > 0);
+
   const ongoing = await snapshot(page);
+  assert.ok(ongoing.hasBar, "the status row renders");
+  assert.doesNotMatch(ongoing.className, /is-fresh/, "a session in progress is not fresh");
+  // [model][project][name][stats] — the name only when the session has one, which these fixtures do not.
+  const order = ["chat-status-model", "chat-status-project", "chat-status-stats"].map((cls) => at(ongoing.segments, cls));
   assert.ok(
-    !ongoing.className.split(/\s+/).includes("is-fresh"),
-    `A session in progress must not be narrowed: ${ongoing.className}`,
+    order.every((index) => index >= 0) && order[0] < order[1] && order[1] < order[2],
+    `the ongoing row must be [model][project]([name])[stats], got ${ongoing.segments}`,
   );
-  // The session name is optional — these fixtures are nameless — so the contract is
-  // `[model][project]([name])[stats]`: the three required segments in order, with the name, when it
-  // exists, sitting between the project and the token cluster. The named variant is covered by the
-  // plan's browser drive, which opens a real named session.
-  assert.deepEqual(
-    ongoing.segments.filter((cls) => cls !== "chat-status-name"),
-    ["chat-status-model", "chat-status-project", "chat-status-stats"],
-    "The ongoing row must be [model][project]([name])[stats] in that order",
-  );
-  const nameAt = ongoing.segments.indexOf("chat-status-name");
-  if (nameAt >= 0) {
-    assert.ok(
-      nameAt > ongoing.segments.indexOf("chat-status-project") &&
-        nameAt < ongoing.segments.indexOf("chat-status-stats"),
-      `A session name must sit between the project and the token cluster: ${ongoing.segments.join(" | ")}`,
-    );
-  }
+  assert.ok(ongoing.hasStats, "the ongoing row carries the token cluster");
+  assert.equal(ongoing.hasFold, false, "the row offers no fold control — it is always fully displayed");
+  // The row draws no line of its own — the input's bottom rule separates it.
+  assert.equal(ongoing.borderTopWidth, "0px", `the row must not draw its own line, got ${ongoing.borderTopWidth}`);
+  // Full width now, matching the composer above it rather than a reading-width cap. It shares its line
+  // with the composer-hide control, so it spans the content width *apart from that control*.
   assert.ok(
-    ongoing.available && near(ongoing.bar.left, ongoing.available.left),
-    `The ongoing row must start at the bottom-bar frame: bar=${ongoing.bar.left} available=${ongoing.available?.left}`,
+    ongoing.frame !== null && ongoing.bar !== null && near(ongoing.bar.left, ongoing.frame.left, 2),
+    `the row must start on the content edge: bar=${ongoing.bar?.left} frame=${ongoing.frame?.left}`,
   );
   assert.ok(
-    ongoing.available && near(ongoing.bar.width, ongoing.available.width),
-    `The ongoing row must span the full bottom-bar width: bar=${ongoing.bar.width} available=${ongoing.available?.width}`,
+    ongoing.frame !== null && ongoing.bar !== null
+      && ongoing.bar.width > ongoing.frame.width - 40 && ongoing.bar.width <= ongoing.frame.width,
+    `the row must span the content width apart from its own controls: bar=${ongoing.bar?.width} frame=${ongoing.frame?.width}`,
   );
-  console.log("PASS: ongoing status row spans full width as [model][project]([name])[stats]");
+  console.log("PASS: status row — ongoing state spans the content width and is always fully displayed");
+
+  await page.goto(`${base}/?cwd=${encodeURIComponent(cwd)}`, { waitUntil: "domcontentloaded" });
+  await page.locator(".chat-status-bar.is-fresh").waitFor();
+  await page.waitForTimeout(1000);
+  const fresh = await snapshot(page);
+  assert.match(fresh.className, /is-fresh/, "a new session shows the fresh state");
+  assert.equal(fresh.hasStats, false, "the fresh row shows no token cluster");
+  assert.equal(fresh.hasName, false, "the fresh row shows no session name");
+  assert.equal(fresh.hasFold, false, "the row never offers a fold control");
+  const freshOrder = ["chat-status-model", "chat-status-project"].map((cls) => at(fresh.segments, cls));
+  assert.ok(
+    freshOrder.every((index) => index >= 0) && freshOrder[0] < freshOrder[1],
+    `the fresh row must be exactly [model][project], got ${fresh.segments}`,
+  );
+  assert.ok(
+    fresh.frame !== null && fresh.bar !== null && near(fresh.bar.left, fresh.frame.left, 2)
+      && fresh.bar.width > fresh.frame.width - 40,
+    `the fresh row must span the content width apart from its own controls: bar=${fresh.bar?.left}/${fresh.bar?.width} frame=${fresh.frame?.left}/${fresh.frame?.width}`,
+  );
+  console.log("PASS: status row — fresh state is [model][project] at full width with no fold control");
 }

@@ -232,14 +232,14 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
           </div>
           <div className="settings-chat-option settings-chat-range-option">
             <div className="settings-chat-range-header">
-              <label htmlFor="settings-chat-content-width">{t("settings.chatContentWidth")}</label>
+              <label htmlFor="settings-chat-content-width">{t("settings.messageWidth")}</label>
               <output htmlFor="settings-chat-content-width">{chatContentWidth}px</output>
               <ConfigButton
                 variant="ghost"
                 size="small"
                 className="settings-chat-reset"
-                title={t("settings.resetChatContentWidth")}
-                aria-label={t("settings.resetChatContentWidth")}
+                title={t("settings.resetMessageWidth")}
+                aria-label={t("settings.resetMessageWidth")}
                 disabled={chatContentWidth === CHAT_CONTENT_WIDTH_DEFAULT}
                 onClick={() => setChatContentWidth(CHAT_CONTENT_WIDTH_DEFAULT)}
               >
