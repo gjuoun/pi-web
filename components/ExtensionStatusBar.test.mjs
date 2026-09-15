@@ -65,8 +65,9 @@ test("keeps the status bar text unwrapped and never truncates it", async () => {
 
   // The row's max-height + overflow-y: auto is the only cap; the text itself is never clipped.
   assert.match(extRule, /white-space:\s*pre\s*;/);
-  // The line-3 bar keeps the same even padding as the status row.
-  assert.match(extRule, /padding:\s*2px 15px/);
+  // The line-3 bar keeps the same even padding as the status row, which is 14px now that the
+  // composer has no side borders to add a 15th pixel of inset.
+  assert.match(extRule, /padding:\s*4px 4px/);
   assert.doesNotMatch(extRule, /overflow[^:]*:\s*hidden/);
   assert.doesNotMatch(extRule, /text-overflow:\s*ellipsis/);
   assert.match(statusTextRule, /white-space:\s*pre\s*;/);

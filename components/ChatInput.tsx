@@ -43,6 +43,8 @@ interface Props {
   onPromptWithStreamingBehavior?: (message: string, behavior: "steer" | "followUp", images?: AttachedImage[]) => void;
   isStreaming: boolean;
   /** Text-only composer without the session controls or outer spacing. */
+  /** Start with the actions bar revealed instead of collapsed (embedding and tests). */
+  initialActionsOpen?: boolean;
   compact?: boolean;
   model?: { provider: string; modelId: string } | null;
   modelList?: { id: string; name: string; provider: string; input?: string[] }[];
@@ -524,6 +526,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   draftKey,
   cwd,
   compact = false,
+  initialActionsOpen = false,
 }: Props, ref) {
   const { t } = useI18n();
   const { fontSize } = useChatAppearance();
@@ -547,6 +550,30 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const [historyMenuOpen, setHistoryMenuOpen] = useState(false);
   const [historyActiveIndex, setHistoryActiveIndex] = useState(0);
   const [builtinCommandPending, setBuiltinCommandPending] = useState(false);
+  /** The actions bar is collapsed by default: the input is bare until there is something to do. */
+  const [actionsOpen, setActionsOpen] = useState(initialActionsOpen);
+  /**
+   * The primary action is shown when the bar is open, when there is something to send, or while a run is
+   * live — a run must always be stoppable, and on mobile plain Enter does not send (see `handleKeyDown`).
+   */
+  const showPrimary = compact || actionsOpen || Boolean(value.trim()) || attachedImages.length > 0 || isStreaming || isCompacting;
+  const composerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (composerRef.current && !composerRef.current.contains(event.target as Node)) setActionsOpen(false);
+    };
+    // `globalThis.` because this file imports React's KeyboardEvent (textarea handlers).
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setActionsOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [actionsOpen]);
   const builtinCommandPendingRef = useRef(false);
   const [fileIndex, setFileIndex] = useState<{ cwd: string; entries: FileIndexEntry[]; truncated: boolean } | null>(null);
   const [fileIndexLoading, setFileIndexLoading] = useState(false);
@@ -1495,6 +1522,18 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // The rail's colour is the state channel. ChatInput has no thinking level — that lives in the
+  // status bar — so there are three states: shell mode, a run in flight, and nothing to announce.
+  // The colours themselves are declared in `app/globals.css` against `data-state`, so that
+  // `:focus-within` can override them: an inline colour would outrank the stylesheet and win.
+  const railWorking = isStreaming && Boolean(onSteer || onFollowUp);
+  const railState = bashMode ? "shell" : railWorking ? "working" : "idle";
+  const railLabel = railState === "shell"
+    ? `${t("chat.shell")} · ${t(bashExcluded ? "chat.outputLocal" : "chat.outputModel")}`
+    : railState === "working"
+      ? t("chat.railWorking")
+      : undefined;
+
   return (
     <fieldset
       disabled={builtinCommandPending}
@@ -1505,7 +1544,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         margin: 0,
         border: 0,
         background: "transparent",
-        padding: compact ? 0 : "0 16px 8px",
+        padding: compact ? 0 : "0 16px",
         paddingRight: compact ? 0 : isMobile ? 16 : 52, // desktop: 16px base + 36px for ChatMinimap alignment
         opacity: builtinCommandPending ? 0.5 : 1,
         transition: "opacity 0.15s",
@@ -1524,7 +1563,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           e.target.value = "";
         }}
       />}
-      <div style={{ maxWidth: "var(--chat-content-max-width, 820px)", margin: "0 auto" }}>
+      <div>
         <ModelErrorBanner error={modelError} />
         <ModelScopeWarningBanner warnings={modelScopeWarnings} />
         {showImageUnsupportedWarning && (() => {
@@ -1538,72 +1577,43 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             />
           );
         })()}
-        {/* Queued steering / follow-up messages (delivered by pi on upcoming turns) */}
+        {/* Queued steering / follow-up messages (delivered by pi on upcoming turns). Flat dim rows —
+            the shape pi itself uses (`Steering:` / `Follow-up:`) — not a bordered panel: the panel's
+            header and its `Queued · N` count were chrome around information the row already carries. */}
         {((queuedMessages?.steering.length ?? 0) + (queuedMessages?.followUp.length ?? 0)) > 0 && (
-          <div style={{
-            marginBottom: 8,
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            background: "var(--bg-panel)",
-            padding: "5px 0",
-          }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 8,
-              padding: "2px 8px 4px 10px",
-            }}>
-              <span style={{
-                fontSize: 10,
-                fontFamily: "var(--font-mono)",
-                color: "var(--text-dim)",
-                textTransform: "uppercase",
-                letterSpacing: 0.4,
-              }}>
-                {t("chat.queued", { count: (queuedMessages?.steering.length ?? 0) + (queuedMessages?.followUp.length ?? 0) })}
-              </span>
-              {onRecallQueue && (
+          <div style={{ marginBottom: 6 }}>
+            {queuedMessages?.steering.map((text, i) => (
+              <div key={`steer-${i}`} data-chat-queued="steer">
+                <QueuedMessageRow kind="steer" text={text} />
+              </div>
+            ))}
+            {queuedMessages?.followUp.map((text, i) => (
+              <div key={`followup-${i}`} data-chat-queued="follow-up">
+                <QueuedMessageRow kind="follow-up" text={text} />
+              </div>
+            ))}
+            {onRecallQueue && (
+              <div style={{ display: "flex", justifyContent: "flex-end", padding: "2px 4px 0" }}>
                 <button
+                  type="button"
+                  data-chat-recall=""
                   onClick={onRecallQueue}
-                   title={t("chat.recallTitle")}
+                  title={t("chat.recallTitle")}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "4px 12px",
-                    fontSize: 12,
-                    color: "var(--text)",
-                    background: "transparent",
-                    border: "1px solid var(--border)",
-                    borderRadius: 7,
-                    cursor: "pointer",
-                    transition: "background 0.12s, border-color 0.12s",
-                    whiteSpace: "nowrap",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "var(--bg-hover)";
-                    e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 45%, var(--border))";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.borderColor = "var(--border)";
+                    display: "flex", alignItems: "center", gap: 5,
+                    padding: "1px 2px", border: "none", background: "transparent",
+                    color: "var(--text-muted)", cursor: "pointer",
+                    fontFamily: "var(--font-mono)", fontSize: 10,
                   }}
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <polyline points="9 14 4 9 9 4" />
                     <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
                   </svg>
-                   {t("chat.recall")}
+                  {t("chat.recall")}
                 </button>
-              )}
-            </div>
-            {queuedMessages?.steering.map((text, i) => (
-              <QueuedMessageRow key={`steer-${i}`} kind="steer" text={text} />
-            ))}
-            {queuedMessages?.followUp.map((text, i) => (
-              <QueuedMessageRow key={`followup-${i}`} kind="follow-up" text={text} />
-            ))}
+              </div>
+            )}
           </div>
         )}
         {/* Retry banner */}
@@ -1654,11 +1664,11 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             {compactError}
           </div>
         )}
-        {/* Image previews */}
+        {/* Image previews, above the input frame and visible at rest — never collapsed behind a count. */}
         {attachedImages.length > 0 && (
           <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
             {attachedImages.map((img, i) => (
-              <div key={i} style={{ position: "relative", flexShrink: 0 }}>
+              <div key={i} data-chat-chip="" style={{ position: "relative", flexShrink: 0 }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={img.previewUrl}
@@ -2029,29 +2039,41 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             );
           })()}
           <div
+            ref={composerRef}
+            data-chat-rail=""
+            data-chat-composer-box=""
+            data-state={railState}
+            data-compact={compact ? "true" : undefined}
+            className="chat-rail"
             style={{
+              position: "relative",
               minWidth: 0,
               display: "flex",
               flexDirection: compact ? "column" : "row",
-              gap: 8,
+              gap: 6,
               alignItems: compact ? "stretch" : textareaMultiline ? "flex-end" : "center",
-              background: "var(--bg)",
-              border: compact ? "none" : `1px solid ${bashMode ? "var(--tool-bg)" : isStreaming && (onSteer || onFollowUp)
-                ? "rgba(234,179,8,0.4)"
-                : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
-              borderRadius: compact ? 0 : 14,
-              padding: compact ? 0 : "10px 14px",
-              boxShadow: compact ? "none" : "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)",
-              transition: "border-color 0.15s, background 0.15s, box-shadow 0.15s",
+              // The rules and their colour are declared in `app/globals.css` against .chat-rail.
+              background: "transparent",
+              borderRadius: 0,
+              padding: compact ? 0 : "6px 4px",
             } as React.CSSProperties}
           >
-          {!compact && (
+          {/* The rail is a wordless tinted line; the state reaches assistive tech from here. Absent
+              while idle, so the app never opens a live region that has nothing to say. */}
+          <span
+            data-chat-rail-status=""
+            role={railState === "idle" ? undefined : "status"}
+            aria-label={railLabel}
+            className="sr-only"
+          />
+          {!compact && actionsOpen && (
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => { setActionsOpen(false); fileInputRef.current?.click(); }}
               title={t("chat.attachImage")}
               aria-label={t("chat.attachImage")}
               className={`chat-composer-action is-attach${attachedImages.length ? " is-active" : ""}`}
+              data-chat-action="attach"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -2112,7 +2134,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             }}
           />
 
-          {compact ? (
+          {showPrimary && (compact ? (
             <button
               onClick={handleSend}
               disabled={!value.trim() && !attachedImages.length}
@@ -2146,23 +2168,62 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               title={t("chat.stopCompaction")}
               aria-label={t("chat.stopCompaction")}
               className="chat-composer-action is-danger"
+              data-chat-action="stop-compaction"
             >
               <svg width="11" height="11" viewBox="0 0 10 10" fill="none" aria-hidden="true">
                 <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
               </svg>
             </button>
           ) : isStreaming ? (
-            <button
-              type="button"
-              onClick={onAbort}
-              title={t("chat.stopAgent")}
-              aria-label={t("chat.stop")}
-              className="chat-composer-action is-danger"
-            >
-              <svg width="11" height="11" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
-              </svg>
-            </button>
+            <>
+              {/* Contextual primary: stop while the draft is empty, steer once it has text. Esc also
+                  interrupts, but a phone has no Esc, so stopping must never be keyboard-only. */}
+              {showPrimary && (value.trim() || attachedImages.length ? (
+                <button
+                  type="button"
+                  data-chat-action="steer"
+                  onClick={() => sendQueued("steer")}
+                  title={t("chat.steer")}
+                  aria-label={t("chat.steer")}
+                  className="chat-composer-action is-send is-active"
+                >
+                  <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <line x1="2" y1="7" x2="11" y2="7" />
+                    <polyline points="7.5 3 12 7 7.5 11" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  data-chat-action="stop"
+                  onClick={onAbort}
+                  title={t("chat.stopAgent")}
+                  aria-label={t("chat.stop")}
+                  className="chat-composer-action is-danger"
+                >
+                  <svg width="11" height="11" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                    <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
+                  </svg>
+                </button>
+              )
+              )}
+              {/* The action the deleted hint row used to document: Alt+Enter, made visible. */}
+              {actionsOpen && onFollowUp && (
+                <button
+                  type="button"
+                  data-chat-action="queue"
+                  onClick={() => sendQueued("followup")}
+                  title={t("chat.queueFollowUp")}
+                  aria-label={t("chat.queueFollowUp")}
+                  className="chat-composer-action is-queue"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4 6v6a3 3 0 0 0 3 3h10" />
+                    <polyline points="14 12 17 15 14 18" />
+                  </svg>
+                </button>
+              )}
+            </>
           ) : (
             <button
               type="button"
@@ -2171,27 +2232,35 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               title={t("chat.send")}
               aria-label={t("chat.send")}
               className={`chat-composer-action is-send${(value.trim() || attachedImages.length) ? " is-active" : ""}`}
+              data-chat-action="send"
             >
               <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <line x1="2" y1="7" x2="11" y2="7" />
                 <polyline points="7.5 3 12 7 7.5 11" />
               </svg>
             </button>
+          )
+          )}
+          {/* The disclosure control. Collapsed, the input is text and one dot-dot-dot. */}
+          {!compact && (
+            <button
+              type="button"
+              data-chat-actions-toggle=""
+              aria-expanded={actionsOpen}
+              aria-label={t("chat.moreActions")}
+              title={t("chat.moreActions")}
+              className={`chat-composer-action is-more${actionsOpen ? " is-active" : ""}`}
+              onClick={() => setActionsOpen((open) => !open)}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="5" cy="12" r="1.7" />
+                <circle cx="12" cy="12" r="1.7" />
+                <circle cx="19" cy="12" r="1.7" />
+              </svg>
+            </button>
           )}
           </div>
-          {!compact && (isStreaming || isCompacting) && (
-            <div className="chat-composer-hint">
-              {isCompacting && !isStreaming ? t("chat.compacting") : t("chat.queueHint")}
-            </div>
-          )}
         </div>
-
-        {/* Bash mode status label */}
-        {bashMode && (
-          <div className="text-xs px-2 py-1" style={{ color: bashExcluded ? "var(--text-muted)" : "var(--accent)", marginTop: 4 }}>
-             {t("chat.shell")} · {bashExcluded ? t("chat.outputLocal") : t("chat.outputModel")}
-          </div>
-        )}
 
       </div>
     </fieldset>

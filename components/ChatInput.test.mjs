@@ -159,19 +159,20 @@ test("cycleListIndex wraps in both directions", () => {
   assert.equal(cycleListIndex(-1, 4, 1), 0);
 });
 
-test("keeps the queue actions off the composer and hints the keyboard instead", () => {
+test("keeps the actions behind a disclosure control, and the hint line deleted", () => {
   const html = renderToStaticMarkup(
     React.createElement(I18nProvider, null, React.createElement(ChatInput, {
       onSend() {}, onAbort() {}, onSteer() {}, onFollowUp() {}, isStreaming: true,
     })),
   );
 
-  // pi queues with Enter / Alt+Enter rather than dedicated buttons, so the composer shows the
-  // two-icon shape (attach left, stop right) plus a mono hint.
-  assert.match(html, /class="chat-composer-hint"/);
-  assert.match(html, /Alt\+Enter queues a follow-up/);
-  assert.doesNotMatch(html, />Steer<\/button>|>Follow-up<\/button>/);
-  assert.match(html, /aria-label="Attach image"/);
+  // Enter steers and Alt+Enter queues. Both are icons now, so the mono hint row is gone and the
+  // actions no longer depend on knowing the keys — which matters because a phone has no Alt or Esc.
+  assert.doesNotMatch(html, /class="chat-composer-hint"/);
+  assert.doesNotMatch(html, /Alt\+Enter queues a follow-up/);
+  // Collapsed, a streaming composer offers the disclosure control and stop — nothing else. Stop cannot
+  // hide: on mobile plain Enter does not send, and Esc does not exist.
+  assert.match(html, /data-chat-actions-toggle/);
   assert.match(html, /aria-label="Stop"/);
   assert.equal((html.match(/<button\b/g) ?? []).length, 2);
 });

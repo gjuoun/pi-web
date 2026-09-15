@@ -357,17 +357,20 @@ test("styles the bar as one scrollable mono row with a fixed popover", async () 
   assert.match(barRule, /font-family:\s*var\(--font-mono\)/);
   assert.match(barRule, /font-size:\s*11px/);
   // Even top/bottom padding: the row and the line-3 bar share one vertical rhythm.
-  assert.match(barRule, /padding:\s*2px 15px/);
+  assert.match(barRule, /padding:\s*4px 4px/);
   // The bar spans the full bottom-bar width by default and keeps the horizontal separator above it.
   assert.match(barRule, /width:\s*100%/);
   assert.doesNotMatch(barRule, /max-width/);
-  assert.match(barRule, /border-top:\s*1px solid var\(--border\)/);
-  // Only the fresh state narrows the row to the composer's own content box, so the bar's edges land
-  // on the input's edges. 820px is the same variable the composer's inline-styled box reads.
-  assert.match(freshRule, /max-width:\s*var\(--chat-content-max-width,\s*820px\)/);
-  assert.match(freshRule, /margin:\s*0 auto/);
+  // The line moved to the composer: the row must not draw one of its own, or the column grows a
+  // third rule (the composer already has a top and a bottom one).
+  assert.doesNotMatch(barRule, /border-top/);
+  // The fresh row no longer narrows itself: the composer above it is full width now, so capping the
+  // row would pull its edges off the input's. It must not read the reading-width preference at all.
+  assert.doesNotMatch(freshRule, /max-width/);
   // ...and it drops the separator: with no session running there is no footer to divide off.
-  assert.match(freshRule, /border-top:\s*none/);
+  // The fresh row's rule had nothing left to say once the cap moved to the composer, so the whole
+  // block is gone rather than reduced to a dead override.
+  assert.equal(freshRule, "");
   // The old two-line block is gone from the stylesheet.
   assert.doesNotMatch(css, /\.chat-status-line\s*\{/);
   // ...and so is the single project-plus-name span it used to share.
