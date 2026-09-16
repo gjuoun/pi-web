@@ -5,6 +5,7 @@ import type { SessionInfo } from "@/lib/types";
 import { collapseHomePath } from "@/lib/path-display";
 import { listSessionFamilies } from "@/lib/session-family";
 import { loadExplorerOpen, saveExplorerOpen } from "@/lib/file-explorer-state";
+import { EXPLORER_ENABLED } from "@/lib/feature-flags";
 import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
 import { skillExpansionToCommand } from "@/lib/slash-display";
 import { getProjectActivity, getRecentProjects, sessionsForProject } from "@/lib/project-groups";
@@ -998,6 +999,19 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 <circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" />
               </svg>
             </button>
+            {!EXPLORER_ENABLED && onOpenTerminal && (
+              <span data-action="open-terminal" style={{ display: "flex" }}>
+                <ToolbarIconButton
+                  onClick={() => onOpenTerminal(selectedCwd ?? selectedCwdProp!)}
+                  title={t("terminal.open")}
+                  color="var(--text-dim)"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
+                  </svg>
+                </ToolbarIconButton>
+              </span>
+            )}
           </div>
         </div>
 
@@ -1642,9 +1656,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       </div>
       </SessionSearch>
 
-      {/* File Explorer section */}
-      {(selectedCwdProp || selectedCwd) && (
+      {/* File Explorer section — hidden while EXPLORER_ENABLED is false (lib/feature-flags.ts) */}
+      {EXPLORER_ENABLED && (selectedCwdProp || selectedCwd) && (
         <div
+          data-panel="explorer"
           style={{
             borderTop: "1px solid var(--border)",
             display: "flex",

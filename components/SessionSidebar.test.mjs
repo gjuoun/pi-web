@@ -45,6 +45,13 @@ test("does not register row-level session deletion shortcuts", () => {
   assert.doesNotMatch(sessionItemSource, /tabIndex=\{0\}/);
 });
 
+test("hides the Explorer panel behind its feature flag and keeps a terminal action reachable", () => {
+  assert.match(source, /EXPLORER_ENABLED && \(selectedCwdProp \|\| selectedCwd\)/);
+  assert.match(source, /data-panel="explorer"/);
+  assert.match(source, /!EXPLORER_ENABLED && onOpenTerminal/);
+  assert.match(source, /data-action="open-terminal"/);
+});
+
 test("polls running sessions only while the tab is visible", () => {
   assert.doesNotMatch(source, /new EventSource\("\/api\/agent\/running\/events"\)/);
   assert.match(source, /fetch\("\/api\/agent\/running"/);
