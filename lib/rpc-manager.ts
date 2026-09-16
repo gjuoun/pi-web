@@ -8,6 +8,7 @@ import { validateAgentImages } from "./image-attachments";
 import { invalidateModelsCache } from "./models-cache";
 import { resolveVisibleModels, selectInitialModelScope } from "./model-scope";
 import { cacheSessionPath, getLatestModelChange, invalidateSessionListCache } from "./session-reader";
+import type { SessionConfig } from "./session-config";
 import { getProjectTrustStatus, projectTrustReloadOptions } from "./project-trust";
 import { persistExplicitStartupPreferences } from "./startup-preferences";
 import { notifySessionComplete } from "./web-push";
@@ -140,13 +141,8 @@ const COMMANDS_ALLOWED_DURING_SESSION_REPLACEMENT = new Set([
   "extension_ui_input",
 ]);
 
-export interface RpcSessionStartOptions {
-  initialModel?: { provider: string; modelId: string };
-  allowInitialModelFallback?: boolean;
-  thinkingLevel?: ThinkingLevel;
-}
-
-const THINKING_LEVEL_NAMES = new Set<ThinkingLevel>(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
+// Session creation takes the typed bundle from lib/session-config.ts
+// (SessionConfig). The old RpcSessionStartOptions shape is absorbed into it.
 
 // Extensions require a complete Theme, while the web UI applies its own styling.
 class PlainTextTheme extends Theme {
@@ -1821,10 +1817,9 @@ export function getCompletionNotificationSuppressedRpcSessionIds(): string[] {
 export async function startRpcSession(
   sessionId: string,
   sessionFile: string,
-  cwd: string | undefined,
-  options: RpcSessionStartOptions = {},
+  config: SessionConfig = {},
 ): Promise<{ session: AgentSessionWrapper; realSessionId: string }> {
-  const { initialModel, allowInitialModelFallback, thinkingLevel } = options;
+  const { cwd, initialModel, allowInitialModelFallback, thinkingLevel } = config;
   const registry = getRegistry();
   const locks = getLocks();
 

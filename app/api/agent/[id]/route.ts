@@ -55,7 +55,7 @@ export async function POST(
       }));
     }
 
-    const { session } = yield* safeAsync(() => startRpcSession(id, filePath, undefined))
+    const { session } = yield* safeAsync(() => startRpcSession(id, filePath))
       .mapErr((message) => fail.internal(message, rejectionFields()));
     const sent = yield* safeAsync(() => session.send(body))
       .mapErr((message) => fail.internal(message, rejectionFields()));

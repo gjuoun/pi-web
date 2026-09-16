@@ -31,7 +31,7 @@ export async function GET(
       .andThen((path) => (path ? ok(path) : err(fail.notFound("Session not found"))));
     if (outcome.isErr()) return failureResponse(outcome.error);
     if (req.signal.aborted) return new Response(null, { status: 204 });
-    sessionPromise = startRpcSession(id, outcome.value, undefined).then((result) => result.session);
+    sessionPromise = startRpcSession(id, outcome.value).then((result) => result.session);
   }
 
   const stream = createAgentEventStream(req, id, sessionPromise);
