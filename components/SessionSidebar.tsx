@@ -1037,6 +1037,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         {/* CWD picker */}
         <div ref={dropdownRef} style={{ position: "relative" }}>
           <button
+            data-action="open-project-picker"
             onClick={() => setDropdownOpen((v) => !v)}
             title={selectedProject?.root ?? selectedCwd ?? ""}
             style={{
@@ -1142,6 +1143,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 {visibleProjects.map((project) => (
                   <button
                     key={project.key}
+                    data-project-option
+                    data-project-key={project.key}
                     onClick={() => {
                       setSelectedCwd(project.root);
                       setProjectFilter("");
