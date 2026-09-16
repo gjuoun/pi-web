@@ -31,3 +31,23 @@ export function safeRequestJson(request: Request): ResultAsync<unknown, string> 
 export function safeAsync<T>(fn: () => Promise<T>): ResultAsync<T, string> {
   return ResultAsync.fromPromise(fn(), errorMessage);
 }
+
+/**
+ * Errno-style sync outcome (wiki eliminate-try-catch#errno-style-apis): for APIs whose
+ * callers only branch on "did it land" and the errno code. Call sites read `.ok`/`.code`
+ * directly instead of unwrapping a Result.
+ */
+export type SyncOutcome<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly code: string; readonly message: string };
+
+export function trySync<T>(fn: () => T): SyncOutcome<T> {
+  return fromThrowable(fn, (e): SyncOutcome<T> => ({
+    ok: false,
+    code: (e as NodeJS.ErrnoException)?.code ?? "UNKNOWN",
+    message: errorMessage(e),
+  }))().match(
+    (value) => ({ ok: true as const, value }),
+    (failure) => failure,
+  );
+}

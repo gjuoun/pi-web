@@ -155,7 +155,9 @@ test("session listing merges live registry snapshots and honors force refresh", 
   assert.match(listRoute, /listAllSessions\(\{ force \}\)/);
   assert.match(listRoute, /attachSessionProjectInfo\(getRpcSessionInfos\(\)\)/);
   assert.match(listRoute, /mergeSessionLists\(persistedSessions, runtimeSessions\)/);
-  assert.match(listRoute, /"Cache-Control": "no-store"/);
+  // no-store moved into the kernel: respondJson owns that header on both sides
+  // (pinned in lib/result/route.test.mjs).
+  assert.match(listRoute, /respondJson\(req, result\)/);
 });
 
 test("session reads use the live SessionManager before requiring a JSONL path", () => {

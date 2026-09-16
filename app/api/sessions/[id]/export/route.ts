@@ -5,8 +5,11 @@ import { tmpdir } from "os";
 import { basename, dirname, join } from "path";
 import { promisify } from "util";
 import { fileURLToPath, pathToFileURL } from "url";
-import { NextResponse } from "next/server";
+import { err, ok, safeTry } from "neverthrow";
 import { resolveSessionPath } from "@/lib/session-reader";
+import { fail } from "@/lib/result/failures";
+import { failureResponse } from "@/lib/result/route";
+import { safeAsync, safeSync, trySync } from "@/lib/result/safe";
 
 const execFileAsync = promisify(execFile);
 
@@ -244,39 +247,44 @@ export async function GET(
 ) {
   const { id } = await params;
   const inline = new URL(req.url).searchParams.get("inline") === "1";
+  let outputPath: string | undefined;
 
-  try {
-    const filePath = await resolveSessionPath(id);
+  const outcome = await safeTry(async function* () {
+    const filePath = yield* safeAsync(() => resolveSessionPath(id)).mapErr(fail.internal);
     if (!filePath) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return err(fail.notFound("Session not found"));
     }
 
     const tempDir = join(tmpdir(), "pi-web-export");
-    mkdirSync(tempDir, { recursive: true });
+    yield* safeSync(() => mkdirSync(tempDir, { recursive: true })).mapErr(fail.internal);
 
     const sessionBase = basename(filePath, ".jsonl");
     const fileName = `pi-session-${sessionBase}.html`;
-    const outputPath = join(tempDir, `${randomUUID()}.html`);
+    outputPath = join(tempDir, `${randomUUID()}.html`);
+    const out = outputPath;
 
-    try {
-      await exportSession(filePath, outputPath);
+    const patchedHtml = yield* safeAsync(async () => {
+      await exportSession(filePath, out);
+      const html = readFileSync(out, "utf8");
+      return patchExportHtml(html);
+    }).mapErr(fail.internal);
+    return ok({ patchedHtml, fileName });
+  });
 
-      const html = readFileSync(outputPath, "utf8");
-      const patchedHtml = patchExportHtml(html);
-      return new Response(patchedHtml, {
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
-          "Content-Disposition": getContentDisposition(fileName, inline),
-          "Cache-Control": "no-cache",
-          "Content-Security-Policy": "frame-ancestors 'none'",
-          "X-Content-Type-Options": "nosniff",
-          "X-Frame-Options": "DENY",
-        },
-      });
-    } finally {
-      rmSync(outputPath, { force: true });
-    }
-  } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
-  }
+  // Best-effort temp cleanup on every path (the old `finally` could mask a
+  // successful response when rmSync itself threw).
+  const out = outputPath;
+  if (out) trySync(() => rmSync(out, { force: true }));
+
+  if (outcome.isErr()) return failureResponse(outcome.error);
+  return new Response(outcome.value.patchedHtml, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Disposition": getContentDisposition(outcome.value.fileName, inline),
+      "Cache-Control": "no-cache",
+      "Content-Security-Policy": "frame-ancestors 'none'",
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+    },
+  });
 }
