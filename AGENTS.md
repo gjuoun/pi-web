@@ -85,6 +85,11 @@ lib/
   pi-types.ts          local structural types for pi SDK objects
   rpc-manager.ts      AgentSessionWrapper + registry + startRpcSession
   session-reader.ts   SessionManager wrappers + path cache + buildSessionContext adapter
+  session-tabs.ts     pure session-tab model (open/close/select/cycle + persist/restore)
+  session-list-rows.ts  all-projects row model + list geometry (rowLayout/visibleRowIndices)
+  ui-state.ts         browser-local layout state (tabs, project expansion, pins) + validation
+  ui-state-store.ts   the single live owner of UiState, shared by AppShell and the sidebar
+  feature-flags.ts    build-time switches (EXPLORER_ENABLED)
   subagents.ts        reader for the pi-web:subagent* session markers
   pi-subagents-bridge.ts  observes the pi-subagents engine: runs, attach, marker stamping
   types.ts            shared TypeScript types
@@ -94,6 +99,7 @@ lib/
 components/
   AppShell.tsx        layout + URL state + tab management
   SessionSidebar.tsx  session tree + FileExplorer
+  SessionTabs.tsx     session tab strip (one tab per open session, any project)
   ChatWindow.tsx      chat composition + completion sound wrapper
   ChatInput.tsx       input bar + model/thinking/tools/compact controls
   MessageView.tsx     renders one message (user/assistant/toolCall/toolResult)
@@ -173,6 +179,33 @@ Newer pi emits `compaction_start` / `compaction_end`; older versions emitted `au
 - `useAgentSession` treats per-session SSE as primary for chat events and opens it before each prompt. `prompt_done` completes the current UI stage and notification immediately, but the idle SSE stays open for a 30-second grace window and is reused by the next prompt. `agent_start` cancels that close timer; `agent_settled` finishes extension-injected runs that have no wrapper-level `prompt_done` and starts a fresh grace window. Do not close on the first `agent_end`: retries, compaction, and extension-queued messages can continue the same logical prompt.
 - While a run is active, `useAgentSession` periodically calls `GET /api/agent/[id]` and also reconciles on `visibilitychange`/`online`. This fixes missed terminal events from background tabs or half-open connections.
 - Prompt runs use a monotonic run id; late SSE or slow reconciliation responses from an old run must be ignored so they cannot resurrect stale streaming bubbles.
+
+### Session browsing: every project at once, with tabs (2026-09-16)
+
+The sidebar lists **every project and its sessions simultaneously** — there is no selected project. Project
+headers come from `lib/session-list-rows.ts` (`buildSessionListRows`), which is a pure model: it orders
+projects by activity, buckets sessions with no resolvable root under `standalone`, floats pinned sessions,
+and applies the query/archive filters. The list is virtualized over **mixed row heights**
+(`PROJECT_HEADER_HEIGHT` 32 for a header, `SESSION_ROW_HEIGHT` 54 for a session) via `rowLayout` +
+`visibleRowIndices`; never reintroduce `index * height`.
+
+A **session tab** is an open session, and only the active tab's `<ChatWindow>` is mounted (lazy tabs: one
+live SSE stream). The strip is `components/SessionTabs.tsx`; AppShell owns open/close/switch through the
+shared store. Shortcuts are **Option-based** (`Alt+1-9` select, `Alt+W` close, `Alt+[`/`Alt+]` cycle)
+because `Cmd+digit` and `Cmd+W` are browser-owned and cannot be prevented in a web app.
+
+The tab set, per-project expansion and pins live in **one** browser-local payload (`pi-web:ui-state`), owned
+by `lib/ui-state-store.ts`. Neither AppShell nor the sidebar may keep a private copy: two writers each
+persisting the whole payload would clobber the other's half. `lib/ui-state.ts` is the pure format +
+validators, and a restored tab set is validated against the live catalogue so a deleted session cannot leave
+a dead tab.
+
+Opening a session is **not destructive**: `handleCwdChange` only parks the new-session draft, mints its
+composer key and picks up a project's last session when nothing is open.
+
+`lib/feature-flags.ts#EXPLORER_ENABLED` is `false`, so the sidebar's file Explorer is not rendered while the
+session list needs the room. Its component, `/api/files`, upload and `@`-mention insertion stay wired, and
+the terminal action it used to host now lives in the sidebar header (`data-action="open-terminal"`).
 
 ### Worktrees and project grouping
 - `lib/worktree.ts` resolves linked worktree top-levels back to the main repo `projectRoot`; `listAllSessions()` attaches that to each `SessionInfo` so all worktrees for one repo are grouped together in the sidebar.
