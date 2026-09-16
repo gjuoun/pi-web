@@ -6,7 +6,7 @@ import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar } from "./SessionSidebar";
 import { SessionTabs } from "./SessionTabs";
 import { closeTab, cycleTab, openTab, selectTab, type TabSet } from "@/lib/session-tabs";
-import { tabForSession } from "@/lib/ui-state";
+import { tabForSession, resolveTabs } from "@/lib/ui-state";
 import { setUiState, useUiState } from "@/lib/ui-state-store";
 
 /**
@@ -147,6 +147,18 @@ export function AppShell() {
       return next === current.tabs ? current : { ...current, tabs: next };
     });
   }, []);
+
+  // Step 13: a restored tab set is validated against the sessions the server actually has, so a session
+  // deleted while the app was closed cannot leave a dead tab (or a stale active tab) behind.
+  useEffect(() => {
+    if (sessionCatalog.length === 0) return;
+    setUiState((current) => {
+      const resolved = resolveTabs(current, sessionCatalog.map((session) => session.id));
+      const unchanged = resolved.tabs.length === current.tabs.tabs.length
+        && resolved.activeId === current.tabs.activeId;
+      return unchanged ? current : { ...current, tabs: resolved };
+    });
+  }, [sessionCatalog]);
   const sessionsWithSelection = useMemo(() => {
     if (!selectedSession) return sessionCatalog;
     return [

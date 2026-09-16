@@ -1676,7 +1676,9 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                       </span>
                       <span style={{ color: "var(--text-dim)", fontWeight: 500 }}>({row.count})</span>
                       <span style={{ flex: 1 }} />
-                      {showProjectActivity({ running: row.running, unread: row.unread }, t)}
+                      <span data-project-rollup>
+                        {showProjectActivity({ running: row.running, unread: row.unread }, t)}
+                      </span>
                     </button>
                   </div>
                 );
