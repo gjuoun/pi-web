@@ -699,44 +699,28 @@ export function AppShell() {
     ) {
       return;
     }
-    // Close any session that belongs to a different project — it no longer
-    // matches the selected project directory.
-    const previousDraftKey = activeNewSessionDraftKeyRef.current;
-    if (previousDraftKey && currentFreshCwd) {
-      rekeyDraft(previousDraftKey, parkedNewSessionDraftKey(currentFreshCwd));
-    }
-    const draftId = typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-    const draftKey = `new:${draftId}:${cwd}`;
-    rekeyDraft(parkedNewSessionDraftKey(cwd), draftKey);
-    setNewSessionDraftId(draftId);
-    activeNewSessionDraftKeyRef.current = draftKey;
-    setSelectedSession(null);
     setNewSessionCwd((prev) => {
       if (prev && prev !== cwd) return null;
       return prev;
     });
-    setSessionKey((k) => k + 1);
-    setBranchTree([]);
-    setBranchActiveLeafId(null);
-    setSystemPrompt(null);
-    setSystemTools(null);
-    setSystemInfoLoading(false);
-    setActiveTopPanel(null);
-    if (currentProject !== newProject) {
-      // File tabs are keyed by absolute path, so tabs opened in the previous
-      // project must not linger. Same-project worktree switches keep them.
-      setFileTabs([]);
-      if (!activeFileTabId || activeFileTabId.startsWith("file:")) {
-        setActiveFileTabId(null);
-        setRightPanelOpen(false);
+    // Only an empty workspace gets the new-composer treatment. With a chat on screen a project change is
+    // entirely non-destructive: nothing is closed, no file tab is dropped, and the composer draft is left
+    // where it is (an open session's composer is keyed by its session id, not by this cwd-scoped key).
+    if (selectedSession === null) {
+      const previousDraftKey = activeNewSessionDraftKeyRef.current;
+      if (previousDraftKey && currentFreshCwd) {
+        rekeyDraft(previousDraftKey, parkedNewSessionDraftKey(currentFreshCwd));
       }
-      // Restore the workspace we switched to: its last open session, or keep
-      // the default welcome page when none is remembered.
-      restoreWorkspaceContext(newProject, cwd);
+      const draftId = typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+      const draftKey = `new:${draftId}:${cwd}`;
+      rekeyDraft(parkedNewSessionDraftKey(cwd), draftKey);
+      setNewSessionDraftId(draftId);
+      activeNewSessionDraftKeyRef.current = draftKey;
+      // Pick up the project we moved to: its last open session, or the welcome page when none is remembered.
+      if (currentProject !== newProject) restoreWorkspaceContext(newProject, cwd);
     }
-    router.replace(typeof window !== "undefined" ? window.location.pathname : "/", { scroll: false });
   }, [activeCwd, activeFileTabId, invalidateWorkspaceRestore, newSessionCwd, router, selectedSession, restoreWorkspaceContext]);
 
   const handleSelectSession = useCallback((session: SessionInfo, isRestore = false, entryId?: string, blockIndex?: number) => {
@@ -748,16 +732,10 @@ export function AppShell() {
       rekeyDraft(activeDraftKey, parkedNewSessionDraftKey(activeDraftCwd));
     }
     activeNewSessionDraftKeyRef.current = null;
-    // Adopt an explicitly selected session before the sidebar reports its cwd.
+    // Adopt an explicitly selected session before the sidebar reports its cwd. Changing project is no
+    // longer destructive: file tabs are keyed by absolute path and the previously open session keeps its
+    // own cwd, so nothing is closed here.
     const projectKey = workspaceKeyOf(session);
-    if (activeProjectKeyRef.current !== projectKey) {
-      setFileTabs([]);
-      if (!activeFileTabId || activeFileTabId.startsWith("file:")) {
-        setActiveFileTabId(null);
-        setRightPanelOpen(false);
-      }
-      setActiveTopPanel(null);
-    }
     activeProjectKeyRef.current = projectKey;
     // Opening a session puts it in the strip; re-clicking it only focuses the existing tab.
     updateTabs((set) => openTab(set, tabForSession(session)));

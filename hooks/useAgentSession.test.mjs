@@ -208,7 +208,12 @@ test("stale fresh-session completion cannot replace the active composer", () => 
     cwdChangeSource,
     /currentProject === newProject\s*&& \(selectedSession !== null \|\| currentFreshCwd === cwd\)/,
   );
-  assert.match(cwdChangeSource, /if \(currentProject !== newProject\) \{[\s\S]*?setFileTabs\(\[\]\)/);
+  assert.match(cwdChangeSource, /if \(currentProject !== newProject\) restoreWorkspaceContext\(newProject, cwd\)/);
+  // Step 10: a project change must NOT clear the file tabs any more — the wipe this test used to require
+  // is exactly the destructiveness removed. The browser probe `non-destructive` and
+  // `draft-survives-project-switch` are the authority for this flow.
+  assert.doesNotMatch(cwdChangeSource, /setFileTabs\(\[\]\)/);
+  assert.doesNotMatch(cwdChangeSource, /setSelectedSession\(null\)/);
   assert.match(
     appShellSource,
     /useLayoutEffect\(\(\) => \{\s*activeNewSessionDraftKeyRef\.current = newSessionDraftKey;/,

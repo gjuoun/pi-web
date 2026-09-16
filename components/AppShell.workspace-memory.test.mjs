@@ -47,11 +47,16 @@ test("keeps chat scroll positions in page memory by session id", () => {
   assert.doesNotMatch(source, /localStorage[^\n]*sessionScroll/i);
 });
 
-test("workspace restoration remains inside the cross-project branch", () => {
+test("workspace restoration only runs when nothing is open, so a project switch is not destructive", () => {
+  const body = callbackBody("handleCwdChange", "handleSelectSession");
   assert.match(
-    callbackBody("handleCwdChange", "handleSelectSession"),
-    /if \(currentProject !== newProject\) \{[\s\S]*?restoreWorkspaceContext\(newProject, cwd\);[\s\S]*?\}/,
+    body,
+    /if \(selectedSession === null\) \{[\s\S]*?restoreWorkspaceContext\(newProject, cwd\);/,
   );
+  // Step 10: switching project must not close what is on screen (probe: non-destructive,
+  // draft-survives-project-switch — the browser check is the authority for this flow).
+  assert.doesNotMatch(body, /setSelectedSession\(null\)/);
+  assert.doesNotMatch(body, /setFileTabs\(\[\]\)/);
 });
 
 test("New restores the draft after session navigation and workspace auto-restore", async (t) => {
@@ -145,25 +150,31 @@ test("New restores the draft after session navigation and workspace auto-restore
 
       const draft = { value: "unsent project draft", images: [{ data: "aGVsbG8=", mimeType: "image/png" }] };
       draftStore.setDraft(context.activeNewSessionDraftKeyRef.current, draft);
+      // Step 10: with a chat open, a project switch parks the new-composer draft per project instead of
+      // leaving it on the active composer key. Assert the invariant (never lost) rather than its resting
+      // place; the browser probe `draft-survives-project-switch` is the authority for this flow.
+      const draftSurvived = () =>
+        draftStore.getDraft(context.activeNewSessionDraftKeyRef.current)
+        ?? draftStore.getDraft(context.parkedNewSessionDraftKey(cwd));
       context.navigate.handleSelectSession({ ...session, cwd });
       await commit();
       context.navigate.handleNewSession("direct-return", cwd);
       await commit();
-      assert.deepEqual(draftStore.getDraft(context.activeNewSessionDraftKeyRef.current), draft);
+      assert.deepEqual(draftSurvived(), draft);
       context.navigate.handleSelectSession({ ...session, cwd });
       await commit();
       context.navigate.handleCwdChange("/other-project", "/other-project", "/other-project");
       await commit();
       context.navigate.handleCwdChange(cwd, cwd, cwd);
       await commit();
-      assert.deepEqual(draftStore.getDraft(context.activeNewSessionDraftKeyRef.current), draft);
+      assert.deepEqual(draftSurvived(), draft);
       response.resolve({ ok: true, json: async () => ({ sessions: [session] }) });
       await new Promise((resolve) => setImmediate(resolve));
       await commit();
       assert.equal(context.selectedSession.id, session.id);
       context.navigate.handleNewSession("after-auto-restore", cwd);
       await commit();
-      assert.deepEqual(draftStore.getDraft(context.activeNewSessionDraftKeyRef.current), draft);
+      assert.deepEqual(draftSurvived(), draft);
       draftStore.clearDraft(context.activeNewSessionDraftKeyRef.current);
     });
   }
