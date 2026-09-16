@@ -64,6 +64,61 @@ export interface BuildRowsInput {
 
 const EMPTY_IDS: ReadonlySet<string> = new Set();
 
+/** Row heights in px. SessionItem renders at exactly SESSION_ROW_HEIGHT, so the list stays windowed. */
+export const PROJECT_HEADER_HEIGHT = 32;
+export const SESSION_ROW_HEIGHT = 54;
+
+/** How many extra rows are mounted beyond the viewport, in each direction. */
+export const LIST_OVERSCAN = 8;
+
+export function rowHeight(row: SessionListRow): number {
+  return row.kind === "project-header" ? PROJECT_HEADER_HEIGHT : SESSION_ROW_HEIGHT;
+}
+
+/** Prefix-sum offsets: `offsets[i]` is the top of row `i`, and `offsets[n]` is the total height. */
+export function rowLayout(rows: readonly SessionListRow[]): { offsets: number[]; total: number } {
+  const offsets: number[] = new Array(rows.length + 1);
+  offsets[0] = 0;
+  for (let i = 0; i < rows.length; i++) offsets[i + 1] = offsets[i] + rowHeight(rows[i]);
+  return { offsets, total: offsets[rows.length] };
+}
+
+/**
+ * Indices to mount for a given scroll position. Rows have different heights once project headers are
+ * interleaved, so the window is derived from the offset table instead of `index * height`. A focused
+ * row is included even when it is outside the window, so scrolling cannot discard an inline rename;
+ * consecutive windows always overlap, so no row is ever skipped between two scroll positions.
+ */
+export function visibleRowIndices(
+  rows: readonly SessionListRow[],
+  scrollTop: number,
+  viewportHeight: number,
+  focusedIndex = -1,
+): number[] {
+  if (rows.length === 0) return [];
+  const { offsets, total } = rowLayout(rows);
+  const viewport = viewportHeight || 600;
+  const top = Math.max(0, Math.min(scrollTop, Math.max(0, total - 1)));
+
+  // First row whose bottom edge is past the viewport top.
+  let first = 0;
+  while (first < rows.length && offsets[first + 1] <= top) first++;
+  // Last row whose top edge is before the viewport bottom.
+  let last = first;
+  while (last + 1 < rows.length && offsets[last + 1] < top + viewport) last++;
+
+  const start = Math.max(0, first - LIST_OVERSCAN);
+  const end = Math.min(rows.length, last + 1 + LIST_OVERSCAN);
+  const indices: number[] = [];
+  for (let i = start; i < end; i++) indices.push(i);
+
+  if (focusedIndex >= 0 && focusedIndex < rows.length) {
+    if (focusedIndex < start) indices.unshift(focusedIndex);
+    else if (focusedIndex >= end) indices.push(focusedIndex);
+  }
+  return indices;
+}
+
 export function buildSessionListRows(input: BuildRowsInput): SessionListRow[] {
   const pinned = input.pinnedSessionIds ?? EMPTY_IDS;
   const archived = input.archivedSessionIds ?? EMPTY_IDS;
