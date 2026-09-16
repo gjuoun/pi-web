@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-import { jsonResponse } from "@/lib/json-response";
+import { ok, safeTry } from "neverthrow";
 import {
   attachSessionProjectInfo,
   getSessionListVersion,
@@ -11,34 +10,30 @@ import {
   getRpcSessionInfos,
   getRunningRpcSessionIds,
 } from "@/lib/rpc-manager";
+import { fail } from "@/lib/result/failures";
+import { respondJson } from "@/lib/result/route";
+import { safeAsync } from "@/lib/result/safe";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  try {
+  const result = await safeTry(async function* () {
     const force = new URL(req.url).searchParams.get("force") === "1";
     const persistedSessionsPromise = listAllSessions({ force });
     // Capture before awaiting: mutations during the scan still require a later refresh.
     const sessionListVersion = getSessionListVersion();
-    const [persistedSessions, runtimeSessions] = await Promise.all([
+    const [persistedSessions, runtimeSessions] = yield* safeAsync(() => Promise.all([
       persistedSessionsPromise,
       attachSessionProjectInfo(getRpcSessionInfos()),
-    ]);
+    ])).mapErr(fail.internal);
     const sessions = mergeSessionLists(persistedSessions, runtimeSessions);
-    return jsonResponse(
-      req,
-      {
-        sessions,
-        sessionListVersion,
-        runningSessionIds: getRunningRpcSessionIds(),
-        completionNotificationSuppressedSessionIds: getCompletionNotificationSuppressedRpcSessionIds(),
-      },
-      { headers: { "Cache-Control": "no-store" } },
-    );
-  } catch (error) {
-    return NextResponse.json(
-      { error: String(error) },
-      { status: 500, headers: { "Cache-Control": "no-store" } },
-    );
-  }
+    return ok({
+      sessions,
+      sessionListVersion,
+      runningSessionIds: getRunningRpcSessionIds(),
+      completionNotificationSuppressedSessionIds: getCompletionNotificationSuppressedRpcSessionIds(),
+    });
+  });
+
+  return respondJson(req, result);
 }

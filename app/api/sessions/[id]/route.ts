@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { err, ok, safeTry } from "neverthrow";
 import {
   attachSessionProjectInfo,
   listAllSessions,
@@ -14,104 +14,138 @@ import {
   readSessionHeader,
 } from "@/lib/session-reader";
 import { sessionPathKey } from "@/lib/session-path";
-import { getRpcSession, getRpcSessionInfos } from "@/lib/rpc-manager";
+import { getRpcSession, getRpcSessionInfos, type AgentSessionWrapper } from "@/lib/rpc-manager";
 import { projectTreeForResponse } from "@/lib/project-tree";
 import { computeSessionTotalActiveMs } from "@/lib/session-timing";
 import { computeSessionStats } from "@/lib/session-stats";
 import type { SessionEntry } from "@/lib/types";
 import { readSubagentRun, readSubagentSessionResources, SUBAGENT_META_TYPE } from "@/lib/subagents";
-import { jsonResponse } from "@/lib/json-response";
+import { fail } from "@/lib/result/failures";
+import { respondJson } from "@/lib/result/route";
+import { safeAsync, safeJsonParse, safeRequestJson, safeSync, trySync } from "@/lib/result/safe";
+
+interface DetailPayloadInput {
+  id: string;
+  liveRpc?: AgentSessionWrapper;
+  resolvedPath: string | null;
+  deferThinking: boolean;
+  deferToolResultImages: boolean;
+  tail: number;
+}
+
+// Everything between opening the session file and assembling the response body.
+// Kept as one function so the route's safeTry stays a linear pipeline; internal
+// fallible steps degrade explicitly instead of throwing.
+async function buildDetailPayload({
+  id,
+  liveRpc,
+  resolvedPath,
+  deferThinking,
+  deferToolResultImages,
+  tail,
+}: DetailPayloadInput) {
+  const sm = liveRpc?.inner.sessionManager ?? SessionManager.open(resolvedPath!);
+  const filePath = liveRpc?.sessionFile || sm.getSessionFile() || resolvedPath || "";
+  const entries = sm.getEntries();
+  const leafId = sm.getLeafId();
+  const tree = projectTreeForResponse(sm.getTree());
+  const context = buildSessionContext(entries as never, leafId, {
+    deferThinking,
+    deferToolResultImages,
+    tail,
+    sessionId: id, // local: lazy URLs for historical tool-result images
+  });
+  const totalActiveMs = computeSessionTotalActiveMs(entries);
+  // Cumulative usage over ALL entries, including history compacted away —
+  // the same aggregation the SDK's getSessionStats() uses. Lets the client
+  // keep monotonic token/cost counters across compaction and page reloads.
+  const stats = computeSessionStats(entries as unknown as SessionEntry[]);
+  const sessionName = sm.getSessionName();
+  const firstUserEntry = entries.find((entry) => entry.type === "message" && entry.message.role === "user");
+  const firstUserMessage = firstUserEntry?.type === "message" ? firstUserEntry.message : undefined;
+
+  const header = sm.getHeader();
+  // File mtime when available, header timestamp as the fallback.
+  let modified = header?.timestamp ?? new Date().toISOString();
+  modified = safeSync(() => statSync(filePath).mtime.toISOString()).unwrapOr(modified);
+  const parentSessionId = header?.parentSession
+    ? await resolveSessionIdByPath(header.parentSession)
+    : undefined;
+  const subagent = header
+    ? readSubagentRun(entries as never, header.id, filePath)
+    : null;
+  // Only a subagent's profile-frozen tool list is reported here; normal sessions have no
+  // pi-web tool policy any more.
+  const toolNames = readSubagentSessionResources(entries as never)?.tools;
+  const info = header ? (await attachSessionProjectInfo([{
+    path: filePath,
+    id: header.id,
+    cwd: header.cwd ?? "",
+    name: sessionName,
+    created: header.timestamp,
+    modified,
+    messageCount: stats.totalMessages,
+    firstMessage: firstUserMessage
+      ? (() => {
+          const c = (firstUserMessage as { content: unknown }).content;
+          return typeof c === "string" ? c : (Array.isArray(c) ? (c.find((b: { type: string }) => b.type === "text") as { text: string } | undefined)?.text ?? "" : "") || "(no messages)";
+        })()
+      : "(no messages)",
+    parentSessionId,
+    ...(subagent
+      ? { relation: { kind: "subagent" as const, parentSessionId: subagent.parentSessionId, profile: subagent.profile, description: subagent.description, status: liveRpc?.isRunning() ? "running" as const : subagent.status } }
+      : header.parentSession
+        ? { relation: { kind: "fork" as const, ...(parentSessionId ? { originSessionId: parentSessionId } : {}) } }
+        : {}),
+    transient: !filePath || !existsSync(filePath),
+  }]))[0] : null;
+
+  return {
+    sessionId: id,
+    filePath,
+    info,
+    leafId,
+    tree,
+    context,
+    stats,
+    totalActiveMs,
+    ...(toolNames !== undefined ? { toolNames } : {}),
+  };
+}
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  try {
+  const searchParams = new URL(req.url).searchParams;
+  const deferThinking = searchParams.has("deferThinking");
+  const deferToolResultImages = searchParams.has("deferMedia");
+  const rawTail = Number(searchParams.get("tail"));
+  const tail = Number.isFinite(rawTail) && rawTail > 0 ? Math.min(rawTail, 1000) : 50;
+
+  const result = await safeTry(async function* () {
     const rpc = getRpcSession(id);
     const liveRpc = rpc?.isAlive() ? rpc : undefined;
-    const resolvedPath = liveRpc ? null : await resolveSessionPath(id);
+    const resolvedPath = liveRpc
+      ? null
+      : yield* safeAsync(() => resolveSessionPath(id)).mapErr(fail.internal);
     if (!liveRpc && !resolvedPath) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return err(fail.notFound("Session not found"));
     }
 
-    const sm = liveRpc?.inner.sessionManager ?? SessionManager.open(resolvedPath!);
-    const filePath = liveRpc?.sessionFile || sm.getSessionFile() || resolvedPath || "";
-    const entries = sm.getEntries();
-    const leafId = sm.getLeafId();
-    const tree = projectTreeForResponse(sm.getTree());
-    const searchParams = new URL(req.url).searchParams;
-    const deferThinking = searchParams.has("deferThinking");
-    const deferToolResultImages = searchParams.has("deferMedia");
-    const rawTail = Number(searchParams.get("tail"));
-    const tail = Number.isFinite(rawTail) && rawTail > 0 ? Math.min(rawTail, 1000) : 50;
-    const context = buildSessionContext(entries as never, leafId, {
+    const payload = yield* safeAsync(() => buildDetailPayload({
+      id,
+      liveRpc,
+      resolvedPath,
       deferThinking,
       deferToolResultImages,
       tail,
-      sessionId: id, // local: lazy URLs for historical tool-result images
-    });
-    const totalActiveMs = computeSessionTotalActiveMs(entries);
-    // Cumulative usage over ALL entries, including history compacted away —
-    // the same aggregation the SDK's getSessionStats() uses. Lets the client
-    // keep monotonic token/cost counters across compaction and page reloads.
-    const stats = computeSessionStats(entries as unknown as SessionEntry[]);
-    const sessionName = sm.getSessionName();
-    const firstUserEntry = entries.find((entry) => entry.type === "message" && entry.message.role === "user");
-    const firstUserMessage = firstUserEntry?.type === "message" ? firstUserEntry.message : undefined;
+    })).mapErr(fail.internal);
+    return ok(payload);
+  });
 
-    const header = sm.getHeader();
-    let modified = header?.timestamp ?? new Date().toISOString();
-    try { modified = statSync(filePath).mtime.toISOString(); } catch { /* use header timestamp */ }
-    const parentSessionId = header?.parentSession
-      ? await resolveSessionIdByPath(header.parentSession)
-      : undefined;
-    const subagent = header
-      ? readSubagentRun(entries as never, header.id, filePath)
-      : null;
-    // Only a subagent's profile-frozen tool list is reported here; normal sessions have no
-    // pi-web tool policy any more.
-    const toolNames = readSubagentSessionResources(entries as never)?.tools;
-    const info = header ? (await attachSessionProjectInfo([{
-      path: filePath,
-      id: header.id,
-      cwd: header.cwd ?? "",
-      name: sessionName,
-      created: header.timestamp,
-      modified,
-      messageCount: stats.totalMessages,
-      firstMessage: firstUserMessage
-        ? (() => {
-            const c = (firstUserMessage as { content: unknown }).content;
-            return typeof c === "string" ? c : (Array.isArray(c) ? (c.find((b: { type: string }) => b.type === "text") as { text: string } | undefined)?.text ?? "" : "") || "(no messages)";
-          })()
-        : "(no messages)",
-      parentSessionId,
-      ...(subagent
-        ? { relation: { kind: "subagent" as const, parentSessionId: subagent.parentSessionId, profile: subagent.profile, description: subagent.description, status: liveRpc?.isRunning() ? "running" as const : subagent.status } }
-        : header.parentSession
-          ? { relation: { kind: "fork" as const, ...(parentSessionId ? { originSessionId: parentSessionId } : {}) } }
-          : {}),
-      transient: !filePath || !existsSync(filePath),
-    }]))[0] : null;
-
-    return jsonResponse(
-      req,
-      {
-        sessionId: id,
-        filePath,
-        info,
-        leafId,
-        tree,
-        context,
-        stats,
-        totalActiveMs,
-        ...(toolNames !== undefined ? { toolNames } : {}),
-      },
-    );
-  } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
-  }
+  return respondJson(req, result);
 }
 
 // PATCH /api/sessions/[id]  body: { name: string }
@@ -120,22 +154,24 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  try {
-    const { name } = await req.json() as { name?: string };
+  const result = await safeTry(async function* () {
+    const raw = yield* safeRequestJson(req).mapErr(fail.badRequest);
+    const { name } = (typeof raw === "object" && raw !== null ? raw : {}) as { name?: unknown };
     if (typeof name !== "string") {
-      return NextResponse.json({ error: "name is required" }, { status: 400 });
+      return err(fail.badRequest("name is required"));
     }
-    const filePath = await resolveSessionPath(id);
+    const filePath = yield* safeAsync(() => resolveSessionPath(id)).mapErr(fail.internal);
     if (!filePath) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return err(fail.notFound("Session not found"));
     }
-    const sm = SessionManager.open(filePath);
-    sm.appendSessionInfo(name.trim());
+    yield* safeSync(() => {
+      SessionManager.open(filePath).appendSessionInfo(name.trim());
+    }).mapErr(fail.internal);
     invalidateSessionListCache();
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
-  }
+    return ok({ ok: true });
+  });
+
+  return respondJson(req, result);
 }
 
 // DELETE /api/sessions/[id]
@@ -144,35 +180,30 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  try {
-    const filePath = await resolveSessionPath(id);
+  const result = await safeTry(async function* () {
+    const filePath = yield* safeAsync(() => resolveSessionPath(id)).mapErr(fail.internal);
     if (!filePath) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return err(fail.notFound("Session not found"));
     }
 
     // Read only the bounded header before deleting.
-    let parentSessionPath: string | undefined;
-    try {
-      parentSessionPath = readSessionHeader(filePath)?.parentSession;
-    } catch (error) {
-      // Empty runtime sessions have a cached path before their first disk write.
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    // Empty runtime sessions have a cached path before their first disk write.
+    const ownHeader = trySync(() => readSessionHeader(filePath));
+    if (!ownHeader.ok && ownHeader.code !== "ENOENT") {
+      return err(fail.internal(ownHeader.message));
     }
-    let parentSessionId: string | undefined;
-    if (parentSessionPath) {
-      try {
-        // The parent may have been deleted or moved already; treat it as absent.
-        parentSessionId = readSessionHeader(parentSessionPath)?.id;
-      } catch {
-        parentSessionId = undefined;
-      }
-    }
+    const parentSessionPath = ownHeader.ok ? ownHeader.value?.parentSession : undefined;
+    // The parent may have been deleted or moved already; treat it as absent.
+    const parentHeader = parentSessionPath
+      ? trySync(() => readSessionHeader(parentSessionPath))
+      : undefined;
+    const parentSessionId = parentHeader?.ok ? parentHeader.value?.id : undefined;
 
     const targetPathKey = sessionPathKey(filePath);
     const dir = dirname(filePath);
     // Deleting a session also deletes every persisted or live subagent below it.
     const sessions = mergeSessionLists(
-      await listAllSessions({ force: true }),
+      yield* safeAsync(() => listAllSessions({ force: true })).mapErr(fail.internal),
       getRpcSessionInfos({ includeTransient: true }),
     );
     const childrenByParent = new Map<string, string[]>();
@@ -184,26 +215,29 @@ export async function DELETE(
     }
     const sessionPaths = new Map(sessions.map((session) => [session.id, session.path]));
     // Include local files even when the global catalogue is stale or incomplete.
-    try {
-      for (const file of readdirSync(dir).filter((name) => name.endsWith(".jsonl"))) {
+    const dirListing = trySync(() => readdirSync(dir));
+    if (dirListing.ok) {
+      for (const file of dirListing.value.filter((name) => name.endsWith(".jsonl"))) {
         const childPath = join(dir, file);
         if (sessionPathKey(childPath) === targetPathKey) continue;
-        try {
-          const lines = readFileSync(childPath, "utf8").split("\n");
-          const header = JSON.parse(lines[0]) as { type?: string; id?: string };
-          if (header.type !== "session" || typeof header.id !== "string") continue;
-          const entries = lines.slice(1).flatMap((line) => {
-            try { return [JSON.parse(line) as SessionEntry]; } catch { return []; }
-          });
-          const subagent = readSubagentRun(entries, header.id, childPath);
-          if (!subagent) continue;
-          const children = childrenByParent.get(subagent.parentSessionId) ?? [];
-          children.push(header.id);
-          childrenByParent.set(subagent.parentSessionId, children);
-          sessionPaths.set(header.id, childPath);
-        } catch { /* skip malformed or concurrently removed sessions */ }
+        // Skip malformed or concurrently removed sessions.
+        const child = trySync(() => readFileSync(childPath, "utf8"));
+        if (!child.ok) continue;
+        const lines = child.value.split("\n");
+        const header = safeJsonParse<{ type?: string; id?: string }>(lines[0]);
+        if (!header.isOk() || header.value.type !== "session" || typeof header.value.id !== "string") continue;
+        const entries = lines.slice(1).flatMap((line) => {
+          const parsed = safeJsonParse<SessionEntry>(line);
+          return parsed.isOk() ? [parsed.value] : [];
+        });
+        const subagent = readSubagentRun(entries, header.value.id, childPath);
+        if (!subagent) continue;
+        const children = childrenByParent.get(subagent.parentSessionId) ?? [];
+        children.push(header.value.id);
+        childrenByParent.set(subagent.parentSessionId, children);
+        sessionPaths.set(header.value.id, childPath);
       }
-    } catch { /* skip if dir unreadable */ }
+    }
     const deletedSessionIds = new Set<string>([id]);
     const pending = [id];
     while (pending.length > 0) {
@@ -224,7 +258,7 @@ export async function DELETE(
       const runtimePath = getRpcSession(deletedId)?.sessionFile;
       if (runtimePath) deletedPaths.set(deletedId, runtimePath);
       else {
-        const resolvedPath = await resolveSessionPath(deletedId);
+        const resolvedPath = yield* safeAsync(() => resolveSessionPath(deletedId)).mapErr(fail.internal);
         if (resolvedPath) deletedPaths.set(deletedId, resolvedPath);
       }
     }
@@ -232,73 +266,71 @@ export async function DELETE(
 
     // Re-attach all direct children to this session's parent (cascade re-parent)
     // Scan sibling files in the same directory
-    try {
-      const files = readdirSync(dir).filter(
+    const reparentListing = trySync(() => readdirSync(dir));
+    if (reparentListing.ok) {
+      const files = reparentListing.value.filter(
         (file) => file.endsWith(".jsonl") && sessionPathKey(join(dir, file)) !== targetPathKey,
       );
       for (const file of files) {
         const childPath = join(dir, file);
         if (deletedPathKeys.has(sessionPathKey(childPath))) continue;
-        try {
-          const content = readFileSync(childPath, "utf8");
-          const lines = content.split("\n");
-          const header = JSON.parse(lines[0]) as { type?: string; parentSession?: string };
-          if (
-            header.type === "session" &&
-            header.parentSession &&
-            sessionPathKey(header.parentSession) === targetPathKey
-          ) {
-            // Rewrite header with new parentSession
-            header.parentSession = parentSessionPath;
-            lines[0] = JSON.stringify(header);
-            if (parentSessionPath && parentSessionId) {
-              for (let index = 1; index < lines.length; index += 1) {
-                let entry: { type?: string; customType?: string; data?: unknown };
-                try {
-                  entry = JSON.parse(lines[index]);
-                } catch {
-                  continue;
-                }
-                if (
-                  entry.type !== "custom"
-                  || entry.customType !== SUBAGENT_META_TYPE
-                  || typeof entry.data !== "object"
-                  || entry.data === null
-                  || Array.isArray(entry.data)
-                ) continue;
-                entry.data = {
-                  ...entry.data,
-                  parentSessionId,
-                  parentSessionPath,
-                };
-                lines[index] = JSON.stringify(entry);
-                break;
-              }
-            }
-            writeFileSync(childPath, lines.join("\n"));
+        // Skip malformed files.
+        const content = trySync(() => readFileSync(childPath, "utf8"));
+        if (!content.ok) continue;
+        const lines = content.value.split("\n");
+        const header = safeJsonParse<{ type?: string; parentSession?: string }>(lines[0]);
+        if (
+          !header.isOk()
+          || header.value.type !== "session"
+          || !header.value.parentSession
+          || sessionPathKey(header.value.parentSession) !== targetPathKey
+        ) continue;
+        // Rewrite header with new parentSession
+        header.value.parentSession = parentSessionPath;
+        lines[0] = JSON.stringify(header.value);
+        if (parentSessionPath && parentSessionId) {
+          for (let index = 1; index < lines.length; index += 1) {
+            const entry = safeJsonParse<{ type?: string; customType?: string; data?: unknown }>(lines[index]);
+            if (!entry.isOk()) continue;
+            if (
+              entry.value.type !== "custom"
+              || entry.value.customType !== SUBAGENT_META_TYPE
+              || typeof entry.value.data !== "object"
+              || entry.value.data === null
+              || Array.isArray(entry.value.data)
+            ) continue;
+            entry.value.data = {
+              ...entry.value.data,
+              parentSessionId,
+              parentSessionPath,
+            };
+            lines[index] = JSON.stringify(entry.value);
+            break;
           }
-        } catch { /* skip malformed */ }
+        }
+        trySync(() => writeFileSync(childPath, lines.join("\n")));
       }
-    } catch { /* skip if dir unreadable */ }
+    }
 
     for (const deletedId of [...deletedSessionIds].reverse()) {
       if (deletedId === id) continue;
       // Shutting the wrapper down stops an attached child; a detached package run is the
       // engine's own business (docs/adr/0006).
-      await getRpcSession(deletedId)?.shutdown();
+      yield* safeAsync(() => getRpcSession(deletedId)?.shutdown() ?? Promise.resolve())
+        .mapErr(fail.internal);
     }
-    await getRpcSession(id)?.shutdown();
+    yield* safeAsync(() => getRpcSession(id)?.shutdown() ?? Promise.resolve())
+      .mapErr(fail.internal);
     for (const [deletedId, deletedPath] of deletedPaths) {
-      try {
-        unlinkSync(deletedPath);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      const removed = trySync(() => unlinkSync(deletedPath));
+      if (!removed.ok && removed.code !== "ENOENT") {
+        return err(fail.internal(removed.message));
       }
       invalidateSessionPathCache(deletedId);
     }
     invalidateSessionListCache();
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
-  }
+    return ok({ ok: true });
+  });
+
+  return respondJson(_req, result);
 }
