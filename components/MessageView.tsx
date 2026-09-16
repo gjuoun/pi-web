@@ -1,8 +1,9 @@
 "use client";
 
-import { memo, useState, useRef, useEffect, useMemo } from "react";
+import { memo, useState, useRef, useEffect, useMemo, createElement } from "react";
 import ReactMarkdown from "react-markdown";
 import { MarkdownBody } from "./MarkdownBody";
+import { resolveToolRenderer } from "./tool-renderers/registry";
 import { ImagePreview } from "./ImagePreview";
 import { CodeBlock } from "./MermaidBlock";
 import { ThinkingIcon } from "./ThinkingIcon";
@@ -1006,6 +1007,13 @@ export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex 
 function ToolCallBlock({ block, result, duration }: { block: ToolCallContent; result?: ToolResultMessage; duration?: number }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
+  // Custom tool renderers (preset UI components — see components/tool-renderers/registry.ts)
+  // take over the block entirely when one matches. Nothing registers at startup, so the
+  // default body below renders unchanged for every built-in tool.
+  const CustomRenderer = resolveToolRenderer(block.toolName);
+  if (CustomRenderer) {
+    return createElement(CustomRenderer, { block, result, duration });
+  }
   const inputStr = getToolCallInputText(block);
   const isStreamingInput = block.rawInput !== undefined;
   const isEditTool = isEditToolName(block.toolName);
