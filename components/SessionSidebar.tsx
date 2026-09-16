@@ -3,12 +3,26 @@
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import type { SessionInfo } from "@/lib/types";
 import { collapseHomePath } from "@/lib/path-display";
-import { listSessionFamilies } from "@/lib/session-family";
 import { loadExplorerOpen, saveExplorerOpen } from "@/lib/file-explorer-state";
 import { EXPLORER_ENABLED } from "@/lib/feature-flags";
+import {
+  PROJECT_HEADER_HEIGHT,
+  SESSION_ROW_HEIGHT,
+  STANDALONE_PROJECT_KEY,
+  buildSessionListRows,
+  rowLayout,
+  visibleRowIndices,
+} from "@/lib/session-list-rows";
+import {
+  loadUiState,
+  projectExpanded,
+  saveUiState,
+  setProjectExpanded,
+  type UiState,
+} from "@/lib/ui-state";
 import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
 import { skillExpansionToCommand } from "@/lib/slash-display";
-import { getProjectActivity, getRecentProjects, sessionsForProject } from "@/lib/project-groups";
+import { getProjectActivity, getRecentProjects } from "@/lib/project-groups";
 import { workspaceKeyOf } from "@/lib/workspace-memory";
 import { formatRelativeTime } from "@/lib/i18n/format";
 import { useI18n } from "@/hooks/useI18n";
@@ -16,21 +30,8 @@ import { DirectoryPicker } from "./DirectoryPicker";
 import { FileExplorer, type FileExplorerHandle } from "./FileExplorer";
 import { SessionSearch } from "./SessionSearch";
 
-// Fixed row height for the session list. SessionItem renders at exactly this
-// height, so the list can be windowed (only the visible slice is mounted).
-const SESSION_LIST_ITEM_HEIGHT = 54;
-
-export function getSessionListIndices(count: number, scrollTop: number, viewportHeight: number, focusedIndex = -1): number[] {
-  const overscan = 8;
-  const visibleCount = Math.ceil((viewportHeight || 600) / SESSION_LIST_ITEM_HEIGHT) + overscan * 2;
-  const start = Math.max(0, Math.min(Math.floor(scrollTop / SESSION_LIST_ITEM_HEIGHT) - overscan, count - visibleCount));
-  const end = Math.min(count, start + visibleCount);
-  const indices = Array.from({ length: end - start }, (_, offset) => start + offset);
-  // Keep a focused row mounted so scrolling cannot discard an inline rename.
-  if (focusedIndex >= 0 && focusedIndex < start) indices.unshift(focusedIndex);
-  if (focusedIndex >= end && focusedIndex < count) indices.push(focusedIndex);
-  return indices;
-}
+// The session list is windowed: only the rows near the viewport are mounted.
+// Heights and windowing live in lib/session-list-rows.ts (`rowLayout` / `visibleRowIndices`).
 
 declare global {
   interface Window {
@@ -320,6 +321,11 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [explorerRefreshDone, setExplorerRefreshDone] = useState(false);
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
   const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(() => loadUnreadSessionIds());
+  // Open tabs, per-project expansion and pins live in one browser-local store (lib/ui-state.ts).
+  const [uiState, setUiState] = useState<UiState>(() => loadUiState());
+  useEffect(() => {
+    saveUiState(uiState);
+  }, [uiState]);
   const previousRunningSessionIdsRef = useRef<Set<string>>(new Set());
   const currentSuppressedCompletionSessionIdsRef = useRef<Set<string>>(new Set());
   const previousSuppressedCompletionSessionIdsRef = useRef<Set<string>>(new Set());
@@ -880,9 +886,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     [projectActivity, selectedProject],
   );
 
-  const filteredSessions = selectedProject
-    ? sessionsForProject(allSessions, selectedProject.key)
-    : allSessions;
   const showWorktreeSwitcher = Boolean(
     worktreeState?.isGit
     && worktreeState.isTopLevel
@@ -912,13 +915,33 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         }
       : null);
 
-  const sessionFamilies = listSessionFamilies(filteredSessions);
+  // Every project is listed at once — expansion, never selection, decides what is visible — so the
+  // rows are built from the whole session catalog. Nothing here filters to "the" project.
+  const expandedProjects = useMemo(() => {
+    const keys = [...recentProjects.map((project) => project.key), STANDALONE_PROJECT_KEY];
+    return new Set(keys.filter((key) => projectExpanded(uiState, key)));
+  }, [recentProjects, uiState]);
 
-  const virtualIndices = getSessionListIndices(
-    sessionFamilies.length,
+  const rows = useMemo(
+    () =>
+      buildSessionListRows({
+        sessions: allSessions,
+        runningSessionIds,
+        unreadSessionIds,
+        expandedProjects,
+        pinnedSessionIds: new Set(uiState.pinned),
+        archivedSessionIds: new Set(uiState.archived),
+      }),
+    [allSessions, runningSessionIds, unreadSessionIds, expandedProjects, uiState.pinned, uiState.archived],
+  );
+
+  const { offsets, total } = useMemo(() => rowLayout(rows), [rows]);
+
+  const virtualIndices = visibleRowIndices(
+    rows,
     listScrollTop,
     listViewportH,
-    sessionFamilies.findIndex((family) => family.root.id === focusedSessionId),
+    rows.findIndex((row) => row.kind === "session" && row.session.id === focusedSessionId),
   );
 
   return (
@@ -1610,38 +1633,72 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
             {error}
           </div>
         )}
-        {!loading && !error && sessionFamilies.length === 0 && (
+        {!loading && !error && rows.length === 0 && (
           <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
             {t("sidebar.noSessions")}
           </div>
         )}
-        {sessionFamilies.length > 0 && (
-          <div
-            style={{
-              position: "relative",
-              height: sessionFamilies.length * SESSION_LIST_ITEM_HEIGHT,
-            }}
-          >
+        {rows.length > 0 && (
+          <div style={{ position: "relative", height: total }}>
             {virtualIndices.map((index) => {
-              const family = sessionFamilies[index];
-              const familySessions = [family.root, ...family.subagents];
-              const displaySession = family.latestModified === family.root.modified
-                ? family.root
-                : { ...family.root, modified: family.latestModified };
+              const row = rows[index];
+              if (row.kind === "project-header") {
+                return (
+                  <div
+                    key={`header:${row.projectKey}`}
+                    data-project-header
+                    style={{
+                      position: "absolute",
+                      top: offsets[index],
+                      left: 0,
+                      right: 0,
+                      height: PROJECT_HEADER_HEIGHT,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      aria-expanded={row.expanded}
+                      title={row.root || row.label}
+                      onClick={() =>
+                        setUiState((state) => setProjectExpanded(state, row.projectKey, !row.expanded))
+                      }
+                      style={{
+                        display: "flex", alignItems: "center", width: "100%", height: PROJECT_HEADER_HEIGHT,
+                        padding: "0 10px", gap: 6, background: "none", border: "none",
+                        color: "var(--text-muted)", cursor: "pointer", fontSize: 11, fontWeight: 600,
+                        letterSpacing: "0.05em", textTransform: "uppercase", textAlign: "left",
+                      }}
+                    >
+                      <span style={{ width: 9, flexShrink: 0, color: "var(--text-dim)" }}>
+                        {row.expanded ? "▾" : "▸"}
+                      </span>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {row.label}
+                      </span>
+                      <span style={{ color: "var(--text-dim)", fontWeight: 500 }}>({row.count})</span>
+                      <span style={{ flex: 1 }} />
+                      {showProjectActivity({ running: row.running, unread: row.unread }, t)}
+                    </button>
+                  </div>
+                );
+              }
+              const displaySession = row.latestModified === row.session.modified
+                ? row.session
+                : { ...row.session, modified: row.latestModified };
               // Bubble blur after the input's save handler before unpinning the row.
               return (
                 <div
-                  key={family.root.id}
-                  onFocus={() => setFocusedSessionId(family.root.id)}
+                  key={row.session.id}
+                  onFocus={() => setFocusedSessionId(row.session.id)}
                   onBlur={() => setFocusedSessionId(null)}
-                  style={{ position: "absolute", top: index * SESSION_LIST_ITEM_HEIGHT, left: 0, right: 0 }}
+                  style={{ position: "absolute", top: offsets[index], left: 0, right: 0 }}
                 >
                   <SessionItem
                     session={displaySession}
-                    isSelected={familySessions.some((session) => session.id === selectedSessionId)}
-                    isRunning={familySessions.some((session) => runningSessionIds.has(session.id))}
-                    isUnread={familySessions.some((session) => unreadSessionIds.has(session.id))}
-                    onClick={() => handleSelectSessionFromList(family.root)}
+                    isSelected={Boolean(selectedSessionId) && row.sessionIds.includes(selectedSessionId!)}
+                    isRunning={row.sessionIds.some((id) => runningSessionIds.has(id))}
+                    isUnread={row.sessionIds.some((id) => unreadSessionIds.has(id))}
+                    onClick={() => handleSelectSessionFromList(row.session)}
                     onRenamed={loadSessions}
                     onDeleted={(id) => {
                       onSessionDeleted?.(id);
@@ -2042,7 +2099,7 @@ function SessionItem({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); }}
       style={{
-        height: SESSION_LIST_ITEM_HEIGHT,
+        height: SESSION_ROW_HEIGHT,
         display: "flex",
         alignItems: "center",
         paddingLeft: depth > 0 ? depth * 12 + 14 : 14,

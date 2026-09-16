@@ -37,6 +37,10 @@ export interface ProjectHeaderRow {
 export interface SessionRow {
   kind: "session";
   session: SessionInfo;
+  /** The root session plus every subagent collapsed behind this row. */
+  sessionIds: string[];
+  /** Newest modification across the family, so a busy subagent still bubbles up. */
+  latestModified: string;
   projectKey: string;
   /** 0 for a family root; reserved for showing subagents inline later. */
   depth: number;
@@ -178,6 +182,8 @@ export function buildSessionListRows(input: BuildRowsInput): SessionListRow[] {
       rows.push({
         kind: "session",
         session: family.root,
+        sessionIds: [family.root.id, ...family.subagents.map((session) => session.id)],
+        latestModified: family.latestModified,
         projectKey: group.key,
         depth: 0,
         pinned: pinned.has(family.root.id),

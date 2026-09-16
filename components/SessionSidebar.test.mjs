@@ -1,36 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { createJiti } from "jiti";
 
-const jiti = createJiti(import.meta.url, { jsx: { runtime: "automatic" }, tsconfigPaths: true });
-const { getSessionListIndices } = await jiti.import("./SessionSidebar.tsx");
-
+// List windowing/geometry is covered by lib/session-list-rows.test.mjs; these tests guard the
+// component's wiring and the session-row behaviour that is not visible from the pure model.
 const source = await readFile(new URL("./SessionSidebar.tsx", import.meta.url), "utf8");
 const sessionItemSource = source.slice(source.indexOf("function SessionItem("));
-
-test("scrolling keeps the focused session and the viewport mounted without expanding the whole window", () => {
-  for (const [scrollTop, focusedIndex] of [[0, 1999], [10000, 0]]) {
-    const indices = getSessionListIndices(2000, scrollTop, 335, focusedIndex);
-    const firstVisible = Math.floor(scrollTop / 54);
-    const lastVisible = Math.ceil((scrollTop + 335) / 54) - 1;
-    for (let index = firstVisible; index <= lastVisible; index++) assert.ok(indices.includes(index));
-    assert.ok(indices.includes(focusedIndex));
-    assert.equal(indices.length, 24);
-    assert.equal(new Set(indices).size, indices.length);
-    assert.deepEqual(indices, [...indices].sort((a, b) => a - b));
-  }
-  assert.equal(getSessionListIndices(2000, 0, 335, 3).length, 23);
-  const blurred = getSessionListIndices(2000, 10000, 335);
-  assert.equal(blurred.length, 23);
-  assert.ok(!blurred.includes(0));
-});
-
-test("session windows stay valid after a project shrinks and before the viewport is measured", () => {
-  assert.deepEqual(getSessionListIndices(5, 80000, 335, 1999), [0, 1, 2, 3, 4]);
-  assert.deepEqual(getSessionListIndices(0, 80000, 335, 1999), []);
-  assert.equal(getSessionListIndices(2000, 0, 0).length, 28);
-});
 
 test("only Shift+click bypasses session deletion confirmation", () => {
   assert.match(
@@ -130,8 +105,12 @@ test("does not expose disk-backed actions for transient sessions", () => {
 });
 
 test("hides subagent rows and aggregates their state into the main session row", () => {
-  assert.match(source, /const sessionFamilies = listSessionFamilies\(filteredSessions\)/);
-  assert.match(source, /familySessions\.some\(\(session\) => session\.id === selectedSessionId\)/);
-  assert.match(source, /familySessions\.some\(\(session\) => runningSessionIds\.has\(session\.id\)\)/);
+  // The sidebar renders rows from the shared model; a family is one row whose `sessionIds`
+  // carry the whole family, so subagents never get their own row.
+  assert.match(source, /buildSessionListRows\(\{/);
+  assert.doesNotMatch(source, /listSessionFamilies/);
+  assert.match(source, /row\.sessionIds\.includes\(selectedSessionId!\)/);
+  assert.match(source, /row\.sessionIds\.some\(\(id\) => runningSessionIds\.has\(id\)\)/);
+  assert.match(source, /row\.sessionIds\.some\(\(id\) => unreadSessionIds\.has\(id\)\)/);
   assert.doesNotMatch(source, /function SessionTreeItem/);
 });
