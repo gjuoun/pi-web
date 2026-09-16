@@ -83,7 +83,19 @@ test("New restores the draft after session navigation and workspace auto-restore
         clearLastOpen() {},
         workspaceKeyOf: (value) => value.projectKey ?? value.cwd,
         useCallback: (callback) => callback,
+        useEffect: () => {},
         useGlobalKeyboardShortcuts() {},
+        // Session tabs: the sliced callbacks now open a tab, so the sandbox needs the real helpers.
+        updateTabs: (update) => update({ tabs: [], activeId: null }),
+        openTab: (set, tab) => ({ tabs: [...set.tabs, tab], activeId: tab.sessionId }),
+        tabForSession: (value) => ({
+          sessionId: value.id,
+          projectKey: value.projectKey ?? value.cwd,
+          title: value.id,
+        }),
+        // Read by the tab callbacks' dependency arrays, which evaluate as the slice defines them.
+        sessionCatalog: [],
+        openTabs: { tabs: [], activeId: null },
         activeNewSessionDraftKeyRef: { current: `new:initial:${cwd}` },
         activeProjectKeyRef: { current: cwd },
         workspaceRestoreTokenRef: { current: 0 },

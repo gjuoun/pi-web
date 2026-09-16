@@ -4,6 +4,16 @@ import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } fr
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SessionSidebar } from "./SessionSidebar";
+import { SessionTabs } from "./SessionTabs";
+import { closeTab, cycleTab, openTab, selectTab, type TabSet } from "@/lib/session-tabs";
+import { tabForSession } from "@/lib/ui-state";
+import { setUiState, useUiState } from "@/lib/ui-state-store";
+
+/**
+ * Unread tracking lives in the sidebar today and does not reach AppShell yet, so the tab strip shows
+ * running state only. Plumbing the unread set up is a separate change (plan Step 15).
+ */
+const NO_UNREAD_SESSION_IDS: ReadonlySet<string> = new Set();
 import { ChatWindow } from "./ChatWindow";
 import type { ChatScrollPosition } from "@/lib/chat-scroll-position";
 import { FileViewer } from "./FileViewer";
@@ -125,6 +135,17 @@ export function AppShell() {
   const [sessionCatalog, setSessionCatalog] = useState<SessionInfo[]>([]);
   const handleSessionsChange = useCallback((sessions: SessionInfo[]) => {
     setSessionCatalog(sessions);
+  }, []);
+
+  // Open session tabs live in the shared client store so the sidebar's expansion state and the tab
+  // set travel together (lib/ui-state-store.ts). Only the active tab's chat is mounted.
+  const uiState = useUiState();
+  const openTabs = uiState.tabs;
+  const updateTabs = useCallback((update: (set: TabSet) => TabSet) => {
+    setUiState((current) => {
+      const next = update(current.tabs);
+      return next === current.tabs ? current : { ...current, tabs: next };
+    });
   }, []);
   const sessionsWithSelection = useMemo(() => {
     if (!selectedSession) return sessionCatalog;
@@ -738,6 +759,8 @@ export function AppShell() {
       setActiveTopPanel(null);
     }
     activeProjectKeyRef.current = projectKey;
+    // Opening a session puts it in the strip; re-clicking it only focuses the existing tab.
+    updateTabs((set) => openTab(set, tabForSession(session)));
     // Re-clicking the already-open session must not remount the chat and
     // re-run the full load/positioning cycle. Only skip when the effective
     // cwd context already matches — otherwise a pending cwd move still needs
@@ -772,7 +795,7 @@ export function AppShell() {
     if (!isRestore) {
       router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
     }
-  }, [activeCwd, activeFileTabId, invalidateWorkspaceRestore, router, isMobile, newSessionCwd, selectedSession]);
+  }, [activeCwd, activeFileTabId, invalidateWorkspaceRestore, router, isMobile, newSessionCwd, selectedSession, updateTabs]);
 
   const handleNewSession = useCallback((sessionId: string, cwd: string) => {
     invalidateWorkspaceRestore();
@@ -793,7 +816,63 @@ export function AppShell() {
     router.replace(typeof window !== "undefined" ? window.location.pathname : "/", { scroll: false });
   }, [invalidateWorkspaceRestore, router, isMobile]);
 
+  const handleSelectSessionTab = useCallback(
+    (sessionId: string) => {
+      updateTabs((set) => selectTab(set, sessionId));
+      const session = sessionCatalog.find((entry) => entry.id === sessionId)
+        ?? (selectedSession?.id === sessionId ? selectedSession : null);
+      if (session && session.id !== selectedSession?.id) handleSelectSession(session);
+    },
+    [sessionCatalog, selectedSession, updateTabs, handleSelectSession],
+  );
+
+  const handleCloseSessionTab = useCallback(
+    (sessionId: string) => {
+      const wasActive = openTabs.activeId === sessionId;
+      const next = closeTab(openTabs, sessionId);
+      updateTabs(() => next);
+      if (!wasActive) return;
+      if (next.activeId === null) {
+        setSelectedSession(null);
+        return;
+      }
+      const session = sessionCatalog.find((entry) => entry.id === next.activeId);
+      if (session) handleSelectSession(session);
+    },
+    [openTabs, sessionCatalog, updateTabs, handleSelectSession],
+  );
+
   // Global keyboard shortcuts (handles Esc, Ctrl+Alt+N etc.)
+  // Session tab shortcuts. Cmd+digit and Cmd+W are browser-reserved (they switch or close browser
+  // tabs), so Option is the reliable accelerator in a plain browser tab; the Cmd variants are handled
+  // too for the installed/PWA case where the browser yields them.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.metaKey && !event.altKey && !event.ctrlKey) return;
+      if (openTabs.tabs.length === 0) return;
+      if (event.shiftKey && (event.key === "w" || event.key === "W")) {
+        if (!openTabs.activeId) return;
+        event.preventDefault();
+        handleCloseSessionTab(openTabs.activeId);
+        return;
+      }
+      if (event.shiftKey) return;
+      if (event.key === "[" || event.key === "]") {
+        const step = event.key === "[" ? -1 : 1;
+        event.preventDefault();
+        updateTabs((set) => cycleTab(set, step));
+        return;
+      }
+      if (/^[1-9]$/.test(event.key)) {
+        const tab = openTabs.tabs[Number(event.key) - 1];
+        if (!tab) return;
+        event.preventDefault();
+        handleSelectSessionTab(tab.sessionId);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [openTabs, updateTabs, handleSelectSessionTab, handleCloseSessionTab]);
   useGlobalKeyboardShortcuts({
     onNewSession: (cwd: string) => handleNewSession(`kb-${Date.now()}`, cwd),
     activeCwd,
@@ -2244,7 +2323,16 @@ export function AppShell() {
         </div>
 
         {/* Chat content */}
-        <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+        <div style={{ flex: 1, overflow: "hidden", position: "relative", display: "flex", flexDirection: "column" }}>
+          <SessionTabs
+            tabs={openTabs.tabs}
+            activeId={openTabs.activeId}
+            runningSessionIds={runningSessionIds}
+            unreadSessionIds={NO_UNREAD_SESSION_IDS}
+            onSelect={handleSelectSessionTab}
+            onClose={handleCloseSessionTab}
+          />
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
           {showChat ? (
             <ChatWindow
               key={sessionKey}
@@ -2319,6 +2407,7 @@ export function AppShell() {
               </div>
             )
           ) : null}
+          </div>
         </div>
       </div>
 

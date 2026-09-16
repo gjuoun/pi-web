@@ -28,8 +28,9 @@ test("hides the Explorer panel behind its feature flag and keeps a terminal acti
 });
 
 test("project expansion is the only project-level state and it round-trips through the store", () => {
-  assert.match(source, /const \[uiState, setUiState\] = useState<UiState>\(\(\) => loadUiState\(\)\)/);
-  assert.match(source, /saveUiState\(uiState\)/);
+  // Step 11 moved the state out of the sidebar into the shared store, which AppShell also writes.
+  assert.match(source, /const uiState = useUiState\(\)/);
+  assert.match(source, /from "@\/lib\/ui-state-store"/);
   assert.match(source, /setUiState\(\(state\) => setProjectExpanded\(state, row\.projectKey, !row\.expanded\)\)/);
   assert.match(source, /data-project-header/);
   assert.match(source, /aria-expanded=\{row\.expanded\}/);

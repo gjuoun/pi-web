@@ -14,12 +14,10 @@ import {
   visibleRowIndices,
 } from "@/lib/session-list-rows";
 import {
-  loadUiState,
   projectExpanded,
-  saveUiState,
   setProjectExpanded,
-  type UiState,
 } from "@/lib/ui-state";
+import { setUiState, useUiState } from "@/lib/ui-state-store";
 import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
 import { skillExpansionToCommand } from "@/lib/slash-display";
 import { getProjectActivity, getRecentProjects } from "@/lib/project-groups";
@@ -321,11 +319,9 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [explorerRefreshDone, setExplorerRefreshDone] = useState(false);
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
   const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(() => loadUnreadSessionIds());
-  // Open tabs, per-project expansion and pins live in one browser-local store (lib/ui-state.ts).
-  const [uiState, setUiState] = useState<UiState>(() => loadUiState());
-  useEffect(() => {
-    saveUiState(uiState);
-  }, [uiState]);
+  // Open tabs, per-project expansion and pins live in the shared client store (lib/ui-state-store.ts).
+  // AppShell owns the tab half of the same payload, so neither component holds a private copy.
+  const uiState = useUiState();
   const previousRunningSessionIdsRef = useRef<Set<string>>(new Set());
   const currentSuppressedCompletionSessionIdsRef = useRef<Set<string>>(new Set());
   const previousSuppressedCompletionSessionIdsRef = useRef<Set<string>>(new Set());
