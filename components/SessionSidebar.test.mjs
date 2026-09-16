@@ -27,6 +27,14 @@ test("hides the Explorer panel behind its feature flag and keeps a terminal acti
   assert.match(source, /data-action="open-terminal"/);
 });
 
+test("project expansion is the only project-level state and it round-trips through the store", () => {
+  assert.match(source, /const \[uiState, setUiState\] = useState<UiState>\(\(\) => loadUiState\(\)\)/);
+  assert.match(source, /saveUiState\(uiState\)/);
+  assert.match(source, /setUiState\(\(state\) => setProjectExpanded\(state, row\.projectKey, !row\.expanded\)\)/);
+  assert.match(source, /data-project-header/);
+  assert.match(source, /aria-expanded=\{row\.expanded\}/);
+});
+
 test("polls running sessions only while the tab is visible", () => {
   assert.doesNotMatch(source, /new EventSource\("\/api\/agent\/running\/events"\)/);
   assert.match(source, /fetch\("\/api\/agent\/running"/);
