@@ -26,3 +26,8 @@ export function safeReadFileText(path: string): ResultAsync<string, string> {
 export function safeRequestJson(request: Request): ResultAsync<unknown, string> {
   return ResultAsync.fromPromise(request.json(), errorMessage);
 }
+
+/** Generic async absorber: wraps any promise-returning call whose throw would otherwise escape business code. */
+export function safeAsync<T>(fn: () => Promise<T>): ResultAsync<T, string> {
+  return ResultAsync.fromPromise(fn(), errorMessage);
+}
