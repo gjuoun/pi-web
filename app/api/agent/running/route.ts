@@ -9,8 +9,9 @@ import { respondJson } from "@/lib/result/route";
 export const dynamic = "force-dynamic";
 
 // GET /api/agent/running - Lightweight snapshot for visible-tab polling.
-// `req` is optional so tests can call the handler bare (runtime-route.test.mjs).
-export async function GET(req: Request = new Request("http://localhost/")) {
+// Note: `req` must stay a required positional param — Next 16's build-time route
+// type check rejects `Request | undefined` signatures. Tests pass a Request explicitly.
+export async function GET(req: Request) {
   return respondJson(req, ok({
     sessionListVersion: getSessionListVersion(),
     runningSessionIds: getRunningRpcSessionIds(),
