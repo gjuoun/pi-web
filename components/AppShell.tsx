@@ -843,14 +843,14 @@ export function AppShell() {
   );
 
   // Global keyboard shortcuts (handles Esc, Ctrl+Alt+N etc.)
-  // Session tab shortcuts. Cmd+digit and Cmd+W are browser-reserved (they switch or close browser
-  // tabs), so Option is the reliable accelerator in a plain browser tab; the Cmd variants are handled
-  // too for the installed/PWA case where the browser yields them.
+  // Session tab shortcuts. Option is the right modifier in a browser: Cmd+digit and Cmd+W belong to the
+  // browser (they switch or close browser tabs and cannot be prevented), so the strip binds Option only —
+  // Alt+1-9 switch, Alt+W closes the focused tab, Alt+[ / Alt+] cycle.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!event.metaKey && !event.altKey && !event.ctrlKey) return;
+      if (!event.altKey || event.metaKey || event.ctrlKey) return;
       if (openTabs.tabs.length === 0) return;
-      if (event.shiftKey && (event.key === "w" || event.key === "W")) {
+      if (event.key === "w" || event.key === "W") {
         if (!openTabs.activeId) return;
         event.preventDefault();
         handleCloseSessionTab(openTabs.activeId);
