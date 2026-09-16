@@ -31,7 +31,7 @@ export interface UiState {
   version: number;
   /** Open session tabs, in strip order. */
   tabs: TabSet;
-  /** Explicit user choices only; a project with no entry follows the activity default. */
+  /** Explicit user choices only; a project with no entry is open. */
   projectOverrides: Record<string, ProjectOverride>;
   pinned: string[];
   archived: string[];
@@ -107,14 +107,12 @@ export function saveUiState(state: UiState, storage: StorageLike | null = getBro
 }
 
 /**
- * Whether a project's sessions are shown: an explicit choice always wins, otherwise a project opens
- * itself only while it has something to report.
+ * Whether a project's sessions are shown. Every project is open by default — hiding sessions behind a
+ * default is the behaviour this redesign removes — so only an explicit collapse closes one. The choice
+ * is remembered per project; activity drives the header badge, never visibility.
  */
-export function projectExpanded(state: UiState, projectKey: string, hasActivity: boolean): boolean {
-  const override = state.projectOverrides[projectKey];
-  if (override === "expanded") return true;
-  if (override === "collapsed") return false;
-  return hasActivity;
+export function projectExpanded(state: UiState, projectKey: string): boolean {
+  return state.projectOverrides[projectKey] !== "collapsed";
 }
 
 export function setProjectExpanded(state: UiState, projectKey: string, expanded: boolean): UiState {
