@@ -1125,7 +1125,10 @@ export function AppShell() {
 
   const activeFileTab = fileTabs.find((tab) => tab.id === activeFileTabId) ?? null;
   const activeCwdName = activeCwd ? getFileName(activeCwd) || activeCwd : null;
-  const windowTitle = activeCwdName ?? "";
+  const sessionName = selectedSession?.name?.trim() || null;
+  const windowTitle = sessionName && activeCwdName
+    ? `${sessionName} | ${activeCwdName}`
+    : activeCwdName ?? "";
 
   useEffect(() => {
     const syncWindowTitle = () => {
