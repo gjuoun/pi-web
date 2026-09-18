@@ -9,7 +9,7 @@ const jiti = createJiti(import.meta.url, {
 });
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
-const { ListPicker, filterPickerItems, nextPickerIndex } = await jiti.import("./ListPicker.tsx");
+const { ListPicker, filterPickerItems, nextPickerIndex, pickerHorizontalPlacement } = await jiti.import("./ListPicker.tsx");
 
 const ITEMS = [
   { key: "anthropic:claude-sonnet-5", label: "Claude Sonnet 5", description: "anthropic" },
@@ -119,4 +119,37 @@ test("the input handles its own keys and stops them reaching the document", asyn
     assert.ok(source.includes(key), "the picker input must handle " + key);
   }
   assert.match(source, /autoFocus/, "the picker input must take focus on open so typing filters without a click");
+});
+
+test("a trigger with room to its right grows the panel rightward from its left edge", () => {
+  assert.deepEqual(
+    pickerHorizontalPlacement(ANCHOR, 1280),
+    { align: "left", offset: 700, width: 320 },
+  );
+});
+
+test("the reasoning segment at the far right right-aligns, so its right edge stays inside", () => {
+  // This is the reported bug: the segment is the last thing on its line, and the panel used to grow
+  // rightward from its left edge, run past the viewport, and get squeezed to the trigger's own width.
+  const trigger = { top: 700, right: 1264, bottom: 720, left: 1180, width: 84 };
+  const placement = pickerHorizontalPlacement(trigger, 1280);
+  assert.equal(placement.align, "right");
+  assert.equal(placement.offset, 16);
+  assert.equal(placement.width, 320);
+  const left = 1280 - placement.offset - placement.width;
+  assert.ok(left >= 0 && 1280 - placement.offset <= 1280, "the whole panel sits inside the viewport");
+});
+
+test("the panel is never wider than the window on a phone", () => {
+  const trigger = { top: 700, right: 318, bottom: 720, left: 300, width: 18 };
+  const placement = pickerHorizontalPlacement(trigger, 320);
+  const left = placement.align === "right" ? 320 - placement.offset - placement.width : placement.offset;
+  assert.ok(placement.width <= 320 - 16, "width fits the viewport, got " + placement.width);
+  assert.ok(left >= 0 && left + placement.width <= 320, "panel inside the viewport, got " + JSON.stringify(placement));
+});
+
+test("an anchor that would overflow renders a right-anchored panel", () => {
+  const html = render({ anchorRect: { top: 700, right: 1264, bottom: 720, left: 1180, width: 84 } });
+  assert.match(html, /right:\d+px/);
+  assert.doesNotMatch(html, /left:\d+px/);
 });

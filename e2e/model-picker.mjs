@@ -17,6 +17,12 @@ const COMPOSER = "textarea.chat-input-textarea";
 
 export async function checkModelPicker(page, { base, sessionId }) {
   // get_state is a POST command; the GET route does not answer with the {success, data} envelope.
+  /** The class of whatever currently owns focus — the focus assertions read this. */
+  const activeClass = (target) => target.evaluate(() => {
+    const el = document.activeElement;
+    return el ? String(el.className || el.tagName) : "";
+  });
+
   const stateOf = async () => {
     const res = await page.request.post(base + "/api/agent/" + sessionId, { data: { type: "get_state" } });
     const body = await res.json().catch(() => null);
@@ -60,6 +66,11 @@ export async function checkModelPicker(page, { base, sessionId }) {
   // 3. Escape closes it, and the command never reached the model.
   await page.keyboard.press("Escape");
   await page.locator(PICKER).waitFor({ state: "hidden", timeout: 10000 });
+  const focusAfterEscape = await activeClass(page);
+  assert.ok(
+    focusAfterEscape.includes("chat-input-textarea"),
+    "closing the picker must put the caret back in the composer, got " + focusAfterEscape,
+  );
   const after = await stateOf();
   assert.ok(after, "get_state must answer after the command");
   assert.equal(after.messageCount, before.messageCount, "a picker command must not post a message");
@@ -74,6 +85,24 @@ export async function checkModelPicker(page, { base, sessionId }) {
   const final = await stateOf();
   assert.ok(final, "get_state must answer after /thinking");
   assert.equal(final.messageCount, before.messageCount, "/thinking must not post a message either");
+
+  // 5. Choosing a row returns the caret too: the picker unmounting must not strand focus on <body>.
+  await composer.fill("/model");
+  await page.keyboard.press("Enter");
+  await page.locator(PICKER).waitFor({ timeout: 15000 });
+  const selectableRows = await page.locator(".list-picker-item").count();
+  if (selectableRows > 0) {
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await page.locator(PICKER).waitFor({ state: "hidden", timeout: 10000 });
+    const focusAfterSelect = await activeClass(page);
+    assert.ok(
+      focusAfterSelect.includes("chat-input-textarea"),
+      "choosing a row must put the caret back in the composer, got " + focusAfterSelect,
+    );
+  } else {
+    console.log("NOTE: this agent dir offers no models, so the choose-a-row focus path was not exercised");
+  }
 
   console.log("PASS: model picker — /model and /thinking open a focused picker and never reach the model");
 }

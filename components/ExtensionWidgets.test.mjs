@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createJiti } from "jiti";
 
@@ -156,4 +157,14 @@ test("keeps empty widgets non-interactive", () => {
   assert.doesNotMatch(html, /<button/);
   assert.doesNotMatch(html, /aria-expanded/);
   assert.match(html, /title="empty-widget - Above editor widget"/);
+});
+
+test("the widget content is sized with the chrome, and only its font was reduced", async () => {
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const rule = css.match(/\.extension-widget-content\s*\{([^}]*)\}/)?.[1] ?? "";
+  // 14px was the only non-11/12px text in the chrome; its own panel heading is 11px.
+  assert.match(rule, /font-size:\s*12px/, "the content drops to the chrome's own scale");
+  // "Font only": the block's spacing was deliberately left alone, so pin it or it drifts back.
+  assert.match(rule, /padding:\s*3px 12px 8px/, "padding must stay as it was");
+  assert.match(rule, /line-height:\s*1\.45/, "leading must stay as it was");
 });
