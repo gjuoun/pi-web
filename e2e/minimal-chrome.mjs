@@ -92,6 +92,39 @@ export async function checkMinimalChrome(page, { base, cwd, sessionId }) {
   assert.ok((await snapshot(page)).hasComposer, "the keyboard must bring the input back");
   console.log("PASS: minimal chrome — nothing folds; the input is always shown and hides by keyboard");
 
+  // `/` is the bare-key shortcut for "put the caret in the composer" — the web convention, and the
+  // first bare key this app binds, so its guards matter as much as its happy path.
+  const composer = () => page.evaluate(() => ({
+    active: String((document.activeElement && document.activeElement.className) || ""),
+    value: document.querySelector("textarea.chat-input-textarea")?.value ?? null,
+  }));
+  const blur = () => page.evaluate(() => {
+    const el = document.activeElement;
+    if (el && typeof el.blur === "function") el.blur();
+  });
+
+  // From the page: the caret lands in the composer, and an empty one takes the `/` so the palette opens.
+  await blur();
+  await page.keyboard.press("/");
+  await page.waitForTimeout(300);
+  const fromPage = await composer();
+  assert.ok(fromPage.active.includes("chat-input-textarea"), "`/` must move the caret into the composer, got " + fromPage.active);
+  assert.equal(fromPage.value, "/", "an empty composer takes the `/` with it, so the slash palette opens");
+
+  // Already typing: `/` is just a character. The guard must not eat it or reach for focus.
+  await page.keyboard.press("/");
+  assert.equal((await composer()).value, "//", "a `/` pressed while the composer has focus must type normally");
+
+  // With a draft present the shortcut only focuses — insertIfEmpty never clobbers written text.
+  await blur();
+  await page.keyboard.press("/");
+  await page.waitForTimeout(300);
+  const withDraft = await composer();
+  assert.ok(withDraft.active.includes("chat-input-textarea"), "`/` must still focus when a draft is present");
+  assert.equal(withDraft.value, "//", "the shortcut must not touch a draft");
+  // The composer is reloaded by the navigation below, so `//` cannot leak into the next check.
+  console.log("PASS: minimal chrome — / focuses the composer and never eats a keystroke");
+
   // The fresh row is already only [model] [project], so it must offer no fold control.
   await page.goto(`${base}/?cwd=${encodeURIComponent(cwd)}`, { waitUntil: "domcontentloaded" });
   await page.locator(".chat-rail").waitFor();

@@ -1,5 +1,5 @@
 "use client";
-import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
+import { isComposerFocusKey, registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolEntry, ToolResultMessage, UserMessage } from "@/lib/types";
@@ -257,6 +257,45 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [composerHidden]);
+
+  // "/" puts the caret in the composer — the web convention for "focus the box". Pressed while the
+  // composer is hidden it reveals it first; pressed with a draft in it, it only focuses. It lives here
+  // beside the Cmd/Ctrl+J toggle because this component owns both the composer and its hidden state.
+  // Ctrl+K is deliberately left free: it is reserved for search-everything.
+  const focusComposerPendingRef = useRef(false);
+  const focusComposer = useCallback(() => {
+    const input = chatInputRef?.current;
+    if (input) {
+      input.focus();
+      // An empty composer takes the "/" too, so the slash palette opens in the same keystroke;
+      // insertIfEmpty is a no-op once there is a draft, so half-written text is never touched.
+      input.insertIfEmpty("/");
+      return;
+    }
+    if (!composerHidden) return;
+    // Revealing it mounts ChatInput, so the focus has to wait for that commit.
+    focusComposerPendingRef.current = true;
+    setComposerHidden(false);
+  }, [chatInputRef, composerHidden]);
+
+  useEffect(() => {
+    if (!focusComposerPendingRef.current || composerHidden) return;
+    const input = chatInputRef?.current;
+    if (!input) return;
+    focusComposerPendingRef.current = false;
+    input.focus();
+    input.insertIfEmpty("/");
+  }, [composerHidden, chatInputRef]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isComposerFocusKey(event, event.target)) return;
+      event.preventDefault();
+      focusComposer();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [focusComposer]);
   const completionNotificationsEnabled = session?.relation?.kind !== "subagent";
 
   // Wrap onAgentEnd to play the completion sound. This is more reliable than
