@@ -1349,35 +1349,41 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
         )}
         {!composerHidden && chatInputElement}
         <ExtensionStatusBar widgets={extensionWidgets} />
-        {/* Same horizontal frame as the composer box: the fieldset in ChatInput reserves 16px plus the
-            36px minimap rail on the right (:1499-1510), so a centred 820px box lands 18px left of this
-            column's centre. The footer follows that frame instead of the raw column. */}
-        <div style={{ paddingLeft: 16, paddingRight: isMobile ? 16 : 52 }}>
-          <ChatStatusBar
-            cwd={session?.cwd ?? newSessionCwd}
-            projectRoot={session?.projectRoot ?? null}
-            fresh={isEmptyNew}
-            branch={session?.branch ?? null}
-            sessionName={session?.name ?? null}
-            usage={sessionStats}
-            messages={messages}
-            contextUsage={contextUsage}
-            autoCompactionEnabled={autoCompactionEnabled}
-            model={displayModelValue}
-            providerCount={statusProviderCount}
-            thinkingLevel={thinkingLevel}
-            supportsReasoning={(availableThinkingLevels?.length ?? 0) > 0}
-            busy={sessionBusy}
-            modelOptions={statusModelOptions}
-            onModelChange={handleModelChange}
-            modelSwitching={modelSwitching}
-            isAutoModelSelection={isAutoModelSelection}
-            onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
-            availableThinkingLevels={availableThinkingLevels}
-            thinkingLevelMap={currentThinkingLevelMap}
-          />
-          {/* Line 3 keeps its own bar below the status row: the row stays a single line. */}
-          <ExtensionStatusLine statuses={extensionStatuses} />
+        {/* The whole bar is one scroll surface: the status lines and the extension line share it, so a
+            bar that outgrows the window scrolls together instead of per line. */}
+        <div className="chat-bottom-bar">
+          {/* Same horizontal frame as the composer box: the fieldset in ChatInput reserves 16px plus the
+              36px minimap rail on the right (:1499-1510), so a centred 820px box lands 18px left of this
+              column's centre. The footer follows that frame instead of the raw column — and the inset
+              lives on this inner block rather than on the scroll container, because a scroll container's
+              right padding is not honoured past the overflow edge. */}
+          <div className="chat-bottom-bar-inner" style={{ paddingLeft: 16, paddingRight: isMobile ? 16 : 52 }}>
+            <ChatStatusBar
+              cwd={session?.cwd ?? newSessionCwd}
+              projectRoot={session?.projectRoot ?? null}
+              fresh={isEmptyNew}
+              branch={session?.branch ?? null}
+              sessionName={session?.name ?? null}
+              usage={sessionStats}
+              messages={messages}
+              contextUsage={contextUsage}
+              autoCompactionEnabled={autoCompactionEnabled}
+              model={displayModelValue}
+              providerCount={statusProviderCount}
+              thinkingLevel={thinkingLevel}
+              supportsReasoning={(availableThinkingLevels?.length ?? 0) > 0}
+              busy={sessionBusy}
+              modelOptions={statusModelOptions}
+              onModelChange={handleModelChange}
+              modelSwitching={modelSwitching}
+              isAutoModelSelection={isAutoModelSelection}
+              onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
+              availableThinkingLevels={availableThinkingLevels}
+              thinkingLevelMap={currentThinkingLevelMap}
+            />
+            {/* Line 3 is its own strip on the same surface, after the status lines. */}
+            <ExtensionStatusLine statuses={extensionStatuses} />
+          </div>
         </div>
       </div>
       {isEmptyNew && <div className="min-h-0 flex-1" />}

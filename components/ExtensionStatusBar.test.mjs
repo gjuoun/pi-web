@@ -63,12 +63,11 @@ test("keeps the status bar text unwrapped and never truncates it", async () => {
   const extRule = css.match(/\.chat-status-ext\s*\{([^}]*)\}/)?.[1] ?? "";
   const statusTextRule = css.match(/\.extension-status-text\s*\{([^}]*)\}/)?.[1] ?? "";
 
-  // The row's max-height + overflow-y: auto is the only cap; the text itself is never clipped.
+  // The shared surface in ChatWindow owns the cap and the scrolling; this strip owns the text's
+  // shape only, so it declares no overflow of its own.
   assert.match(extRule, /white-space:\s*pre\s*;/);
-  // The line-3 bar keeps the same even padding as the status row, which is 14px now that the
-  // composer has no side borders to add a 15th pixel of inset.
-  assert.match(extRule, /padding:\s*4px 4px/);
-  assert.doesNotMatch(extRule, /overflow[^:]*:\s*hidden/);
+  assert.match(extRule, /padding:\s*0 4px/);
+  assert.doesNotMatch(extRule, /overflow/);
   assert.doesNotMatch(extRule, /text-overflow:\s*ellipsis/);
   assert.match(statusTextRule, /white-space:\s*pre\s*;/);
   assert.doesNotMatch(statusTextRule, /overflow[^:]*:\s*hidden/);

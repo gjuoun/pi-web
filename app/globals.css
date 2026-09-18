@@ -508,29 +508,67 @@ html.dark .web-login-error {
   color: var(--text);
 }
 
-.chat-status-bar {
-  flex-shrink: 0;
+/* The bottom bar is one scroll surface, and it no longer owns the type: the strips inside it do. Every
+   line of the bar — the status lines and the extension line — lives in here, so a bar that outgrows the
+   window scrolls as a whole instead of each strip scrolling (or clipping) on its own. */
+.chat-bottom-bar {
+  /* Both axes, spelled out: the horizontal one is the bar's whole point (every line moves together),
+     and the vertical one keeps a tall extension status from growing the bar without bound. */
+  overflow-x: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* The cap travels with the scrolling: a tall extension status scrolls inside the bar rather than
+     pushing the composer off screen. */
+  max-height: min(144px, 18dvh);
+}
+
+/* At least the viewport wide, and exactly as wide as its widest line. min-width: 100% is what keeps
+   each line's space-between pinning its right cluster to the edge on a wide window; width: max-content
+   is what lets a narrow one scroll every line by the same amount. The bar's breathing space lives here
+   so no strip adds a gap of its own — otherwise each added line would space the stack unevenly. */
+.chat-bottom-bar-inner {
   display: flex;
+  flex-direction: column;
+  min-width: 100%;
+  width: max-content;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/* The status text itself, as a stack of lines. */
+.chat-status-bar {
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0 12px;
   /* No line of its own: the input's bottom rule separates it from the row (see .chat-rail). Keeping the
      horizontal separator here as well would draw a third line. */
   /* 4px = the composer's inline padding, so the footer text starts on the attach icon and ends on the
      send icon instead of drifting inside the box — the icons are the inset, not empty space beside
-     them. 4px of vertical padding gives the row its breathing space, since the composer contributes
-     none of its own. */
-  padding: 4px 4px;
-  /* The row itself stays one line; it scrolls rather than wrapping if a segment ever grows. */
-  max-height: min(144px, 18dvh);
-  overflow-x: auto;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+     them. */
+  padding: 0 4px;
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.5;
+}
+
+/* One line of the bar: a left cluster and a right cluster, pinned to the line's edges. Segments keep
+   their natural width — the bar scrolls rather than squeezing them into a wrap or an ellipsis. */
+.chat-status-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 12px;
+}
+
+/* On a phone there is no room for the pair to read as a pair across a stretched gap: space-between
+   just strands the right cluster at the end of a bar that is already scrolling sideways. Pack both
+   clusters at the start of the line instead — the row's own gap and the right cluster's inset are
+   what keep them from touching. Same breakpoint as useIsMobile (see hooks/useIsMobile.ts). */
+@media (max-width: 640px) {
+  .chat-status-line {
+    justify-content: flex-start;
+  }
 }
 
 /* The input is framed by a rule above and below and nothing on the sides — pi's own editor shape.
@@ -581,18 +619,18 @@ html.dark .web-login-error {
 .chat-status-name {
   flex: 0 0 auto;
   white-space: nowrap;
+  /* Every line's right cluster carries this inset: the two clusters of a line sit flush against each
+     other only when the bar is squeezed to its natural width, and the row's own gap reads as an
+     accident there. */
+  padding-left: 8px;
   color: var(--text-dim);
 }
 
-/* Line 3's own bar below the status row — it exists only when an extension publishes a status.
-   Whitespace is preserved and nothing is truncated; the bar scrolls instead. */
+/* Line 3's own strip — it exists only when an extension publishes a status. Whitespace is preserved
+   and nothing is truncated; it rides the bar's scroll surface, so it declares no overflow of its own
+   (a strip that scrolled itself would hold the text still while the lines above it moved). */
 .chat-status-ext {
-  display: block;
-  width: 100%;
-  max-height: min(144px, 18dvh);
-  overflow: auto;
-  overscroll-behavior: contain;
-  padding: 4px 4px;
+  padding: 0 4px;
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -602,9 +640,9 @@ html.dark .web-login-error {
 
 .chat-status-stats {
   display: inline-flex;
-  /* The model leads the row now, so the counters are what gets pushed to the right. */
-  margin-left: auto;
-  /* One line, never compressed: when the row runs out of room it scrolls instead. */
+  /* The counters lead line 2 and the model cluster closes it, so nothing pushes them right — an auto
+     margin here would pin both clusters to the edge and mirror the line the layout asks for. */
+  /* One line, never compressed: when the bar runs out of room it scrolls instead. */
   flex: 0 0 auto;
   flex-wrap: nowrap;
   gap: 0 5px;
@@ -614,6 +652,9 @@ html.dark .web-login-error {
   /* The model cluster keeps its full label; the row scrolls rather than squeezing an ellipsis. */
   flex: 0 0 auto;
   white-space: nowrap;
+  /* Line 2's right cluster — and the only cluster on the fresh line — matching the session name's
+     inset on line 1. */
+  padding-left: 8px;
   display: inline-flex;
   align-items: baseline;
   gap: 0 6px;
