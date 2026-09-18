@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const source = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
+const globalsCss = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const mobileHookSource = await readFile(new URL("../hooks/useIsMobile.ts", import.meta.url), "utf8");
 
 test("keeps action icons inline in medium mobile sidebars", () => {
@@ -92,9 +93,9 @@ test("keeps theme and language in settings instead of the chat toolbar", () => {
 });
 
 test("prioritizes context and cost when the mobile statistics area narrows", () => {
-  assert.match(source, /\.mobile-session-stats \{[\s\S]*?container-type: inline-size/);
-  assert.match(source, /@container \(max-width: 158px\)[\s\S]*?\.mobile-session-stat-io/);
-  assert.match(source, /@container \(max-width: 88px\)[\s\S]*?\.mobile-session-stat-cost/);
+  assert.match(globalsCss, /\.mobile-session-stats \{[\s\S]*?container-type: inline-size/);
+  assert.match(globalsCss, /@container \(max-width: 158px\)[\s\S]*?\.mobile-session-stat-io/);
+  assert.match(globalsCss, /@container \(max-width: 88px\)[\s\S]*?\.mobile-session-stat-cost/);
   assert.match(source, /mobileContextText = percent !== null \? `\$\{percent\.toFixed\(0\)\}%` : null/);
 });
 
