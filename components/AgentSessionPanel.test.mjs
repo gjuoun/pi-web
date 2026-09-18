@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const source = await readFile(new URL("./AgentSessionPanel.tsx", import.meta.url), "utf8");
+const globalsCss = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
 test("keeps the main session first and makes every agent session selectable", () => {
   const mainRow = source.indexOf("session={rootSession}");
@@ -18,7 +19,7 @@ test("sorts running subagents first and enables search only for larger families"
   assert.match(source, /if \(aRunning !== bRunning\) return aRunning \? -1 : 1/);
   assert.match(source, /subagents\.length > 8/);
   assert.match(source, /relation\?\.description, relation\?\.profile, session\.name, session\.firstMessage/);
-  assert.match(source, /maxHeight: "min\(58dvh, 480px\)"/);
+  assert.match(globalsCss, /\.agent-session-list \{[^}]*max-height: min\(58dvh, 480px\)/);
 });
 
 test("labels a child by the engine that ran it", () => {
@@ -30,8 +31,8 @@ test("labels a child by the engine that ran it", () => {
 });
 
 test("renders as a compact left-positioned dropdown without a centered inner width", () => {
-  assert.match(source, /borderLeft: "1px solid var\(--border\)"/);
-  assert.match(source, /borderRadius: "0 0 6px 6px"/);
+  assert.match(source, /className="agent-session-panel"/);
+  assert.match(globalsCss, /\.agent-session-panel \{[^}]*border-left: 1px solid var\(--border\)[^}]*border-radius: 0 0 6px 6px/);
   assert.doesNotMatch(source, /maxWidth: 680/);
 });
 

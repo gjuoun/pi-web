@@ -57,12 +57,13 @@ function formatRelativeTime(value: string, locale: string): string {
   return formatter.format(Math.round(elapsedHours / 24), "day");
 }
 
-function statusColor(status: SubagentSessionStatus): string {
-  if (status === "running" || status === "starting") return "var(--accent)";
-  if (status === "completed") return "#16a34a";
-  if (status === "failed") return "#dc2626";
-  if (status === "aborted") return "#d97706";
-  return "var(--text-dim)";
+/** The row's status tone; every tone is a `.agent-session-row-status.is-*` rule in globals.css. */
+function statusTone(status: SubagentSessionStatus): string {
+  if (status === "running" || status === "starting") return "is-running";
+  if (status === "completed") return "is-completed";
+  if (status === "failed") return "is-failed";
+  if (status === "aborted") return "is-aborted";
+  return "is-idle";
 }
 
 function StatusIcon({ status }: { status: SubagentSessionStatus }) {
@@ -128,22 +129,7 @@ function AgentRow({
       role="option"
       aria-selected={selected}
       onClick={onSelect}
-      style={{
-        width: "100%",
-        minHeight: 56,
-        display: "grid",
-        gridTemplateColumns: "28px minmax(0, 1fr) auto",
-        alignItems: "center",
-        gap: 9,
-        padding: "7px 12px",
-        border: "none",
-        borderBottom: "1px solid var(--border)",
-        borderLeft: selected ? "2px solid var(--accent)" : "2px solid transparent",
-        background: selected ? "var(--bg-selected)" : "transparent",
-        color: "var(--text)",
-        cursor: "pointer",
-        textAlign: "left",
-      }}
+      className={"agent-session-row" + (selected ? " is-selected" : "")}
       onMouseEnter={(event) => {
         if (!selected) event.currentTarget.style.background = "var(--bg-hover)";
       }}
@@ -151,7 +137,7 @@ function AgentRow({
         if (!selected) event.currentTarget.style.background = "transparent";
       }}
     >
-      <span style={{ width: 28, height: 28, display: "grid", placeItems: "center", color: main ? "var(--text-muted)" : "var(--accent)" }}>
+      <span className={"agent-session-row-icon" + (main ? " is-main" : "")}>
         {main ? (
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" />
@@ -162,20 +148,16 @@ function AgentRow({
           </svg>
         )}
       </span>
-      <span style={{ minWidth: 0 }}>
-        <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: selected ? 600 : 500 }} title={primary}>
+      <span className="agent-session-row-copy">
+        <span className={"agent-session-row-title" + (selected ? " is-selected" : "")} title={primary}>
           {primary}
         </span>
-        <span style={{ display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-dim)", fontSize: 11 }} title={secondary}>
+        <span className="agent-session-row-subtitle" title={secondary}>
           {relation?.engine === "pi-subagents" && (
             // Origin tag: without it a package run reads exactly like one of Pi Web's own children.
             <span
               data-testid="agent-engine-tag"
-              style={{
-                display: "inline-block", marginRight: 5, padding: "0 4px",
-                border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg-subtle)",
-                color: "var(--accent)", fontSize: 10, lineHeight: "14px", verticalAlign: "1px",
-              }}
+              className="agent-session-engine-tag"
             >
               {t("agentSwitcher.enginePackage")}
             </span>
@@ -183,7 +165,7 @@ function AgentRow({
           {secondary}
         </span>
       </span>
-      <span style={{ display: "flex", alignItems: "center", gap: 6, color: main && !running ? "var(--text-dim)" : statusColor(status), fontSize: 11, whiteSpace: "nowrap" }}>
+      <span className={"agent-session-row-status " + (main && !running ? "is-main" : statusTone(status))}>
         {main && !running ? (
           selected ? t("agentSwitcher.current") : null
         ) : (
@@ -227,45 +209,33 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
     <div
       role="listbox"
       aria-label={t("agentSwitcher.title")}
-      style={{
-        background: "var(--bg-panel)",
-        borderLeft: "1px solid var(--border)",
-        borderRight: "1px solid var(--border)",
-        borderBottom: "1px solid var(--border)",
-        borderRadius: "0 0 6px 6px",
-        boxShadow: "0 10px 28px rgba(0,0,0,0.10)",
-        overflow: "hidden",
-      }}
+      className="agent-session-panel"
     >
       <div>
-        <div style={{ minHeight: 44, display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", borderBottom: "1px solid var(--border)" }}>
-          <strong style={{ fontSize: 12, fontWeight: 600 }}>{t("agentSwitcher.title")}</strong>
-          <span style={{ color: "var(--text-dim)", fontSize: 11 }}>
+        <div className="agent-session-header">
+          <strong className="agent-session-title">{t("agentSwitcher.title")}</strong>
+          <span className="agent-session-count">
             {t("agentSwitcher.count", { count: subagents.length })}
           </span>
           {runningCount > 0 && (
-            <span style={{ marginLeft: "auto", color: "var(--accent)", fontSize: 11 }}>
+            <span className="agent-session-running-count">
               {t("agentSwitcher.runningCount", { count: runningCount })}
             </span>
           )}
         </div>
         {subagents.length > 8 && (
-          <div style={{ padding: 8, borderBottom: "1px solid var(--border)" }}>
+          <div className="agent-session-search">
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("agentSwitcher.search")}
               aria-label={t("agentSwitcher.search")}
-              style={{
-                width: "100%", height: 32, padding: "0 10px",
-                border: "1px solid var(--border)", borderRadius: 6,
-                background: "var(--bg)", color: "var(--text)", fontSize: 12, outline: "none",
-              }}
+              className="agent-session-search-input"
             />
           </div>
         )}
-        <div style={{ maxHeight: "min(58dvh, 480px)", overflowY: "auto" }}>
+        <div className="agent-session-list">
           <AgentRow
             session={rootSession}
             main
@@ -290,28 +260,21 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
               disabled
               data-testid="agent-pending-run"
               title={t("piSubagents.sessionPending")}
-              style={{
-                width: "100%", minHeight: 44, display: "grid",
-                gridTemplateColumns: "28px minmax(0, 1fr) auto",
-                alignItems: "center", gap: 9, padding: "7px 12px",
-                border: "none", borderBottom: "1px solid var(--border)",
-                borderLeft: "2px solid transparent", background: "transparent",
-                color: "var(--text-muted)", textAlign: "left", cursor: "default",
-              }}
+              className="agent-session-pending-row"
             >
-              <span style={{ width: 28, display: "grid", placeItems: "center", color: "var(--accent)" }}>
+              <span className="agent-session-pending-icon">
                 <StatusIcon status="starting" />
               </span>
-              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>
+              <span className="agent-session-pending-title">
                 {run.description || run.profile}
               </span>
-              <span style={{ color: "var(--text-dim)", fontSize: 11, whiteSpace: "nowrap" }}>
+              <span className="agent-session-pending-note">
                 {t("piSubagents.sessionPending")}
               </span>
             </button>
           ))}
           {visibleSubagents.length === 0 && pendingRuns.length === 0 && (
-            <div style={{ padding: "22px 12px", color: "var(--text-dim)", fontSize: 12, textAlign: "center" }}>
+            <div className="agent-session-empty">
               {t("agentSwitcher.noMatches")}
             </div>
           )}
