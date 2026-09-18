@@ -2140,3 +2140,211 @@ span.token.table {
     box-shadow: none;
   }
 }
+
+/* ---- image preview: the zoom-in trigger button ---- */
+.image-preview-trigger {
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: zoom-in;
+}
+
+/* ---- provider icon ---- */
+.provider-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.provider-icon-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ---- thinking icon ---- */
+.thinking-icon {
+  flex-shrink: 0;
+}
+
+.thinking-icon-path.is-active {
+  filter: drop-shadow(0 0 2px rgba(250, 204, 21, 0.35));
+}
+
+/* ---- written files under a turn ---- */
+.turn-written-files {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.turn-written-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* ---- code block: the plain pre used while a message is still streaming ---- */
+.markdown-code-plain {
+  margin: 0;
+  padding: 11px 13px;
+  font-family: var(--font-mono);
+  font-size: calc(12.5px + var(--chat-font-size-offset, 0px));
+  line-height: 1.62;
+  overflow-x: auto;
+  background: color-mix(in srgb, var(--bg) 92%, var(--bg-panel));
+}
+
+.markdown-code-plain code {
+  font-family: var(--font-mono);
+}
+
+/* ---- chat minimap: the rail and its node dots ---- */
+.chat-minimap {
+  flex-shrink: 0;
+  position: relative;
+  /* Keep in step with CHAT_MINIMAP_WIDTH in ChatWindow.tsx, which pads the list by the same gutter. */
+  width: 36px;
+  cursor: pointer;
+  user-select: none;
+  border-left: 1px solid var(--border);
+  background: var(--bg-panel);
+  overflow: visible;
+}
+
+.chat-minimap-rail {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  width: 1px;
+  background: var(--border);
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+.chat-minimap-node {
+  position: absolute;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.chat-minimap-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: rgba(128, 128, 128, 0.16);
+  border: 1.5px solid rgba(128, 128, 128, 0.58);
+  transition: transform 0.1s, background 0.1s;
+  transform: scale(1);
+}
+
+.chat-minimap-dot.is-active {
+  background: rgba(128, 128, 128, 0.42);
+  border-color: rgba(128, 128, 128, 0.95);
+  box-shadow: 0 0 0 2px var(--bg-panel);
+}
+
+.chat-minimap-dot.is-near {
+  transform: scale(1.25);
+}
+
+/* ---- file tab bar ---- */
+.tab-bar {
+  display: flex;
+  align-items: flex-end;
+  flex-shrink: 0;
+  height: 36px;
+  overflow-x: auto;
+  background: var(--bg-panel);
+}
+
+.tab-bar-tab {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 6px;
+  height: 36px;
+  min-width: 80px;
+  max-width: 180px;
+  padding-left: 12px;
+  padding-right: 6px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s, color 0.1s;
+}
+
+.tab-bar-tab.is-active {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.tab-bar-tab-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.tab-bar-tab-icon.is-active {
+  opacity: 1;
+}
+
+.tab-bar-tab-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 400;
+}
+
+.tab-bar-tab-label.is-active {
+  font-weight: 500;
+}
+
+.tab-bar-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.tab-bar-close.is-hovered {
+  background: var(--bg-hover);
+  color: var(--text);
+}

@@ -214,7 +214,7 @@ export function FontFamilyPicker({
             role="listbox"
             aria-label={label}
             className="settings-font-picker-popover"
-            style={{ ...verticalPosition, left: anchor.left, width: anchor.width, maxHeight }}
+            style={{ /* dynamic: viewport-measured anchor box, offset and max height */ ...verticalPosition, left: anchor.left, width: anchor.width, maxHeight }}
           >
             {visible.length === 0 && (
               <li className="settings-font-picker-empty" role="presentation">{t("settings.fontNoMatches")}</li>

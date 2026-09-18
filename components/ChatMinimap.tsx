@@ -20,7 +20,6 @@ interface Props {
   onRevealHistory: () => void;
 }
 
-const MINIMAP_WIDTH = 36;
 const MAX_NODE_GAP = 50;
 const MINIMAP_PADDING = 12;
 const PREVIEW_HIDE_DELAY = 250;
@@ -611,28 +610,11 @@ export function ChatMinimap({
         const rect = event.currentTarget.getBoundingClientRect();
         setMouseYRatio((event.clientY - rect.top) / rect.height);
       }}
-      style={{
-        width: MINIMAP_WIDTH,
-        flexShrink: 0,
-        position: "relative",
-        cursor: "pointer",
-        userSelect: "none",
-        borderLeft: "1px solid var(--border)",
-        background: "var(--bg-panel)",
-        overflow: "visible",
-      }}
+      className="chat-minimap"
     >
       <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          top: MINIMAP_PADDING,
-          height: railHeight,
-          width: 1,
-          background: "var(--border)",
-          transform: "translateX(-50%)",
-          zIndex: 0,
-        }}
+        className="chat-minimap-rail"
+        style={{ /* dynamic: rail height follows the measured node spread */ height: railHeight }}
       />
 
       {positionedNodes.map((node) => {
@@ -644,31 +626,11 @@ export function ChatMinimap({
             key={node.index}
             data-minimap-node-index={node.index}
             data-minimap-node-active={isActive ? "" : undefined}
-            style={{
-              position: "absolute",
-              top: `${node.topRatio * 100}%`,
-              transform: "translateY(-50%)",
-              left: 0,
-              right: 0,
-              height: Math.max(1, nodeGap),
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              pointerEvents: "none",
-              zIndex: 2,
-            }}
+            className="chat-minimap-node"
+            style={{ /* dynamic: measured node position and node gap */ top: `${node.topRatio * 100}%`, height: Math.max(1, nodeGap) }}
           >
             <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 2,
-                background: isActive ? "rgba(128,128,128,0.42)" : "rgba(128,128,128,0.16)",
-                border: `1.5px solid ${isActive ? "rgba(128,128,128,0.95)" : "rgba(128,128,128,0.58)"}`,
-                boxShadow: isActive ? "0 0 0 2px var(--bg-panel)" : "none",
-                transition: "transform 0.1s, background 0.1s",
-                transform: isNearest ? "scale(1.25)" : "scale(1)",
-              }}
+              className={"chat-minimap-dot" + (isActive ? " is-active" : "") + (isNearest ? " is-near" : "")}
             />
           </div>
         );

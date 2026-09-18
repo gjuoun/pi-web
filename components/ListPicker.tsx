@@ -184,7 +184,7 @@ export function ListPicker({
       className="list-picker"
       role="listbox"
       aria-label={ariaLabel}
-      style={{ ...verticalPosition, ...horizontalPosition, maxHeight }}
+      style={{ /* dynamic: viewport-measured popover offset and max height */ ...verticalPosition, ...horizontalPosition, maxHeight }}
     >
       <div className="list-picker-search">
         <input

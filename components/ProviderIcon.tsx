@@ -52,7 +52,7 @@ export function ProviderIcon({ id, size }: { id: string; size: number }) {
         height={size}
         viewBox="0 0 24 24"
         fill={icon.color ? undefined : "currentColor"}
-        style={{ color: "var(--text-muted)", flexShrink: 0 }}
+        className="provider-icon"
       >
         <use href={`/provider-icons.svg#${icon.symbol}`} />
       </svg>
@@ -69,20 +69,8 @@ export function ProviderIcon({ id, size }: { id: string; size: number }) {
   return (
     <span
       aria-hidden="true"
-      style={{
-        width: size,
-        height: size,
-        border: "1px solid var(--border)",
-        borderRadius: 4,
-        color: "var(--text-dim)",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        fontSize: Math.max(8, Math.floor(size * 0.42)),
-        fontWeight: 700,
-        lineHeight: 1,
-      }}
+      className="provider-icon-fallback"
+      style={{ /* dynamic: the size prop drives the badge box and its type size */ width: size, height: size, fontSize: Math.max(8, Math.floor(size * 0.42)) }}
     >
       {label}
     </span>

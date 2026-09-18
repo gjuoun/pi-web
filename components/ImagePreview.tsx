@@ -48,16 +48,8 @@ export function ImagePreview({ src, alt = "", children, className, style }: Imag
       <button
         ref={triggerRef}
         type="button"
-        className={className}
-        style={{
-          display: "block",
-          padding: 0,
-          border: "none",
-          background: "none",
-          color: "inherit",
-          cursor: "zoom-in",
-          ...style,
-        }}
+        className={className ? `image-preview-trigger ${className}` : "image-preview-trigger"}
+        style={style}
         onClick={() => setOpen(true)}
         aria-label={t("chat.previewImage")}
         aria-haspopup="dialog"
