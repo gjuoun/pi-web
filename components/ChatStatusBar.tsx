@@ -19,9 +19,15 @@ import { ModelSelector, type ModelSelectorOption } from "./ModelSelector";
  *
  * Reference: `@earendil-works/pi-coding-agent/dist/modes/interactive/components/footer.js`
  * (`FooterComponent`). Line 1 is `cwd (branch) • session name`; line 2 is the usage stats on the
- * left and `(provider) model • level` on the right. pi's third line (extension statuses) is not
- * reproduced here — `ExtensionStatusBar` renders whatever extensions publish, including the
- * `tps-status` extension's task-timer line.
+ * left and `(provider) model • level` on the right. The web drops pi's `• ` inside each pair: both
+ * clusters are pinned to opposite ends of their line, so a leading separator would hang off the
+ * right-hand one with nothing left to separate it from — a left inset on that cluster does the job.
+ *
+ * A new session has neither a name nor counters to show, so it collapses to a single line: the
+ * workspace against the model and thinking pickers. pi's third line (extension statuses) rides in
+ * the same bar — `ExtensionStatusLine` renders whatever extensions publish, including the
+ * `tps-status` extension's task-timer line — and every line shares one scroll surface with it in
+ * `ChatWindow`, so a bar that outgrows the window scrolls as a whole.
  *
  * Where pi only prints text, the model / level segments double as the control surface:
  * the composer keeps an image button and a send button and nothing else.
@@ -168,10 +174,10 @@ export function formatProjectLine(input: {
   return line;
 }
 
-/** `• name` — the session-name segment, empty while the session has no name. */
+/** The session-name segment, empty while the session has no name. */
 export function formatSessionName(name?: string | null): string {
   const trimmed = name?.trim();
-  return trimmed ? `• ${trimmed}` : "";
+  return trimmed ? trimmed : "";
 }
 
 /** pi colours the context segment by band: `>90` error, `>70` warning. */
@@ -416,40 +422,57 @@ export function ChatStatusBar({
     );
   }
 
+  // The model cluster closes whichever line it rides on: the only line when the session is new,
+  // line 2 once the run has counters to report.
+  const modelCluster = (
+    <span className="chat-status-model">
+      {modelSegment}
+      {thinkingSuffix && (
+        onThinkingLevelChange ? (
+          <StatusMenu
+            label={thinkingSuffix}
+            title={t("chat.changeReasoningLabel")}
+            disabled={busy}
+            items={thinkingItems}
+            openKey={openMenu}
+            menuKey="thinking"
+            onOpenChange={setOpenMenu}
+          />
+        ) : <span>{thinkingSuffix}</span>
+      )}
+    </span>
+  );
+
   return (
     <div
       className={`chat-status-bar${fresh ? " is-fresh" : ""}`}
       role="status"
       aria-label={t("chat.status")}
     >
-      <span className="chat-status-model">
-        {modelSegment}
-        {thinkingSuffix && (
-          onThinkingLevelChange ? (
-            <StatusMenu
-              label={thinkingSuffix}
-              title={t("chat.changeReasoningLabel")}
-              disabled={busy}
-              items={thinkingItems}
-              openKey={openMenu}
-              menuKey="thinking"
-              onOpenChange={setOpenMenu}
-            />
-          ) : <span>{thinkingSuffix}</span>
-        )}
-      </span>
-      <span className="chat-status-project">{projectLine}</span>
-      {!fresh && nameLine && <span className="chat-status-name">{nameLine}</span>}
-      {/* The fresh state shows no counters at all — there is nothing to count yet. */}
-      {!fresh && (
-        <span className="chat-status-stats">
-          {items.map((item) => {
-            const tint = item.kind === "context" ? contextColor(item.percent) : undefined;
-            return (
-              <span key={item.kind} style={tint ? { color: tint } : undefined}>{item.text}</span>
-            );
-          })}
-        </span>
+      {fresh ? (
+        // No counters and no name yet: the workspace against the pickers it was chosen with.
+        <div className="chat-status-line">
+          <span className="chat-status-project">{projectLine}</span>
+          {modelCluster}
+        </div>
+      ) : (
+        <>
+          <div className="chat-status-line">
+            <span className="chat-status-project">{projectLine}</span>
+            {nameLine && <span className="chat-status-name">{nameLine}</span>}
+          </div>
+          <div className="chat-status-line">
+            <span className="chat-status-stats">
+              {items.map((item) => {
+                const tint = item.kind === "context" ? contextColor(item.percent) : undefined;
+                return (
+                  <span key={item.kind} style={tint ? { color: tint } : undefined}>{item.text}</span>
+                );
+              })}
+            </span>
+            {modelCluster}
+          </div>
+        </>
       )}
     </div>
   );

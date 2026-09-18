@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
 
 /**
- * The chat status row's two display states.
+ * The chat bottom bar: its two display states and the one scroll surface they share.
  *
- * Covers the row only: `e2e/minimal-chrome.mjs` owns the composer's geometry, the rail and the
- * toggles. The row's states are:
+ * Covers the bar only: `e2e/minimal-chrome.mjs` owns the composer's geometry, the rail and the
+ * toggles. The bar's states are:
  *
- *   fresh      `[model] ⟷ [project]`, no name, no tokens, no fold control
- *   ongoing    `[model] [project] [session name]` left, `[token cluster]` right, foldable
+ *   fresh      one line   `[workspace] ⟷ [model + thinking]`
+ *   ongoing    line 1     `[workspace] ⟷ [session name]`
+ *              line 2     `[token cluster] ⟷ [model + thinking]`
+ *              line 3     the extension status line, when an extension publishes one
+ *
+ * Everything rides `.chat-bottom-bar`, the single horizontal scroll surface: at a phone width the
+ * lines overflow and travel together rather than each strip scrolling on its own.
  *
  * Model *content* is deliberately not asserted: this suite runs against a temp agent dir with no
  * models configured, so the cluster legitimately renders its "No models" placeholder. The session
@@ -15,9 +20,16 @@ import assert from "node:assert/strict";
  */
 
 const snapshot = (page) => page.evaluate(() => {
+  const surface = document.querySelector(".chat-bottom-bar");
+  const inner = document.querySelector(".chat-bottom-bar-inner");
   const bar = document.querySelector(".chat-status-bar");
   const textarea = document.querySelector("textarea.chat-input-textarea");
   const fieldset = textarea ? textarea.closest("fieldset") : null;
+  const rectOf = (el) => {
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return { left: rect.left, width: rect.width };
+  };
   let frame = null;
   if (fieldset) {
     const style = getComputedStyle(fieldset);
@@ -26,72 +38,128 @@ const snapshot = (page) => page.evaluate(() => {
     const right = rect.right - Number.parseFloat(style.paddingRight);
     frame = { left, width: right - left };
   }
-  const rect = bar ? bar.getBoundingClientRect() : null;
+  const lineEls = Array.from(document.querySelectorAll(".chat-status-line"));
   return {
+    hasSurface: Boolean(surface),
     hasBar: Boolean(bar),
     className: bar ? bar.className : null,
     hasStats: Boolean(bar && bar.querySelector(".chat-status-stats")),
     hasName: Boolean(bar && bar.querySelector(".chat-status-name")),
-    hasFold: Boolean(bar && bar.querySelector('[data-chrome-toggle="status-fold"]')),
+    hasFold: Boolean(surface && surface.querySelector('[data-chrome-toggle="status-fold"]')),
     borderTopWidth: bar ? getComputedStyle(bar).borderTopWidth : null,
-    segments: bar ? Array.from(bar.children).map((child) => child.className) : null,
-    text: bar ? (bar.innerText || "").replace(/\s+/g, " ").trim() : null,
-    bar: rect ? { left: rect.left, width: rect.width } : null,
+    // Nothing inside the surface may scroll on its own, or the lines would move independently.
+    // The extension strip only exists when an extension publishes a status; the unit suite pins it.
+    innerOverflowX: [bar, document.querySelector(".chat-status-ext")]
+      .filter(Boolean)
+      .map((el) => getComputedStyle(el).overflowX),
+    lines: lineEls.map((line) => Array.from(line.children).map((child) => child.className)),
+    lineLefts: lineEls.map((line) => (line.firstElementChild ? line.firstElementChild.getBoundingClientRect().left : null)),
+    surface: surface
+      ? { ...rectOf(surface), clientWidth: surface.clientWidth, scrollWidth: surface.scrollWidth, scrollLeft: surface.scrollLeft }
+      : null,
+    // The inset lives on the inner block, so the composer's frame is that block's *content* box:
+    // its border box starts one inline padding to the left of it.
+    inner: rectOf(inner),
+    innerContent: inner
+      ? (() => {
+          const style = getComputedStyle(inner);
+          const rect = inner.getBoundingClientRect();
+          const left = rect.left + Number.parseFloat(style.paddingLeft);
+          const right = rect.right - Number.parseFloat(style.paddingRight);
+          return { left, width: right - left };
+        })()
+      : null,
     frame,
   };
 });
 
-const near = (a, b) => Math.abs(a - b) <= 1;
-const at = (segments, cls) => segments.findIndex((value) => value.split(/\s+/).includes(cls));
+const near = (a, b, tolerance = 1) => Math.abs(a - b) <= tolerance;
+const has = (line, cls) => line.some((value) => value.split(/\s+/).includes(cls));
 
 export async function checkStatusBar(page, { base, cwd, sessionId }) {
+  const restore = page.viewportSize();
   await page.goto(`${base}/?session=${sessionId}`, { waitUntil: "domcontentloaded" });
   await page.locator(".chat-status-bar").waitFor();
   await page.waitForFunction(() => (document.querySelector(".chat-status-bar")?.innerText ?? "").trim().length > 0);
 
   const ongoing = await snapshot(page);
-  assert.ok(ongoing.hasBar, "the status row renders");
+  assert.ok(ongoing.hasBar && ongoing.hasSurface, "the bar renders inside its scroll surface");
   assert.doesNotMatch(ongoing.className, /is-fresh/, "a session in progress is not fresh");
-  // [model][project][name][stats] — the name only when the session has one, which these fixtures do not.
-  const order = ["chat-status-model", "chat-status-project", "chat-status-stats"].map((cls) => at(ongoing.segments, cls));
+  assert.equal(ongoing.lines.length, 2, `an ongoing session shows two lines, got ${ongoing.lines.length}`);
+  assert.ok(has(ongoing.lines[0], "chat-status-project"), `line 1 must lead with the workspace, got ${ongoing.lines[0]}`);
+  assert.ok(has(ongoing.lines[1], "chat-status-stats"), `line 2 must lead with the token cluster, got ${ongoing.lines[1]}`);
+  assert.ok(has(ongoing.lines[1], "chat-status-model"), `line 2 must close with the model cluster, got ${ongoing.lines[1]}`);
+  assert.ok(ongoing.hasStats, "the ongoing bar carries the token cluster");
+  assert.equal(ongoing.hasName, false, "these fixtures are nameless, so no name segment renders");
+  assert.equal(ongoing.hasFold, false, "the bar offers no fold control — it is always fully displayed");
+  // The bar draws no line of its own — the input's bottom rule separates it.
+  assert.equal(ongoing.borderTopWidth, "0px", `the bar must not draw its own line, got ${ongoing.borderTopWidth}`);
   assert.ok(
-    order.every((index) => index >= 0) && order[0] < order[1] && order[1] < order[2],
-    `the ongoing row must be [model][project]([name])[stats], got ${ongoing.segments}`,
+    ongoing.innerOverflowX.length >= 1 && ongoing.innerOverflowX.every((value) => value === "visible"),
+    `no strip may scroll on its own, got ${ongoing.innerOverflowX}`,
   );
-  assert.ok(ongoing.hasStats, "the ongoing row carries the token cluster");
-  assert.equal(ongoing.hasFold, false, "the row offers no fold control — it is always fully displayed");
-  // The row draws no line of its own — the input's bottom rule separates it.
-  assert.equal(ongoing.borderTopWidth, "0px", `the row must not draw its own line, got ${ongoing.borderTopWidth}`);
-  // Full width now, matching the composer above it rather than a reading-width cap. It shares its line
-  // with the composer-hide control, so it spans the content width *apart from that control*.
+  // The bar follows the composer's frame — same inline inset, same width — instead of a reading cap.
   assert.ok(
-    ongoing.frame !== null && ongoing.bar !== null && near(ongoing.bar.left, ongoing.frame.left, 2),
-    `the row must start on the content edge: bar=${ongoing.bar?.left} frame=${ongoing.frame?.left}`,
+    ongoing.frame && ongoing.innerContent && near(ongoing.innerContent.left, ongoing.frame.left, 2),
+    `the bar must start on the content edge: bar=${ongoing.innerContent?.left} frame=${ongoing.frame?.left}`,
   );
   assert.ok(
-    ongoing.frame !== null && ongoing.bar !== null
-      && ongoing.bar.width > ongoing.frame.width - 40 && ongoing.bar.width <= ongoing.frame.width,
-    `the row must span the content width apart from its own controls: bar=${ongoing.bar?.width} frame=${ongoing.frame?.width}`,
+    ongoing.frame && ongoing.innerContent && ongoing.innerContent.width >= ongoing.frame.width - 1,
+    `the bar must span the content width: bar=${ongoing.innerContent?.width} frame=${ongoing.frame?.width}`,
   );
-  console.log("PASS: status row — ongoing state spans the content width and is always fully displayed");
+  console.log("PASS: bottom bar — ongoing state is [workspace][name] over [counters][model]");
+
+  // The surface is the bar: at a phone width the lines overflow and move together. The viewport is
+  // restored in a finally, so a failure here cannot narrow every later spec in the run.
+  try {
+    await page.setViewportSize({ width: 320, height: restore?.height ?? 720 });
+    await page.waitForTimeout(400);
+    const narrow = await snapshot(page);
+    assert.ok(
+      narrow.surface && narrow.surface.scrollWidth > narrow.surface.clientWidth,
+      `the bar must overflow at 320px: scrollWidth=${narrow.surface?.scrollWidth} clientWidth=${narrow.surface?.clientWidth}`,
+    );
+    const shifted = await page.evaluate(() => {
+      const surface = document.querySelector(".chat-bottom-bar");
+      if (surface) surface.scrollLeft = 60;
+      return {
+        scrollLeft: surface ? surface.scrollLeft : null,
+        lefts: Array.from(document.querySelectorAll(".chat-status-line")).map((line) =>
+          line.firstElementChild ? line.firstElementChild.getBoundingClientRect().left : null),
+      };
+    });
+    assert.ok(shifted.scrollLeft > 0, "the scroll surface did not move");
+    const deltas = shifted.lefts.map((left, i) => left - narrow.lineLefts[i]);
+    assert.ok(
+      deltas.length === 2 && deltas.every((delta) => near(delta, -shifted.scrollLeft, 1.5)),
+      `every line must travel with the surface: deltas=${deltas} scrollLeft=${shifted.scrollLeft}`,
+    );
+    console.log("PASS: bottom bar — 320px overflow scrolls both lines together");
+  } finally {
+    await page.setViewportSize(restore ?? { width: 1280, height: 720 });
+  }
 
   await page.goto(`${base}/?cwd=${encodeURIComponent(cwd)}`, { waitUntil: "domcontentloaded" });
   await page.locator(".chat-status-bar.is-fresh").waitFor();
   await page.waitForTimeout(1000);
   const fresh = await snapshot(page);
   assert.match(fresh.className, /is-fresh/, "a new session shows the fresh state");
-  assert.equal(fresh.hasStats, false, "the fresh row shows no token cluster");
-  assert.equal(fresh.hasName, false, "the fresh row shows no session name");
-  assert.equal(fresh.hasFold, false, "the row never offers a fold control");
-  const freshOrder = ["chat-status-model", "chat-status-project"].map((cls) => at(fresh.segments, cls));
+  assert.equal(fresh.hasStats, false, "the fresh bar shows no token cluster");
+  assert.equal(fresh.hasName, false, "the fresh bar shows no session name");
+  assert.equal(fresh.hasFold, false, "the bar never offers a fold control");
+  assert.equal(fresh.lines.length, 1, `a new session shows one line, got ${fresh.lines.length}`);
   assert.ok(
-    freshOrder.every((index) => index >= 0) && freshOrder[0] < freshOrder[1],
-    `the fresh row must be exactly [model][project], got ${fresh.segments}`,
+    has(fresh.lines[0], "chat-status-project") && has(fresh.lines[0], "chat-status-model"),
+    `the fresh line must be [workspace][model], got ${fresh.lines[0]}`,
   );
   assert.ok(
-    fresh.frame !== null && fresh.bar !== null && near(fresh.bar.left, fresh.frame.left, 2)
-      && fresh.bar.width > fresh.frame.width - 40,
-    `the fresh row must span the content width apart from its own controls: bar=${fresh.bar?.left}/${fresh.bar?.width} frame=${fresh.frame?.left}/${fresh.frame?.width}`,
+    fresh.innerOverflowX.length >= 1 && fresh.innerOverflowX.every((value) => value === "visible"),
+    `no strip may scroll on its own, got ${fresh.innerOverflowX}`,
   );
-  console.log("PASS: status row — fresh state is [model][project] at full width with no fold control");
+  assert.ok(
+    fresh.frame && fresh.innerContent && near(fresh.innerContent.left, fresh.frame.left, 2)
+      && fresh.innerContent.width >= fresh.frame.width - 1,
+    `the fresh bar must span the content frame: bar=${fresh.innerContent?.left}/${fresh.innerContent?.width} frame=${fresh.frame?.left}/${fresh.frame?.width}`,
+  );
+  console.log("PASS: bottom bar — fresh state is one [workspace][model] line with no counters");
 }

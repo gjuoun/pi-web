@@ -33,6 +33,31 @@ test("renders the extension status line as its own bar below the status row", ()
   assert.doesNotMatch(source, /rowSlot/);
 });
 
+test("puts every line of the bar inside one shared scroll surface", () => {
+  const surfaceAt = source.indexOf('className="chat-bottom-bar"');
+  const innerAt = source.indexOf('className="chat-bottom-bar-inner"');
+  const rowAt = source.indexOf("<ChatStatusBar");
+  const extAt = source.indexOf("<ExtensionStatusLine");
+
+  assert.ok(surfaceAt >= 0 && innerAt >= 0, "the bottom bar needs its scroll surface and inner block");
+  assert.ok(
+    surfaceAt < innerAt,
+    `the inner block must sit inside the surface: surface=${surfaceAt} inner=${innerAt}`,
+  );
+  // Both the status lines and the extension line ride the surface, so they scroll as one bar.
+  assert.ok(
+    innerAt < rowAt && rowAt < extAt,
+    `the lines must ride the surface: inner=${innerAt} row=${rowAt} ext=${extAt}`,
+  );
+
+  // The inline inset belongs to the inner block, not the scroll container: a scroll container's right
+  // padding is not honoured past the overflow edge, so 52px there would leave the tail of an
+  // overflowing line sitting cut off at the viewport edge.
+  const inner = source.slice(innerAt, source.indexOf("</div>", innerAt));
+  assert.match(inner, /paddingLeft: 16/);
+  assert.match(inner, /paddingRight: isMobile \? 16 : 52/);
+});
+
 test("feeds the status row the fresh predicate and the project root", () => {
   const call = source.slice(source.indexOf("<ChatStatusBar"), source.indexOf("<ExtensionStatusLine"));
   assert.ok(call.length > 0, "ChatStatusBar is not rendered before ExtensionStatusLine");

@@ -155,7 +155,9 @@ test("composes the project line from projectRoot, falling back to cwd", () => {
 });
 
 test("composes the session name as its own segment", () => {
-  assert.equal(formatSessionName("接入 pi-subagents"), "• 接入 pi-subagents");
+  // No leading separator: the name is the right-hand cluster of its own line now, so a bullet would
+  // hang off the end of the workspace cluster with nothing left to separate it from.
+  assert.equal(formatSessionName("接入 pi-subagents"), "接入 pi-subagents");
   assert.equal(formatSessionName(""), "");
   assert.equal(formatSessionName("   "), "");
   assert.equal(formatSessionName(null), "");
@@ -169,7 +171,26 @@ test("tints the context segment by band and nothing else", () => {
   assert.equal(contextColor(null), undefined);
 });
 
-test("renders one full-width row in [model][project][name][stats] order while a session is ongoing", () => {
+// The bar is a stack of lines, and each line is one flex row. Map every segment to the line that
+// holds it, so the tests below assert the layout the user sees rather than a flat string order.
+function linesOf(html) {
+  const starts = [...html.matchAll(/class="chat-status-line"/g)].map((match) => match.index);
+  const lineOf = (cls) => {
+    const at = html.indexOf(`class="chat-status-${cls}"`);
+    // A marker index points at the row's own attribute list, so a segment inside row 0 sits after
+    // exactly one marker: subtract it to make the result 0-based.
+    return at < 0 ? -1 : starts.filter((start) => start < at).length - 1;
+  };
+  return {
+    count: starts.length,
+    project: lineOf("project"),
+    name: lineOf("name"),
+    stats: lineOf("stats"),
+    model: lineOf("model"),
+  };
+}
+
+test("stacks two lines in [project][name] / [stats][model] order while a session is ongoing", () => {
   const html = renderBar({
     cwd: "/Users/junguo/code/gjuoun/pi-web",
     home: "/Users/junguo",
@@ -191,9 +212,7 @@ test("renders one full-width row in [model][project][name][stats] order while a 
   assert.match(html, /class="chat-status-bar"/);
   // Only the fresh state narrows to the composer width.
   assert.doesNotMatch(html, /is-fresh/);
-  // The two-line block is gone: every segment is a child of the single row.
-  assert.doesNotMatch(html, /chat-status-line/);
-  // Line 3 is no longer injected here — it is its own bar in ChatWindow.
+  // Line 3 is not injected here — it is its own strip inside the same bar in ChatWindow.
   assert.doesNotMatch(html, /chat-status-ext/);
 
   assert.match(html, /~/);
@@ -210,21 +229,18 @@ test("renders one full-width row in [model][project][name][stats] order while a 
   assert.match(html, /• low/);
   assert.match(html, /role="status"/);
 
-  const modelAt = html.indexOf("chat-status-model");
-  const projectAt = html.indexOf("chat-status-project");
-  const nameAt = html.indexOf("chat-status-name");
-  const statsAt = html.indexOf("chat-status-stats");
-  assert.ok(
-    modelAt >= 0 && projectAt >= 0 && nameAt >= 0 && statsAt >= 0,
-    `every segment must exist: model=${modelAt} project=${projectAt} name=${nameAt} stats=${statsAt}`,
-  );
-  assert.ok(
-    modelAt < projectAt && projectAt < nameAt && nameAt < statsAt,
-    `segments must be row children in [model][project][name][stats] order: model=${modelAt} project=${projectAt} name=${nameAt} stats=${statsAt}`,
+  // The workspace leads line 1 and the session name closes it; the counters lead line 2 and the
+  // model cluster closes it.
+  const lines = linesOf(html);
+  assert.equal(lines.count, 2, `an ongoing session shows two lines, got ${lines.count}`);
+  assert.deepEqual(
+    { project: lines.project, name: lines.name, stats: lines.stats, model: lines.model },
+    { project: 0, name: 0, stats: 1, model: 1 },
+    "line 1 must be [project][name] and line 2 [stats][model]",
   );
 });
 
-test("narrows the fresh state to [model] [project] and drops the rest", () => {
+test("narrows the fresh state to one [project][model] line and drops the rest", () => {
   const html = renderBar({
     fresh: true,
     cwd: "/Users/junguo/code/gjuoun/pi-web",
@@ -244,13 +260,11 @@ test("narrows the fresh state to [model] [project] and drops the rest", () => {
   assert.doesNotMatch(html, /↑1\.2M/);
   assert.doesNotMatch(html, /接入 pi-subagents/);
 
-  const modelAt = html.indexOf("chat-status-model");
-  const projectAt = html.indexOf("chat-status-project");
-  assert.ok(
-    modelAt >= 0 && projectAt >= 0 && modelAt < projectAt,
-    `fresh state must be [model][project]: model=${modelAt} project=${projectAt}`,
-  );
-  // Only those two segments share the row.
+  const lines = linesOf(html);
+  assert.equal(lines.count, 1, `a new session shows a single line, got ${lines.count}`);
+  assert.equal(lines.project, 0, "the workspace must lead the fresh line");
+  assert.equal(lines.model, 0, "the model cluster must close the fresh line");
+  // Only those two segments share the line.
   assert.equal((html.match(/class="chat-status-(model|project)(")/g) ?? []).length, 2);
 });
 
@@ -336,9 +350,12 @@ test("closes a segment menu on Escape like the model selector", async () => {
   assert.match(source, /event\.stopPropagation\(\);[\s\S]{0,80}onOpenChange\(null\)/);
 });
 
-test("styles the bar as one scrollable mono row with a fixed popover", async () => {
+test("styles the bar as one scroll surface of stacked mono lines with a fixed popover", async () => {
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const surfaceRule = css.match(/\.chat-bottom-bar\s*\{([^}]*)\}/)?.[1] ?? "";
+  const innerRule = css.match(/\.chat-bottom-bar-inner\s*\{([^}]*)\}/)?.[1] ?? "";
   const barRule = css.match(/\.chat-status-bar\s*\{([^}]*)\}/)?.[1] ?? "";
+  const lineRule = css.match(/\.chat-status-line\s*\{([^}]*)\}/)?.[1] ?? "";
   const statsRule = css.match(/\.chat-status-stats\s*\{([^}]*)\}/)?.[1] ?? "";
   const modelRule = css.match(/\.chat-status-model\s*\{([^}]*)\}/)?.[1] ?? "";
   const projectRule = css.match(/\.chat-status-project\s*\{([^}]*)\}/)?.[1] ?? "";
@@ -348,16 +365,36 @@ test("styles the bar as one scrollable mono row with a fixed popover", async () 
   const popoverRule = css.match(/\.chat-status-menu-popover\s*\{([^}]*)\}/)?.[1] ?? "";
   const extRule = css.match(/\.chat-status-ext\s*\{([^}]*)\}/)?.[1] ?? "";
 
+  // One scroll surface for the whole bar: every line moves with it, so it owns both axes and the cap.
+  assert.match(surfaceRule, /overflow-x:\s*auto/);
+  assert.match(surfaceRule, /overflow-y:\s*auto/);
+  assert.match(surfaceRule, /max-height:\s*min\(144px,\s*18dvh\)/);
+  assert.match(surfaceRule, /overscroll-behavior:\s*contain/);
+
+  // The lines stack inside a block that is at least the viewport wide and exactly as wide as its
+  // widest line — that is what keeps space-between pinning the right cluster to the edge on a wide
+  // window while a narrow one scrolls the whole stack together.
+  assert.match(innerRule, /display:\s*flex/);
+  assert.match(innerRule, /flex-direction:\s*column/);
+  assert.match(innerRule, /min-width:\s*100%/);
+  assert.match(innerRule, /width:\s*max-content/);
+
+  // The bar is that stack, not a scroller.
   assert.match(barRule, /display:\s*flex/);
-  assert.match(barRule, /align-items:\s*baseline/);
-  assert.match(barRule, /justify-content:\s*space-between/);
-  assert.match(barRule, /overflow-x:\s*auto/);
-  assert.match(barRule, /overflow-y:\s*auto/);
-  assert.match(barRule, /max-height:\s*min\(144px,\s*18dvh\)/);
+  assert.match(barRule, /flex-direction:\s*column/);
+  assert.doesNotMatch(barRule, /overflow/);
+  assert.doesNotMatch(barRule, /max-height/);
+
+  // A line is the row: two clusters pinned to its edges, always on one baseline.
+  assert.match(lineRule, /display:\s*flex/);
+  assert.match(lineRule, /align-items:\s*baseline/);
+  assert.match(lineRule, /justify-content:\s*space-between/);
+  assert.match(lineRule, /gap:\s*0 12px/);
   assert.match(barRule, /font-family:\s*var\(--font-mono\)/);
   assert.match(barRule, /font-size:\s*11px/);
-  // Even top/bottom padding: the row and the line-3 bar share one vertical rhythm.
-  assert.match(barRule, /padding:\s*4px 4px/);
+  // 4px of inline inset puts the footer text on the composer's icons; the vertical rhythm belongs
+  // to the surface now, so a strip carries none of its own or every line would add a gap.
+  assert.match(barRule, /padding:\s*0 4px/);
   // The bar spans the full bottom-bar width by default and keeps the horizontal separator above it.
   assert.match(barRule, /width:\s*100%/);
   assert.doesNotMatch(barRule, /max-width/);
@@ -371,14 +408,21 @@ test("styles the bar as one scrollable mono row with a fixed popover", async () 
   // The fresh row's rule had nothing left to say once the cap moved to the composer, so the whole
   // block is gone rather than reduced to a dead override.
   assert.equal(freshRule, "");
-  // The old two-line block is gone from the stylesheet.
-  assert.doesNotMatch(css, /\.chat-status-line\s*\{/);
-  // ...and so is the single project-plus-name span it used to share.
+  // The single project-plus-name span the two lines used to share is gone for good.
   assert.doesNotMatch(css, /\.chat-status-pwd\s*\{/);
 
-  // Model leads the row now, so the token cluster is what gets pushed to the right.
-  assert.match(statsRule, /margin-left:\s*auto/);
-  assert.doesNotMatch(modelRule, /margin-left:\s*auto/);
+  // On a phone the two clusters are packed at the start of the line instead of being pushed to its
+  // edges: space-between only strands the right cluster at the end of a bar that is already scrolling.
+  const mobileBlocks = [...css.matchAll(/@media \(max-width: 640px\)\s*\{([\s\S]*?)\n\}/g)].map((match) => match[1]);
+  assert.ok(
+    mobileBlocks.some((block) => /\.chat-status-line\s*\{/.test(block) && /justify-content:\s*flex-start/.test(block)),
+    "the mobile breakpoint must pack the clusters at the start of the line",
+  );
+
+  // The counters lead line 2 and the model cluster closes it. An auto margin here would pin both
+  // clusters to the right and silently mirror the line the user asked for.
+  assert.doesNotMatch(statsRule, /margin-left/);
+  assert.doesNotMatch(modelRule, /margin-left/);
   // A narrow window must not squeeze the row: segments keep their natural width and it scrolls.
   assert.match(statsRule, /flex-wrap:\s*nowrap/);
   assert.match(statsRule, /flex:\s*0 0 auto/);
@@ -387,6 +431,10 @@ test("styles the bar as one scrollable mono row with a fixed popover", async () 
   assert.match(projectRule, /white-space:\s*nowrap/);
   assert.match(nameRule, /flex:\s*0 0 auto/);
   assert.match(nameRule, /white-space:\s*nowrap/);
+  // Each line's right cluster carries the same left spacing, so the two clusters of a line never sit
+  // flush against each other when the bar is squeezed down to its natural width.
+  assert.match(nameRule, /padding-left:\s*\d+px/);
+  assert.match(modelRule, /padding-left:\s*\d+px/);
   assert.doesNotMatch(modelRule, /min-width:\s*0/);
   // A segment must read as footer text, not as a button.
   assert.match(segmentRule, /background:\s*none/);
@@ -397,9 +445,10 @@ test("styles the bar as one scrollable mono row with a fixed popover", async () 
   const zIndex = Number(popoverRule.match(/z-index:\s*(\d+)/)?.[1] ?? "0");
   assert.ok(zIndex >= 500, `popover z-index ${zIndex} must be >= 500`);
 
-  // Line 3 lives in its own bar below the row: whitespace preserved, never truncated with an ellipsis.
+  // Line 3 rides the same surface: whitespace preserved, never truncated, and no scroll of its own
+  // or a long status would scroll inside the line instead of moving the whole bar.
   assert.match(extRule, /white-space:\s*pre\s*;/);
-  assert.match(extRule, /overflow:\s*auto/);
+  assert.match(extRule, /padding:\s*0 4px/);
+  assert.doesNotMatch(extRule, /overflow/);
   assert.doesNotMatch(extRule, /text-overflow:\s*ellipsis/);
-  assert.doesNotMatch(extRule, /overflow[^:]*:\s*hidden/);
 });

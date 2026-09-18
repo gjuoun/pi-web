@@ -121,12 +121,14 @@ test("focus rides the rules, never a closed outline", () => {
 
 test("the status row's line moved to the rail instead of being duplicated", () => {
   const barRule = css.match(/\.chat-status-bar\s*\{([^}]*)\}/)?.[1] ?? "";
-  assert.doesNotMatch(barRule, /border-top/, "the row must not draw a line of its own");
-  // The 1px side border is gone, so the composer's inline inset is 14px and the footer follows it.
-  assert.match(barRule, /padding:\s*4px 4px/);
+  assert.doesNotMatch(barRule, /border-top/, "the bar must not draw a line of its own");
+  // The 1px side border is gone, so each strip keeps the 4px inline inset that lands the footer text
+  // on the composer's icons. The vertical rhythm moved to the shared scroll surface, so no strip adds
+  // spacing on that axis — otherwise every added line would carry its own gap.
+  assert.match(barRule, /padding:\s*0 4px/);
   const extRule = css.match(/\.chat-status-ext\s*\{([^}]*)\}/)?.[1] ?? "";
-  assert.match(extRule, /padding:\s*4px 4px/);
-  // The fresh row had nothing left to say, so its rule is gone entirely.
+  assert.match(extRule, /padding:\s*0 4px/);
+  // The fresh bar has nothing left to override: it shows one line and swaps which strips it is.
   assert.doesNotMatch(css, /\.chat-status-bar\.is-fresh\s*\{/);
 });
 
