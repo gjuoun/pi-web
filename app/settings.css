@@ -1638,3 +1638,187 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---- skills config: the add-skill panel and its result rows ---- */
+.skill-hidden-note {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.skill-save-error {
+  overflow-wrap: anywhere;
+  color: #f87171;
+  font-size: 12px;
+}
+
+.skill-update-error {
+  color: #ef4444;
+  font-size: 12px;
+}
+
+.skill-add-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.skill-search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.skill-search-input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  background: var(--bg-panel);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.skill-scope-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.skill-scope-toggle {
+  display: flex;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.skill-scope-option {
+  padding: 3px 10px;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-weight: 400;
+}
+
+.skill-scope-option.is-global {
+  border-right: 1px solid var(--border);
+}
+
+.skill-scope-option.is-selected {
+  background: var(--bg-selected);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.skill-scope-option.is-unavailable {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.skill-install-path {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-error {
+  color: #f87171;
+  font-size: 12px;
+}
+
+.skill-error.is-wrapping {
+  word-break: break-word;
+}
+
+.skill-results {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.skill-result-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.skill-result-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.skill-result-name {
+  margin-bottom: 3px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.skill-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.skill-result-repo {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.skill-result-installs {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.skill-result-link {
+  color: var(--accent);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.skill-install-action {
+  flex-shrink: 0;
+}
+
+/* The install action's colours are state-driven, and they must outrank the shared secondary
+   button's :hover rule exactly as the inline declaration they replace did. */
+.config-button.skill-install-action:not(:disabled),
+.config-button.skill-install-action:not(:disabled):hover {
+  background: none;
+  color: var(--text-muted);
+}
+
+.config-button.skill-install-action.is-installed {
+  background: rgba(34,197,94,0.1);
+  color: #16a34a;
+}
+
+.config-button.skill-install-action.is-installing {
+  color: var(--accent);
+}
+
+.skill-search-hint {
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.skill-search-hint-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.skill-update-count {
+  color: #d97706;
+  font-size: 12px;
+}
