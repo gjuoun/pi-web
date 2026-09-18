@@ -627,3 +627,23 @@ test("the picker commands never spawn a session as a side effect", () => {
     "a picker command must fall back to null rather than to ensureNewSession()",
   );
 });
+
+test("closing the picker returns the caret to the composer", async () => {
+  // The picker is unmounted on close, which drops focus to <body>; the composer takes it back.
+  assert.match(
+    chatWindowSource,
+    /chatInputRef\?\.current\?\.focus\(\)/,
+    "the composer handle must be asked for focus",
+  );
+  assert.match(
+    chatWindowSource,
+    /useLayoutEffect\(\(\) => \{\s*if \(picker\) \{/,
+    "the refocus must run in a layout effect, after the picker has been removed",
+  );
+  const chatInputSource = await readFile(new URL("../components/ChatInput.tsx", import.meta.url), "utf8");
+  assert.match(
+    chatInputSource,
+    /focus: \(\) => void;/,
+    "ChatInputHandle must expose focus",
+  );
+});

@@ -897,6 +897,20 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     setPicker({ mode, anchorRect });
   }, [sessionBusy]);
 
+  // The picker unmounts on close, which drops focus to <body>. Put the caret back in the composer:
+  // the picker is opened either from there or from the bar, and either way the next thing typed is a
+  // message. A layout effect, so it runs after the removal and nothing can take focus back.
+  const pickerWasOpenRef = useRef(false);
+  useLayoutEffect(() => {
+    if (picker) {
+      pickerWasOpenRef.current = true;
+      return;
+    }
+    if (!pickerWasOpenRef.current) return;
+    pickerWasOpenRef.current = false;
+    chatInputRef?.current?.focus();
+  }, [picker, chatInputRef]);
+
 
   // pi prefixes the provider on the status bar only while several providers are in play.
   const statusProviderCount = useMemo(

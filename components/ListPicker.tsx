@@ -67,6 +67,39 @@ export function nextPickerIndex(current: number, count: number, delta: number): 
   return next;
 }
 
+const PICKER_MIN_WIDTH = 320;
+const PICKER_VIEWPORT_EDGE = 8;
+
+export interface PickerHorizontalPlacement {
+  align: "left" | "right";
+  /** Distance from the aligned viewport edge to the panel's own aligned edge. */
+  offset: number;
+  width: number;
+}
+
+/**
+ * Where the panel sits horizontally.
+ *
+ * The reasoning segment is the last thing on its line, so a panel that always grew rightward from
+ * the trigger's LEFT edge ran off the window there and was squeezed to the trigger's own width.
+ * Prefer growing rightward; when that does not fit but growing leftward from the trigger's RIGHT edge
+ * does, right-align instead — the edge that then stays inside the viewport is the panel's right one.
+ */
+export function pickerHorizontalPlacement(
+  anchorRect: PickerAnchorRect,
+  viewportWidth: number,
+): PickerHorizontalPlacement {
+  const edge = PICKER_VIEWPORT_EDGE;
+  // Never wider than the window, so a phone cannot be handed a panel it has nowhere to put.
+  const width = Math.min(Math.max(anchorRect.width, PICKER_MIN_WIDTH), Math.max(viewportWidth - edge * 2, 1));
+  const leftOffset = Math.max(edge, anchorRect.left);
+  const rightOffset = Math.max(edge, viewportWidth - anchorRect.right);
+  const fitsGrowingRight = leftOffset + width <= viewportWidth - edge;
+  const fitsGrowingLeft = viewportWidth - rightOffset - width >= edge;
+  if (!fitsGrowingRight && fitsGrowingLeft) return { align: "right", offset: rightOffset, width };
+  return { align: "left", offset: Math.max(edge, Math.min(leftOffset, viewportWidth - edge - width)), width };
+}
+
 export function ListPicker({
   items,
   anchorRect,
@@ -140,12 +173,10 @@ export function ListPicker({
   const verticalPosition = openAbove
     ? { bottom: viewportHeight - anchorRect.top + 6 }
     : { top: anchorRect.bottom + 6 };
-  const left = Math.max(8, anchorRect.left);
-  const horizontalPosition: CSSProperties = {
-    left,
-    width: Math.max(anchorRect.width, 320),
-    maxWidth: Math.max(anchorRect.width, viewportWidth - left - 8),
-  };
+  const placement = pickerHorizontalPlacement(anchorRect, viewportWidth);
+  const horizontalPosition: CSSProperties = placement.align === "right"
+    ? { right: placement.offset, width: placement.width, minWidth: Math.min(240, placement.width) }
+    : { left: placement.offset, width: placement.width, minWidth: Math.min(240, placement.width) };
 
   return (
     <div
