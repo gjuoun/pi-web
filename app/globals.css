@@ -661,12 +661,6 @@ html.dark .web-login-error {
 }
 
 /* Segments inherit the footer's mono text — they read as pi's footer, not as buttons. */
-.chat-status-menu {
-  position: relative;
-  display: inline-flex;
-  align-items: baseline;
-}
-
 .chat-status-segment {
   padding: 0;
   border: none;
@@ -685,66 +679,6 @@ html.dark .web-login-error {
 .chat-status-segment:disabled {
   cursor: default;
   opacity: 0.6;
-}
-
-.chat-status-menu-popover {
-  position: fixed;
-  z-index: 500;
-  display: flex;
-  flex-direction: column;
-  min-width: 200px;
-  max-height: min(320px, 50vh);
-  overflow: auto;
-  padding: 4px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.10);
-}
-
-.chat-status-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  border: none;
-  border-radius: 6px;
-  background: none;
-  color: var(--text-muted);
-  font-family: inherit;
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.chat-status-menu-item:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.chat-status-menu-item.is-active {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.chat-status-menu-check {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 10px;
-  flex-shrink: 0;
-}
-
-.chat-status-menu-label {
-  flex: 1;
-  min-width: 0;
-}
-
-.chat-status-menu-desc {
-  color: var(--text-dim);
-  font-size: 11px;
-  white-space: nowrap;
 }
 
 .extension-status-shelf {
@@ -2033,4 +1967,92 @@ span.token.table {
   .chat-input-textarea {
     font-size: max(16px, var(--chat-content-font-size, 14px)) !important;
   }
+}
+
+/* The shared list picker — the one popover behind the model segment, the thinking segment and both
+   composer commands (`/model`, `/thinking`). It replaces the two bespoke menus the bar used to own
+   (the model selector's list and the thinking StatusMenu), keeping their popover shape and adding a
+   search input and a wrapped cursor. */
+.list-picker {
+  position: fixed;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.10);
+  /* The panel is fixed to the viewport, outside the footer, so it cannot inherit the bar's mono text. */
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.list-picker-search {
+  flex-shrink: 0;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.list-picker-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.list-picker-list {
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: 4px;
+}
+
+.list-picker-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0 6px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.list-picker-item.is-active {
+  background: var(--bg-hover);
+}
+
+.list-picker-check {
+  flex: 0 0 auto;
+  width: 10px;
+}
+
+.list-picker-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.list-picker-desc {
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--text-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.list-picker-empty {
+  padding: 8px;
+  color: var(--text-dim);
 }

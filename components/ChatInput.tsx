@@ -63,6 +63,8 @@ interface Props {
   slashCommandsLoading?: boolean;
   onLoadSlashCommands?: () => Promise<SlashCommandInfo[]> | SlashCommandInfo[];
   onBuiltinCommand?: (message: string) => Promise<BuiltinSlashCommandResult>;
+  /** Opens the shared list picker — the composer's /model and /thinking, and both bottom-bar segments. */
+  onOpenPicker?: (mode: "model" | "thinking", query?: string) => void;
   onAudioUnlock?: () => void;
   draftKey?: string;
   /** Session working directory — enables the @ file autocomplete menu */
@@ -189,13 +191,18 @@ type SlashCommandPaletteItem = SlashCommandInfo | BuiltinSlashCommand;
 
 type SlashCommandSource = SlashCommandPaletteItem["source"];
 
-const BUILTIN_SLASH_COMMANDS: BuiltinSlashCommand[] = [
+// pi handles /model and /thinking itself, in its TUI only — they are absent from get_commands, so a
+// client has to own them and call set_model / set_thinking_level over RPC. Neither is offered while
+// streaming: the picker is gated on `busy`, exactly like the status bar's two segments.
+export const BUILTIN_SLASH_COMMANDS: BuiltinSlashCommand[] = [
   { name: "compact", description: "chat.commandCompact", source: "builtin" },
   { name: "reload", description: "chat.commandReload", source: "builtin" },
   { name: "name", description: "chat.commandName", source: "builtin" },
   { name: "session", description: "chat.commandSession", source: "builtin", availableWhileStreaming: true },
   { name: "copy", description: "chat.commandCopy", source: "builtin", availableWhileStreaming: true },
   { name: "clone", description: "chat.commandClone", source: "builtin" },
+  { name: "model", description: "chat.commandModel", source: "builtin" },
+  { name: "thinking", description: "chat.commandThinking", source: "builtin" },
 ];
 
 function getBuiltinSlashCommand(message: string): BuiltinSlashCommand | undefined {
@@ -210,6 +217,22 @@ export function canRunBuiltinSlashCommandWhileStreaming(message: string): boolea
 
 export function isExactSlashCommand(message: string, command: SlashCommandPaletteItem): boolean {
   return command.source === "builtin" && message.trim() === `/${command.name}`;
+}
+
+/**
+ * The picker a builtin result asks for, or null when the command already did its work.
+ *
+ * pi answers /model and /thinking in its own UI and never forwards them, and get_commands does not
+ * advertise them — so the client owes the user the same: open the picker, and do not let the text
+ * reach the model as a prompt.
+ */
+export function pickerRequestForBuiltinResult(
+  result: BuiltinSlashCommandResult,
+): { mode: "model" | "thinking"; query?: string } | null {
+  if (!result.handled) return null;
+  if (result.action === "openModelPicker") return { mode: "model", query: result.query };
+  if (result.action === "openThinkingPicker") return { mode: "thinking", query: result.query };
+  return null;
 }
 
 export function canClearBuiltinCommandInput(message: string, imageCount: number, submittedMessage: string): boolean {
@@ -521,6 +544,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   retryInfo, queuedMessages, inputHistory = [], onRecallQueue,
   slashCommands, slashCommandsLoading, onLoadSlashCommands,
   onBuiltinCommand,
+  onOpenPicker,
   onAudioUnlock,
   onPromptWithStreamingBehavior,
   draftKey,
@@ -926,13 +950,16 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     try {
       const result = await onBuiltinCommand(msg);
       if (!result.handled) return false;
+      // /model and /thinking stop here and open the picker; everything else keeps its notice path.
+      const picker = pickerRequestForBuiltinResult(result);
+      if (picker) onOpenPicker?.(picker.mode, picker.query);
       if (!result.error && canClearBuiltinCommandInput(valueRef.current, attachedImagesRef.current.length, msg)) clearInput();
       return true;
     } finally {
       builtinCommandPendingRef.current = false;
       setBuiltinCommandPending(false);
     }
-  }, [attachedImages.length, clearInput, onBuiltinCommand]);
+  }, [attachedImages.length, clearInput, onBuiltinCommand, onOpenPicker]);
 
   const handleSend = useCallback(async () => {
     const msg = value.trim();

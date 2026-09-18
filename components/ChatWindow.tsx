@@ -14,10 +14,12 @@ import { MarkdownBody } from "./MarkdownBody";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
 import { ChatStatusBar } from "./ChatStatusBar";
+import { ListPicker, type PickerAnchorRect, type PickerItem } from "./ListPicker";
+import { THINKING_LEVEL_DESC_KEYS, thinkingChoicesFor, thinkingLevelAlias } from "@/lib/thinking-levels";
 import { ExtensionStatusBar, ExtensionStatusLine } from "./ExtensionStatusBar";
 import { AnsiText } from "./AnsiText";
 import { useI18n } from "@/hooks/useI18n";
-import { useAgentSession, type AgentPhase, type NoticeItem } from "@/hooks/useAgentSession";
+import { useAgentSession, type AgentPhase, type NoticeItem, type ThinkingLevelOption } from "@/hooks/useAgentSession";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { SessionStatsInfo } from "@/lib/pi-types";
@@ -289,10 +291,9 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     loading, error, messages, activeToolResults, entryIds, historyCursor, hasEarlierMessages, streamState,
     agentRunning, bashRunning, pendingBash, modelNames, modelList, modelError, modelScopeWarnings, modelThinkingLevels, modelThinkingLevelMaps, thinkingLevel,
     retryInfo, contextUsage, forkingEntryId,
-    isCompacting, autoCompactionEnabled, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
+    isCompacting, autoCompactionEnabled, compactError, compactResult, displayModel: displayModelValue, sessionStats,
     slashCommands, slashCommandsLoading, queuedMessages,
     notices, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused,
-    isAutoModelSelection,
     agentPhase,
     isNew,
     sessionIdRef, scrollContainerRef,
@@ -865,6 +866,38 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     ? (modelThinkingLevels[`${displayModelValue.provider}:${displayModelValue.modelId}`] ?? null)
     : null;
 
+  // One picker serves all four entry points: the composer's /model and /thinking, and the bottom
+  // bar's model and thinking segments. It hangs off whatever opened it — the composer's textarea, or
+  // the clicked segment's own rect.
+  const [picker, setPicker] = useState<{ mode: "model" | "thinking"; query?: string; anchorRect: PickerAnchorRect } | null>(null);
+
+  const openPickerFromComposer = useCallback((mode: "model" | "thinking", query?: string) => {
+    if (sessionBusy) return;
+    const composer = typeof document === "undefined" ? null : document.querySelector("textarea.chat-input-textarea");
+    const box = composer?.getBoundingClientRect();
+    const viewportHeight = typeof window === "undefined" ? 720 : window.innerHeight;
+    const viewportWidth = typeof window === "undefined" ? 1280 : window.innerWidth;
+    // The fallback is a band just above the bottom of the window, which is where the composer sits.
+    const anchorRect: PickerAnchorRect = box
+      ? { top: box.top, right: box.right, bottom: box.bottom, left: box.left, width: box.width }
+      : { top: viewportHeight - 140, right: viewportWidth, bottom: viewportHeight - 100, left: 16, width: 480 };
+    setPicker({ mode, query, anchorRect });
+  }, [sessionBusy]);
+
+  // The bottom bar's two segments take the same path, anchored to whichever trigger was clicked.
+  const openPickerFromSegment = useCallback((mode: "model" | "thinking") => {
+    if (sessionBusy) return;
+    const selector = mode === "model" ? ".chat-status-model button" : ".chat-status-thinking button";
+    const trigger = typeof document === "undefined" ? null : document.querySelector(selector);
+    const box = trigger?.getBoundingClientRect();
+    const viewportHeight = typeof window === "undefined" ? 720 : window.innerHeight;
+    const anchorRect: PickerAnchorRect = box
+      ? { top: box.top, right: box.right, bottom: box.bottom, left: box.left, width: box.width }
+      : { top: viewportHeight - 140, right: 340, bottom: viewportHeight - 120, left: 16, width: 320 };
+    setPicker({ mode, anchorRect });
+  }, [sessionBusy]);
+
+
   // pi prefixes the provider on the status bar only while several providers are in play.
   const statusProviderCount = useMemo(
     () => new Set((modelList ?? []).map((entry) => entry.provider)).size,
@@ -886,6 +919,42 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   const currentThinkingLevelMap = displayModelValue
     ? (modelThinkingLevelMaps[`${displayModelValue.provider}:${displayModelValue.modelId}`] ?? null)
     : null;
+
+  // The same rows the bar's two menus used to build, now fed to the one picker. `data-key` is the
+  // value the picker hands back on Enter.
+  const pickerItems: PickerItem[] = useMemo(() => {
+    if (!picker) return [];
+    if (picker.mode === "model") {
+      return statusModelOptions.map((option) => ({
+        key: option.provider + ":" + option.modelId,
+        label: option.name || option.modelId,
+        description: option.provider,
+        active: displayModelValue
+          ? option.provider === displayModelValue.provider && option.modelId === displayModelValue.modelId
+          : false,
+      }));
+    }
+    return thinkingChoicesFor(availableThinkingLevels).map((level) => {
+      const alias = thinkingLevelAlias(level, currentThinkingLevelMap);
+      return {
+        key: level,
+        label: alias ?? level,
+        description: t(THINKING_LEVEL_DESC_KEYS[level]),
+        active: (thinkingLevel ?? "auto") === level,
+      };
+    });
+  }, [picker, statusModelOptions, displayModelValue, availableThinkingLevels, currentThinkingLevelMap, thinkingLevel, t]);
+
+  const handlePickerSelect = useCallback((key: string) => {
+    const mode = picker?.mode;
+    setPicker(null);
+    if (mode === "model") {
+      const separator = key.indexOf(":");
+      if (separator > 0) void handleModelChange(key.slice(0, separator), key.slice(separator + 1));
+      return;
+    }
+    if (mode === "thinking") void handleThinkingLevelChange(key as ThinkingLevelOption);
+  }, [picker?.mode, handleModelChange, handleThinkingLevelChange]);
 
   const chatInputElement = (
     <ChatInput
@@ -912,6 +981,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       slashCommandsLoading={slashCommandsLoading}
       onLoadSlashCommands={loadSlashCommands}
       onBuiltinCommand={handleBuiltinSlashCommand}
+      onOpenPicker={openPickerFromComposer}
       onAudioUnlock={unlockAudio}
       draftKey={session?.id ?? newSessionDraftKey ?? undefined}
       cwd={session?.cwd ?? newSessionCwd}
@@ -1373,19 +1443,27 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
               thinkingLevel={thinkingLevel}
               supportsReasoning={(availableThinkingLevels?.length ?? 0) > 0}
               busy={sessionBusy}
-              modelOptions={statusModelOptions}
-              onModelChange={handleModelChange}
-              modelSwitching={modelSwitching}
-              isAutoModelSelection={isAutoModelSelection}
-              onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
-              availableThinkingLevels={availableThinkingLevels}
-              thinkingLevelMap={currentThinkingLevelMap}
+              onOpenModelPicker={() => openPickerFromSegment("model")}
+              onOpenThinkingPicker={() => openPickerFromSegment("thinking")}
             />
             {/* Line 3 is its own strip on the same surface, after the status lines. */}
             <ExtensionStatusLine statuses={extensionStatuses} />
           </div>
         </div>
       </div>
+      {picker && typeof document !== "undefined" && createPortal(
+        <ListPicker
+          items={pickerItems}
+          anchorRect={picker.anchorRect}
+          ariaLabel={picker.mode === "model" ? t("chat.commandModel") : t("chat.changeReasoningLabel")}
+          initialQuery={picker.query}
+          placeholder={picker.mode === "model" ? t("chat.filterModels") : undefined}
+          emptyLabel={t("chat.pickerNoMatch")}
+          onSelect={handlePickerSelect}
+          onClose={() => setPicker(null)}
+        />,
+        document.body,
+      )}
       {isEmptyNew && <div className="min-h-0 flex-1" />}
     </div>
   );
