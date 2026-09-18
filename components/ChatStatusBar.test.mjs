@@ -268,16 +268,14 @@ test("narrows the fresh state to one [project][model] line and drops the rest", 
   assert.equal((html.match(/class="chat-status-(model|project)(")/g) ?? []).length, 2);
 });
 
-test("keeps the model selector visible when a model error leaves no options", () => {
-  const html = renderBar({
-    cwd: "/tmp/work",
-    model: null,
-    modelOptions: [],
-    onModelChange() {},
-  });
+test("keeps the model trigger visible when a model error leaves no options", () => {
+  // Nothing to pick from, but the segment must still render: that is how a broken models.json stays
+  // visible next to the model-error banner instead of silently disappearing.
+  const html = renderBar({ cwd: "/tmp/work", model: null, onOpenModelPicker() {} });
 
-  assert.match(html, />No models</);
-  assert.match(html, /title="No available models"/);
+  assert.ok(html.includes("chat-status-model"), "the model cluster still renders");
+  assert.ok(html.includes("listbox"), "the model segment is still an actionable trigger");
+  assert.ok(html.includes("no-model"), "and it still names the resolved model");
 });
 
 test("renders no tools segment", () => {
@@ -288,38 +286,33 @@ test("renders no tools segment", () => {
   assert.doesNotMatch(html, /Chat only/);
 });
 
-test("shows and locks the optimistic model while a switch is pending", () => {
+test("shows the model and locks the segment while the agent is running", () => {
   const html = renderBar({
     cwd: "/tmp/work",
     model: { provider: "deepseek", modelId: "deepseek-v4-flash" },
     providerCount: 1,
-    modelOptions: [{ provider: "deepseek", modelId: "deepseek-v4-flash", name: "DeepSeek V4 Flash" }],
-    onModelChange() {},
-    modelSwitching: true,
+    busy: true,
+    onOpenModelPicker() {},
   });
 
-  assert.match(html, /title="Switching model"/);
-  assert.match(html, /aria-busy="true"/);
-  assert.match(html, /disabled=""/);
-  assert.match(html, />deepseek-v4-flash</);
-  assert.match(html, /animation:spin 0\.8s linear infinite/);
+  assert.ok(html.includes(">deepseek-v4-flash<"), "the running model is still named");
+  assert.ok(html.includes("disabled"), "a running session locks the trigger");
 });
 
-test("disables every segment while the agent is running", () => {
+test("disables both segments while the agent is running", () => {
   const html = renderBar({
     cwd: "/tmp/work",
     busy: true,
     model: { provider: "deepseek", modelId: "deepseek-v4-flash" },
     providerCount: 1,
-    modelOptions: [{ provider: "deepseek", modelId: "deepseek-v4-flash", name: "DeepSeek V4 Flash" }],
-    onModelChange() {},
+    onOpenModelPicker() {},
     thinkingLevel: "low",
     supportsReasoning: true,
-    onThinkingLevelChange() {},
+    onOpenThinkingPicker() {},
   });
 
   // model + reasoning
-  assert.equal((html.match(/disabled=""/g) ?? []).length, 2);
+  assert.equal(html.split("disabled").length - 1, 2);
 });
 
 test("renders nothing when there is neither a cwd nor usage data", () => {
@@ -338,18 +331,6 @@ test("never synthesises the extension status line it does not own", async () => 
   assert.doesNotMatch(code, /extension-status|formatExtensionStatusLine/);
 });
 
-test("closes a segment menu on Escape like the model selector", async () => {
-  const source = await readFile(new URL("./ChatStatusBar.tsx", import.meta.url), "utf8");
-
-  // Keyboard users must be able to dismiss a menu without clicking outside.
-  assert.match(
-    source,
-    /onKeyDown=\{\(event\) => \{\s*if \(event\.key !== "Escape" \|\| !open\) return;\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);/,
-  );
-  // The composer's own Escape shortcut must not also fire while a menu is open.
-  assert.match(source, /event\.stopPropagation\(\);[\s\S]{0,80}onOpenChange\(null\)/);
-});
-
 test("styles the bar as one scroll surface of stacked mono lines with a fixed popover", async () => {
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   const surfaceRule = css.match(/\.chat-bottom-bar\s*\{([^}]*)\}/)?.[1] ?? "";
@@ -362,7 +343,7 @@ test("styles the bar as one scroll surface of stacked mono lines with a fixed po
   const nameRule = css.match(/\.chat-status-name\s*\{([^}]*)\}/)?.[1] ?? "";
   const freshRule = css.match(/\.chat-status-bar\.is-fresh\s*\{([^}]*)\}/)?.[1] ?? "";
   const segmentRule = css.match(/\.chat-status-segment\s*\{([^}]*)\}/)?.[1] ?? "";
-  const popoverRule = css.match(/\.chat-status-menu-popover\s*\{([^}]*)\}/)?.[1] ?? "";
+  const popoverRule = css.match(/\.list-picker\s*\{([^}]*)\}/)?.[1] ?? "";
   const extRule = css.match(/\.chat-status-ext\s*\{([^}]*)\}/)?.[1] ?? "";
 
   // One scroll surface for the whole bar: every line moves with it, so it owns both axes and the cap.
@@ -440,7 +421,7 @@ test("styles the bar as one scroll surface of stacked mono lines with a fixed po
   assert.match(segmentRule, /background:\s*none/);
   assert.match(segmentRule, /font:\s*inherit/);
 
-  // The menu escapes the scrolling row: fixed to the viewport, above every panel.
+  // The picker escapes the scrolling row: fixed to the viewport, above every panel.
   assert.match(popoverRule, /position:\s*fixed/);
   const zIndex = Number(popoverRule.match(/z-index:\s*(\d+)/)?.[1] ?? "0");
   assert.ok(zIndex >= 500, `popover z-index ${zIndex} must be >= 500`);
@@ -451,4 +432,28 @@ test("styles the bar as one scroll surface of stacked mono lines with a fixed po
   assert.match(extRule, /padding:\s*0 4px/);
   assert.doesNotMatch(extRule, /overflow/);
   assert.doesNotMatch(extRule, /text-overflow:\s*ellipsis/);
+});
+
+test("the bar hands both segments to the shared picker instead of owning a popover", async () => {
+  const source = await readFile(new URL("./ChatStatusBar.tsx", import.meta.url), "utf8");
+  // One picker for all four entry points: the bar must not keep a second, differently-behaved list.
+  assert.ok(!source.includes("chat-status-menu"), "the bar's own popover must be gone");
+  assert.ok(!source.includes("StatusMenu"), "the local menu component must be gone");
+  assert.ok(!source.includes("ModelSelector"), "the model segment must use the shared picker too");
+  assert.ok(source.includes("onOpenModelPicker"), "the model segment must ask for the shared picker");
+  assert.ok(source.includes("onOpenThinkingPicker"), "the thinking segment must ask for the shared picker");
+});
+
+test("both bar segments render listbox triggers that call their openers", () => {
+  const html = renderBar({
+    cwd: "/tmp/work",
+    model: { provider: "anthropic", modelId: "claude-sonnet-5" },
+    thinkingLevel: "high",
+    supportsReasoning: true,
+    onOpenModelPicker() {},
+    onOpenThinkingPicker() {},
+  });
+  const triggers = html.split('aria-haspopup="listbox"').length - 1;
+  assert.equal(triggers, 2, "the model and thinking segments are the bar's two listbox triggers");
+  assert.ok(html.includes('class="chat-status-thinking"'), "the thinking segment gets its own hook class");
 });

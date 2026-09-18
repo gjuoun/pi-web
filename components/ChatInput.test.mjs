@@ -11,7 +11,7 @@ const jiti = createJiti(import.meta.url, {
 });
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
-const { ChatInput, ModelErrorBanner, ModelScopeWarningBanner, canClearBuiltinCommandInput, canRestoreUserMessage, canRunBuiltinSlashCommandWhileStreaming, compressImageFile, cycleListIndex, filterModelOptions, getUpwardMenuMaxHeight, getUserMessageText, getUserMessageDraftImages, isExactSlashCommand, modelSupportsImageInput, replaceLinksWithMarkdown, shouldCompressImageFile } = await jiti.import("./ChatInput.tsx");
+const { BUILTIN_SLASH_COMMANDS, ChatInput, ModelErrorBanner, pickerRequestForBuiltinResult, ModelScopeWarningBanner, canClearBuiltinCommandInput, canRestoreUserMessage, canRunBuiltinSlashCommandWhileStreaming, compressImageFile, cycleListIndex, filterModelOptions, getUpwardMenuMaxHeight, getUserMessageText, getUserMessageDraftImages, isExactSlashCommand, modelSupportsImageInput, replaceLinksWithMarkdown, shouldCompressImageFile } = await jiti.import("./ChatInput.tsx");
 const { ModelSelector } = await jiti.import("./ModelSelector.tsx");
 const { clearDraft, getDraft, mergeRestoredSubmissionDraft, mergeRestoredSubmissionText, rekeyDraft, setDraft } = await jiti.import("@/lib/draft-store.ts");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
@@ -394,6 +394,8 @@ test("locks built-in command submission until it settles", async () => {
     attachedImagesRef: { current: [] },
     builtinCommandPendingRef: { current: false },
     canClearBuiltinCommandInput,
+    pickerRequestForBuiltinResult,
+    onOpenPicker: undefined,
     clearInput() {},
     onBuiltinCommand: async () => new Promise((resolve) => { callback.resolve = resolve; }),
     setBuiltinCommandPending(value) { callback.pendingStates.push(value); },
@@ -622,4 +624,53 @@ test("renders image warnings for known text-only defaults without an explicit mo
   } finally {
     clearDraft(draftKey);
   }
+});
+
+test("the builtin slash table lists /model and /thinking", () => {
+  const names = BUILTIN_SLASH_COMMANDS.map((command) => command.name);
+  assert.ok(names.includes("model"), "the composer palette must offer /model");
+  assert.ok(names.includes("thinking"), "the composer palette must offer /thinking");
+  const model = BUILTIN_SLASH_COMMANDS.find((command) => command.name === "model");
+  const thinking = BUILTIN_SLASH_COMMANDS.find((command) => command.name === "thinking");
+  assert.equal(model.source, "builtin");
+  assert.equal(thinking.source, "builtin");
+  // Switching model or level mid-run is not offered: the picker is gated on busy, like the bar.
+  assert.notEqual(model.availableWhileStreaming, true, "/model must not be offered while streaming");
+  assert.notEqual(thinking.availableWhileStreaming, true, "/thinking must not be offered while streaming");
+  assert.equal(canRunBuiltinSlashCommandWhileStreaming("/model"), false);
+  assert.equal(canRunBuiltinSlashCommandWhileStreaming("/thinking"), false);
+});
+
+test("every locale defines the picker command descriptions", () => {
+  const keys = ["chat.commandModel", "chat.commandThinking", "chat.pickerNoMatch"];
+  for (const file of ["en.ts", "zh-CN.ts", "zh-TW.ts"]) {
+    const source = readFileSync(new URL("../lib/i18n/messages/" + file, import.meta.url), "utf8");
+    for (const key of keys) {
+      assert.ok(source.includes('"' + key + '"'), file + " must define " + key);
+    }
+  }
+});
+
+test("a picker action result opens the picker instead of reaching the model", () => {
+  assert.deepEqual(
+    pickerRequestForBuiltinResult({ handled: true, action: "openModelPicker" }),
+    { mode: "model", query: undefined },
+  );
+  assert.deepEqual(
+    pickerRequestForBuiltinResult({ handled: true, action: "openThinkingPicker", query: "high" }),
+    { mode: "thinking", query: "high" },
+  );
+  // Every other result keeps its existing path: a notice, the stats panel, or a fall-through.
+  assert.equal(pickerRequestForBuiltinResult({ handled: true, action: "openSessionStats" }), null);
+  assert.equal(pickerRequestForBuiltinResult({ handled: true, message: "Compacted context" }), null);
+  assert.equal(pickerRequestForBuiltinResult({ handled: true, error: "boom" }), null);
+  assert.equal(pickerRequestForBuiltinResult({ handled: false }), null);
+});
+
+test("runBuiltinCommand routes a picker action to onOpenPicker and still reports handled", () => {
+  const source = readFileSync(new URL("./ChatInput.tsx", import.meta.url), "utf8");
+  const run = source.slice(source.indexOf("const runBuiltinCommand"), source.indexOf("const handleSend"));
+  assert.match(run, /pickerRequestForBuiltinResult\(result\)/, "runBuiltinCommand must consult the picker helper");
+  assert.match(run, /onOpenPicker\?\.\(/, "the picker action must reach the onOpenPicker prop");
+  assert.match(run, /return true;/, "a handled command must stop before onSend");
 });

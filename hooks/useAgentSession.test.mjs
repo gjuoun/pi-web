@@ -577,3 +577,53 @@ test("keeps a detached viewport in place when streaming completes", () => {
   assert.doesNotMatch(scrollEffectSource, /\|\|/);
   assert.match(source, /addEventListener\("scroll", handleScrollPositionChange/);
 });
+
+test("the builtin handler dispatches /model and /thinking", () => {
+  const resultTypeStart = source.indexOf("export type BuiltinSlashCommandResult");
+  const resultType = source.slice(resultTypeStart, source.indexOf("export ", resultTypeStart + 10));
+  assert.match(resultType, /openModelPicker/, "the result union must carry the model picker action");
+  assert.match(resultType, /openThinkingPicker/, "the result union must carry the thinking picker action");
+  assert.match(resultType, /query\?: string/, "the result union must carry the picker pre-fill query");
+
+  const modelCase = source.slice(source.indexOf('case "model": {'), source.indexOf('case "thinking": {'));
+  const thinkingCase = source.slice(source.indexOf('case "thinking": {'), source.indexOf("default:", source.indexOf('case "thinking": {')));
+  assert.ok(modelCase.length > 0, "the handler must have a /model case");
+  assert.ok(thinkingCase.length > 0, "the handler must have a /thinking case");
+  assert.match(modelCase, /action: "openModelPicker"/, "bare /model opens the picker");
+  assert.match(modelCase, /resolveModelArgument/, "/model with an argument resolves inline");
+  assert.match(modelCase, /handleModelChange/, "/model <exact> applies without the picker");
+  assert.match(thinkingCase, /action: "openThinkingPicker"/, "bare /thinking opens the picker");
+  assert.match(thinkingCase, /resolveThinkingArgument/, "/thinking with an argument resolves inline");
+  assert.match(thinkingCase, /handleThinkingLevelChange/, "/thinking <exact> applies without the picker");
+});
+
+test("an action result never posts a success notice", () => {
+  // The picker actions return before any notice, like openSessionStats does.
+  assert.doesNotMatch(
+    source,
+    /result\.action !== "openSessionStats"/,
+    "a second action must not fall into the success-notice branch",
+  );
+});
+
+test("the thinking applier is defined before the builtin handler that calls it", () => {
+  // handleBuiltinSlashCommand's dependency array reads it during render, so a later const is a TDZ error.
+  assert.ok(
+    source.indexOf("const handleThinkingLevelChange") < source.indexOf("const handleBuiltinSlashCommand"),
+    "handleThinkingLevelChange must be declared above handleBuiltinSlashCommand",
+  );
+});
+
+test("the picker commands never spawn a session as a side effect", () => {
+  // Observed live: typing /model in a tab pointed at an existing session fired POST /api/agent/new,
+  // created a second session, and sent set_model to that one — the bar updated optimistically while
+  // the session in the URL never changed. The prelude runs for every builtin, so it has to opt out.
+  const prelude = source.slice(source.indexOf("const opensPicker"), source.indexOf("const complete ="));
+  assert.match(prelude, /commandName === "model"/, "the prelude must recognise /model");
+  assert.match(prelude, /commandName === "thinking"/, "the prelude must recognise /thinking");
+  assert.match(
+    prelude,
+    /opensPicker \? sessionIdRef\.current : \(sessionIdRef\.current \?\? await ensureNewSession\(\)\)/,
+    "a picker command must fall back to null rather than to ensureNewSession()",
+  );
+});

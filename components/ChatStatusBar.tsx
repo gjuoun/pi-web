@@ -1,18 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { useHomeDir } from "@/hooks/useHomeDir";
 import { collapseHomePath } from "@/lib/path-display";
 import type { ContextUsage, SessionStatsInfo } from "@/lib/pi-types";
-import {
-  THINKING_LEVEL_DESC_KEYS,
-  thinkingChoicesFor,
-  thinkingLevelAlias,
-  type ThinkingLevelChoice,
-} from "@/lib/thinking-levels";
 import type { AgentUsage } from "@/lib/types";
-import { ModelSelector, type ModelSelectorOption } from "./ModelSelector";
 
 /**
  * pi's native footer, reproduced for the web.
@@ -188,128 +180,6 @@ export function contextColor(percent: number | null | undefined): string | undef
   return undefined;
 }
 
-interface StatusMenuItem {
-  key: string;
-  label: string;
-  description?: string;
-  active: boolean;
-  onSelect: () => void;
-}
-
-/** One flat, pi-styled text trigger with an upward menu. */
-function StatusMenu({
-  label,
-  title,
-  disabled,
-  items,
-  openKey,
-  menuKey,
-  onOpenChange,
-}: {
-  label: string;
-  title: string;
-  disabled?: boolean;
-  items: StatusMenuItem[];
-  openKey: string | null;
-  menuKey: string;
-  onOpenChange: (key: string | null) => void;
-}) {
-  const open = openKey === menuKey;
-  const rootRef = useRef<HTMLSpanElement>(null);
-  // The popover lives outside the scrolling row, so it is anchored from the trigger's viewport rect
-  // on open instead of from an absolutely-positioned ancestor (ModelSelector does the same).
-  const [anchorRect, setAnchorRect] = useState<{ top: number; right: number; bottom: number; left: number; width: number } | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleOutside = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) onOpenChange(null);
-    };
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, [open, onOpenChange]);
-
-  return (
-    <span
-      ref={rootRef}
-      className="chat-status-menu"
-      onKeyDown={(event) => {
-        if (event.key !== "Escape" || !open) return;
-        event.preventDefault();
-        event.stopPropagation();
-        onOpenChange(null);
-      }}
-    >
-      <button
-        type="button"
-        className="chat-status-segment"
-        title={title}
-        aria-label={title}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={(event) => {
-          const rect = event.currentTarget.getBoundingClientRect();
-          setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
-          onOpenChange(open ? null : menuKey);
-        }}
-      >
-        {label}
-      </button>
-      {open && anchorRect && (() => {
-        const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-        const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
-        const spaceAbove = anchorRect.top - 8;
-        const spaceBelow = viewportHeight - anchorRect.bottom - 8;
-        // Prefer opening downwards; flip above only when the row is close enough to the bottom
-        // that the menu no longer fits below it.
-        const openAbove = spaceBelow < Math.min(320, viewportHeight * 0.5);
-        const maxHeight = Math.max(120, Math.min(openAbove ? spaceAbove : spaceBelow, viewportHeight * 0.6));
-        const verticalPosition = openAbove
-          ? { bottom: viewportHeight - anchorRect.top + 6 }
-          : { top: anchorRect.bottom + 6 };
-        const horizontalPosition: CSSProperties = {
-          right: Math.max(8, viewportWidth - anchorRect.right),
-          maxWidth: Math.max(anchorRect.width, viewportWidth - anchorRect.left - 8),
-        };
-
-        return (
-          <div
-            className="chat-status-menu-popover"
-            role="listbox"
-            aria-label={title}
-            style={{ ...verticalPosition, ...horizontalPosition, maxHeight }}
-          >
-            {items.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                role="option"
-                aria-selected={item.active}
-                className={`chat-status-menu-item${item.active ? " is-active" : ""}`}
-                onClick={() => {
-                  onOpenChange(null);
-                  if (!item.active) item.onSelect();
-                }}
-              >
-                <span className="chat-status-menu-check">
-                  {item.active ? (
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="1.5 5 4 7.5 8.5 2.5" />
-                    </svg>
-                  ) : null}
-                </span>
-                <span className="chat-status-menu-label">{item.label}</span>
-                {item.description && <span className="chat-status-menu-desc">{item.description}</span>}
-              </button>
-            ))}
-          </div>
-        );
-      })()}
-    </span>
-  );
-}
-
 interface Props {
   cwd?: string | null;
   /** Main repo of a linked worktree; falls back to `cwd` when absent. */
@@ -333,15 +203,10 @@ interface Props {
   supportsReasoning?: boolean;
   /** True while the agent is running: every segment is read-only then. */
   busy?: boolean;
-  // Model segment
-  modelOptions?: ModelSelectorOption[];
-  onModelChange?: (provider: string, modelId: string) => void;
-  modelSwitching?: boolean;
-  isAutoModelSelection?: boolean;
-  // Thinking segment
-  onThinkingLevelChange?: (level: ThinkingLevelChoice) => void;
-  availableThinkingLevels?: string[] | null;
-  thinkingLevelMap?: Record<string, string | null> | null;
+  // Both segments are plain text triggers: the list they open is the one shared picker, which
+  // ChatWindow owns and anchors, so the bar carries no popover state of its own.
+  onOpenModelPicker?: () => void;
+  onOpenThinkingPicker?: () => void;
 }
 
 export function ChatStatusBar({
@@ -360,23 +225,12 @@ export function ChatStatusBar({
   thinkingLevel,
   supportsReasoning = false,
   busy = false,
-  modelOptions,
-  onModelChange,
-  modelSwitching = false,
-  isAutoModelSelection = false,
-  onThinkingLevelChange,
-  availableThinkingLevels,
-  thinkingLevelMap,
+  onOpenModelPicker,
+  onOpenThinkingPicker,
 }: Props) {
   const { t } = useI18n();
   const fetchedHome = useHomeDir();
   const homeDir = home ?? fetchedHome;
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-
-  // A segment opened while idle should not survive a run that starts underneath it.
-  useEffect(() => {
-    if (busy) setOpenMenu(null);
-  }, [busy]);
 
   const projectLine = formatProjectLine({ cwd, projectRoot, home: homeDir, branch });
   const nameLine = formatSessionName(sessionName);
@@ -387,59 +241,50 @@ export function ChatStatusBar({
   const modelName = formatModelName({ model, providerCount });
   const thinkingSuffix = formatThinkingSuffix({ thinkingLevel, supportsReasoning });
 
-  const thinkingItems: StatusMenuItem[] = thinkingChoicesFor(availableThinkingLevels).map((level) => {
-    const alias = thinkingLevelAlias(level, thinkingLevelMap);
-    const description = t(THINKING_LEVEL_DESC_KEYS[level]);
-    return {
-      key: level,
-      label: alias ?? level,
-      description: alias ? `(${level}) ${description}` : description,
-      active: (thinkingLevel ?? "auto") === level,
-      onSelect: () => onThinkingLevelChange?.(level),
-    };
-  });
 
   // Without a project line there is nothing to anchor the row; the fresh state is exactly this pair.
   if (!projectLine) return null;
 
-  let modelSegment: ReactNode = modelName;
-  if (onModelChange) {
-    // Rendered even with an empty option list: the selector itself reports "No models", which is
-    // how a broken models.json surfaces next to the model-error banner.
-    modelSegment = (
-      <ModelSelector
-        variant="status"
-        placement="up"
-        options={modelOptions ?? []}
-        value={model}
-        onChange={onModelChange}
-        disabled={busy}
-        busy={modelSwitching}
-        isAutoSelection={isAutoModelSelection}
-        triggerLabel={model ? modelName : undefined}
-        ariaLabel={modelName}
-      />
-    );
-  }
+  // A plain text trigger. The list it opens is the one shared picker — the bar keeps no popover
+  // state of its own, so both segments behave identically to the composer's /model and /thinking.
+  const modelSegment = onOpenModelPicker ? (
+    <button
+      type="button"
+      className="chat-status-segment"
+      title={modelName}
+      aria-label={t("chat.commandModel")}
+      aria-haspopup="listbox"
+      disabled={busy}
+      onClick={onOpenModelPicker}
+    >
+      {modelName}
+    </button>
+  ) : modelName;
+
+  const thinkingSegment = thinkingSuffix
+    ? (onOpenThinkingPicker ? (
+      <span className="chat-status-thinking">
+        <button
+          type="button"
+          className="chat-status-segment"
+          title={t("chat.changeReasoningLabel")}
+          aria-label={t("chat.changeReasoningLabel")}
+          aria-haspopup="listbox"
+          disabled={busy}
+          onClick={onOpenThinkingPicker}
+        >
+          {thinkingSuffix}
+        </button>
+      </span>
+    ) : <span>{thinkingSuffix}</span>)
+    : null;
 
   // The model cluster closes whichever line it rides on: the only line when the session is new,
   // line 2 once the run has counters to report.
   const modelCluster = (
     <span className="chat-status-model">
       {modelSegment}
-      {thinkingSuffix && (
-        onThinkingLevelChange ? (
-          <StatusMenu
-            label={thinkingSuffix}
-            title={t("chat.changeReasoningLabel")}
-            disabled={busy}
-            items={thinkingItems}
-            openKey={openMenu}
-            menuKey="thinking"
-            onOpenChange={setOpenMenu}
-          />
-        ) : <span>{thinkingSuffix}</span>
-      )}
+      {thinkingSegment}
     </span>
   );
 

@@ -22,6 +22,8 @@ import { mergeSessionStats, type SessionFileStats } from "@/lib/session-stats";
 import { userMessageKey } from "@/lib/prompt-recovery";
 import { AgentEventConnection } from "@/lib/agent-event-connection";
 import { getToolExecutionProgress } from "@/lib/tool-execution-progress";
+import { thinkingChoicesFor } from "@/lib/thinking-levels";
+import { resolveModelArgument, resolveThinkingArgument } from "@/lib/picker-commands";
 import {
   CHAT_SCROLL_REATTACH_TOLERANCE,
   CHAT_SCROLL_TAIL_TOLERANCE,
@@ -137,7 +139,14 @@ export interface SlashCommandInfo {
 
 export type BuiltinSlashCommandResult =
   | { handled: false }
-  | { handled: true; message?: string; error?: string; action?: "openSessionStats" };
+  | {
+      handled: true;
+      message?: string;
+      error?: string;
+      action?: "openSessionStats" | "openModelPicker" | "openThinkingPicker";
+      /** Pre-fills the picker's search box when an argument did not resolve exactly. */
+      query?: string;
+    };
 
 export interface UseAgentSessionOptions {
   session: SessionInfo | null;
@@ -1678,6 +1687,21 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, [isNew, newSessionCwd, session?.cwd]);
 
+  const handleThinkingLevelChange = useCallback(async (level: ThinkingLevelOption) => {
+    setThinkingLevel(level);
+    if (isNew && !sessionIdRef.current) {
+      thinkingLevelOverrideRef.current = level === "auto" ? null : level;
+    }
+    if (level === "auto") return; // "auto" leaves pi's current setting untouched
+    const sid = sessionIdRef.current ?? await ensuringNewSessionRef.current;
+    if (!sid) return;
+    try {
+      await sendAgentCommand(sid, { type: "set_thinking_level", level });
+    } catch (e) {
+      console.error("Failed to set thinking level:", e);
+    }
+  }, [isNew]);
+
   const handleBuiltinSlashCommand = useCallback(async (text: string): Promise<BuiltinSlashCommandResult> => {
     if (!text.startsWith("/")) return { handled: false };
     const match = text.match(/^\/([^\s]+)(?:\s+([\s\S]*))?$/);
@@ -1685,12 +1709,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
     const [, commandName, rawArgs = ""] = match;
     const args = rawArgs.trim();
-    const sid = sessionIdRef.current ?? await ensureNewSession();
+    // /model and /thinking are pure UI commands — they open the picker and nothing else. The
+    // prelude runs for every builtin, so typing /model in a tab that has not started a session yet
+    // used to spawn one (and send the model change to that new session) as a side effect.
+    const opensPicker = commandName === "model" || commandName === "thinking";
+    const sid = opensPicker ? sessionIdRef.current : (sessionIdRef.current ?? await ensureNewSession());
     const complete = (result: BuiltinSlashCommandResult): BuiltinSlashCommandResult => {
       if (!result.handled) return result;
       if (result.error) {
         addNotice({ type: "error", message: result.error });
-      } else if (result.action !== "openSessionStats") {
+      } else if (!result.action) {
         addNotice({ type: "success", message: result.message ?? "Command completed" });
       }
       return result;
@@ -1768,6 +1796,34 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           return completed;
         }
 
+        // pi keeps /model and /thinking to its TUI; both are dual-mode there — bare opens the
+        // selector, an argument is applied inline (interactive-mode.ts#L2980-2991).
+        case "model": {
+          if (!args) return complete({ handled: true, action: "openModelPicker" });
+          const target = resolveModelArgument(args, modelList);
+          // pi does not guess: a near miss opens the selector pre-filled with what was typed.
+          if (!target) return complete({ handled: true, action: "openModelPicker", query: args });
+          await handleModelChange(target.provider, target.modelId);
+          return complete({ handled: true, message: "Model set to " + target.provider + "/" + target.modelId });
+        }
+
+        case "thinking": {
+          const levels = thinkingChoicesFor(
+            currentModel ? modelThinkingLevels[currentModel.provider + ":" + currentModel.modelId] : null,
+          );
+          if (!args) return complete({ handled: true, action: "openThinkingPicker" });
+          const level = resolveThinkingArgument(args, levels);
+          // pi errors on an unknown level and lists what the model does offer, rather than clamping.
+          if (!level) {
+            return complete({
+              handled: true,
+              error: "Unknown thinking level: " + args + ". Available: " + levels.join(", "),
+            });
+          }
+          await handleThinkingLevelChange(level as ThinkingLevelOption);
+          return complete({ handled: true, message: "Thinking level set to " + level });
+        }
+
         default:
           return { handled: false };
       }
@@ -1776,7 +1832,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     } finally {
       if (commandName === "compact") setIsCompacting(false);
     }
-  }, [activeLeafId, addNotice, ensureNewSession, isCompacting, loadModels, loadSession, loadSlashCommands, loadTools, promoteNewSession, onSessionForked, onSessionStatsPanelOpen]);
+  }, [activeLeafId, addNotice, ensureNewSession, isCompacting, loadModels, loadSession, loadSlashCommands, loadTools, promoteNewSession, onSessionForked, onSessionStatsPanelOpen, modelList, modelThinkingLevels, currentModel, handleModelChange, handleThinkingLevelChange]);
 
   // Let AgentSession.prompt decide atomically whether to queue against the
   // current run or start a new turn if it settled while the request was in
@@ -1858,20 +1914,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, [opts.chatInputRef, addNotice]);
 
-  const handleThinkingLevelChange = useCallback(async (level: ThinkingLevelOption) => {
-    setThinkingLevel(level);
-    if (isNew && !sessionIdRef.current) {
-      thinkingLevelOverrideRef.current = level === "auto" ? null : level;
-    }
-    if (level === "auto") return; // "auto" leaves pi's current setting untouched
-    const sid = sessionIdRef.current ?? await ensuringNewSessionRef.current;
-    if (!sid) return;
-    try {
-      await sendAgentCommand(sid, { type: "set_thinking_level", level });
-    } catch (e) {
-      console.error("Failed to set thinking level:", e);
-    }
-  }, [isNew]);
 
   const scrollToMessage = useCallback((element: HTMLElement, viewportOffset = 16) => {
     const container = scrollContainerRef.current;
