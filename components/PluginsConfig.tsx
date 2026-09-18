@@ -88,11 +88,20 @@ function findInstalledPackage(
     ?? packages.find((pkg) => pkg.scope === scope && pkg.source.endsWith(trimmed));
 }
 
+/** The status colour handed to ConfigStatusDot's `color` prop. */
 function statusColor(status: PluginPackageInfo["status"]): string {
   if (status === "loaded") return "var(--accent)";
   if (status === "installed") return "#f59e0b";
   if (status === "disabled") return "var(--text-dim)";
   return "#ef4444";
+}
+
+/** The same statuses as `.plugins-status-value.is-*` tone classes in settings.css. */
+function statusTone(status: PluginPackageInfo["status"]): string {
+  if (status === "loaded") return "is-loaded";
+  if (status === "installed") return "is-installed";
+  if (status === "disabled") return "is-disabled";
+  return "is-error";
 }
 
 function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
@@ -112,67 +121,26 @@ function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
 
   if (groups.length === 0) {
     return (
-      <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
+      <div className="plugins-empty-resources">
         {pkg.disabled ? t("i18n.packageDisabled") : t("i18n.noResolvedResources")}
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-      }}
-    >
+    <div className="plugins-resource-groups">
       {groups.map((group, groupIndex) => (
-        <div
-          key={group.kind}
-          style={{
-            borderTop: groupIndex === 0 ? "none" : "1px solid var(--border)",
-            paddingTop: groupIndex === 0 ? 0 : 12,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              color: "var(--text-dim)",
-              textTransform: "uppercase",
-              marginBottom: 6,
-            }}
-          >
+        <div key={group.kind} className={"plugins-resource-group" + (groupIndex === 0 ? " is-first" : "")}>
+          <div className="plugins-resource-group-label">
             {group.label}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div className="plugins-resource-list">
             {group.resources.map((resource) => (
-              <div key={`${resource.kind}:${resource.path}`} style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text)",
-                    fontFamily: "var(--font-mono)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                  title={resource.path}
-                >
+              <div key={`${resource.kind}:${resource.path}`} className="plugins-resource-item">
+                <div className="plugins-resource-name" title={resource.path}>
                   {resource.name}
                 </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "var(--text-dim)",
-                    fontFamily: "var(--font-mono)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    marginTop: 1,
-                  }}
-                  title={resource.path}
-                >
+                <div className="plugins-resource-path" title={resource.path}>
                   {resource.relativePath}
                 </div>
               </div>
@@ -186,16 +154,7 @@ function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
 
 function ScopeTag({ scope }: { scope: PluginScope }) {
   return (
-    <span
-      style={{
-        fontSize: 10,
-        padding: "1px 5px",
-        borderRadius: 3,
-        flexShrink: 0,
-        background: scope === "project" ? "rgba(99,102,241,0.12)" : "rgba(120,120,120,0.12)",
-        color: scope === "project" ? "rgba(99,102,241,0.85)" : "var(--text-dim)",
-      }}
-    >
+    <span className={"plugins-scope-tag" + (scope === "project" ? " is-project" : "")}>
       {scope}
     </span>
   );
@@ -212,15 +171,7 @@ function SegmentedScope({
 }) {
   const { t } = useI18n();
   return (
-    <div
-      style={{
-        display: "inline-flex",
-        border: "1px solid var(--border)",
-        borderRadius: 7,
-        overflow: "hidden",
-        height: 30,
-      }}
-    >
+    <div className="plugins-scope-toggle">
       {(["global", "project"] as PluginScope[]).map((scope) => {
         const active = value === scope;
         const disabled = scope === "project" && !projectResourcesLoaded;
@@ -232,16 +183,10 @@ function SegmentedScope({
             }}
             disabled={disabled}
             title={disabled ? t("trust.projectScopeUnavailable") : undefined}
-            style={{
-              width: 76,
-              border: "none",
-              borderRight: scope === "global" ? "1px solid var(--border)" : "none",
-              background: active ? "var(--bg-selected)" : "none",
-              color: active ? "var(--text)" : "var(--text-muted)",
-              cursor: disabled ? "not-allowed" : "pointer",
-              opacity: disabled ? 0.45 : 1,
-              fontSize: 12,
-            }}
+            className={"plugins-scope-option"
+              + (active ? " is-active" : "")
+              + (scope === "global" ? " is-global" : "")
+              + (disabled ? " is-unavailable" : "")}
           >
             {scope}
           </button>
@@ -282,24 +227,16 @@ function AddPluginPanel({
 
   return (
     <ConfigDetailStack className="is-fill">
-      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div className="plugins-add-header">
+        <div className="plugins-add-title-row">
           <ConfigDetailTitle>{t("i18n.addPlugin")}</ConfigDetailTitle>
           <a
             href="https://pi.dev/packages"
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 5,
-              color: "var(--accent)",
-              fontSize: 12,
-              textDecoration: "none",
-              whiteSpace: "nowrap",
-            }}
+            className="plugins-package-link"
           >
-            <svg width="28" height="28" viewBox="0 0 800 800" aria-hidden="true" focusable="false" style={{ flexShrink: 0 }}>
+            <svg width="28" height="28" viewBox="0 0 800 800" aria-hidden="true" focusable="false" className="plugins-package-link-icon">
               <path
                 fill="#000"
                 fillRule="evenodd"
@@ -310,7 +247,7 @@ function AddPluginPanel({
             pi.dev/packages
           </a>
         </div>
-        <div style={{ fontSize: 12, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
+        <div className="plugins-install-location">
           {installLocation(scope, cwd)}
         </div>
       </div>
@@ -330,25 +267,14 @@ function AddPluginPanel({
           }}
           onBlur={(e) => onSourceChange(normalizePluginSourceInput(e.currentTarget.value))}
           placeholder="npm:@scope/package"
-          style={{
-            width: "100%",
-            height: 36,
-            padding: "0 11px",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            background: "var(--bg-panel)",
-            color: "var(--text)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 12,
-            outline: "none",
-          }}
+          className="plugins-source-input"
           onKeyDown={(e) => {
             if (e.key === "Enter" && source.trim() && !busy) onInstall();
           }}
         />
       </ConfigField>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div className="plugins-install-row">
         <SegmentedScope
           value={scope}
           projectResourcesLoaded={projectResourcesLoaded}
@@ -364,29 +290,17 @@ function AddPluginPanel({
         </ConfigButton>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>
+      <div className="plugins-examples">
+        <div className="plugins-examples-title">
           Examples
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div className="plugins-example-list">
           {examples.map((example) => (
             <button
               key={example}
               type="button"
               onClick={() => onSourceChange(example)}
-              style={{
-                width: "100%",
-                minHeight: 30,
-                textAlign: "left",
-                padding: "6px 9px",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-                background: "var(--bg-panel)",
-                color: "var(--text-dim)",
-                cursor: "pointer",
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-              }}
+              className="plugins-example-button"
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "var(--bg-hover)";
                 e.currentTarget.style.color = "var(--text-muted)";
@@ -403,7 +317,7 @@ function AddPluginPanel({
       </div>
 
       {actionError && (
-        <div style={{ fontSize: 12, color: "#ef4444", whiteSpace: "pre-wrap" }}>
+        <div className="plugins-error">
           {actionError}
         </div>
       )}
@@ -452,40 +366,15 @@ function PackageDetail({
         <ConfigDetailHeaderInfo>
           <ScopeTag scope={pkg.scope} />
           {pkg.disabled ? (
-            <span
-              style={{
-                fontSize: 10,
-                padding: "1px 5px",
-                borderRadius: 3,
-                background: "rgba(120,120,120,0.12)",
-                color: "var(--text-dim)",
-              }}
-            >
+            <span className="plugins-badge">
               {t("i18n.disabled")}
             </span>
           ) : pkg.filtered && (
-            <span
-              style={{
-                fontSize: 10,
-                padding: "1px 5px",
-                borderRadius: 3,
-                background: "rgba(245,158,11,0.12)",
-                color: "#d97706",
-              }}
-            >
+            <span className="plugins-badge is-filtered">
               {t("i18n.filtered")}
             </span>
           )}
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-              color: "var(--text)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
+          <span className="plugins-source-name">
             {pkg.source}
           </span>
         </ConfigDetailHeaderInfo>
@@ -533,19 +422,11 @@ function PackageDetail({
         </ConfigDetailActions>
       </ConfigDetailHeader>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(96px, 130px) minmax(0, 1fr)",
-          gap: "9px 14px",
-          fontSize: 12,
-          lineHeight: 1.45,
-        }}
-      >
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.status")}</div>
-        <div style={{ color: statusColor(pkg.status), textTransform: "capitalize" }}>{pkg.status}</div>
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.version")}</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+      <div className="plugins-detail-grid">
+        <div className="plugins-field-label">{t("i18n.status")}</div>
+        <div className={"plugins-status-value is-capitalized " + statusTone(pkg.status)}>{pkg.status}</div>
+        <div className="plugins-field-label">{t("i18n.version")}</div>
+        <div className="plugins-version-cell">
           <div className="skill-version-row">
             <span className="skill-version-value">{versionSummary(pkg, t)}</span>
             {updateAvailable && (
@@ -574,43 +455,37 @@ function PackageDetail({
             )}
           </div>
           {updateError && (
-            <span style={{ fontSize: 12, color: "#ef4444" }}>{updateError}</span>
+            <span className="plugins-update-error">{updateError}</span>
           )}
         </div>
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.package")}</div>
-        <div style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>
+        <div className="plugins-field-label">{t("i18n.package")}</div>
+        <div className="plugins-field-value-mono">
           {pkg.packageName ?? t("i18n.unknown")}
         </div>
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.resources")}</div>
-         <div style={{ color: "var(--text-muted)" }}>{resourceSummary(pkg, t)}</div>
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.installedPath")}</div>
-        <div
-          style={{
-            color: pkg.installedPath ? "var(--text-muted)" : "#ef4444",
-            fontFamily: "var(--font-mono)",
-            overflowWrap: "anywhere",
-          }}
-        >
+        <div className="plugins-field-label">{t("i18n.resources")}</div>
+         <div className="plugins-field-value">{resourceSummary(pkg, t)}</div>
+        <div className="plugins-field-label">{t("i18n.installedPath")}</div>
+        <div className={"plugins-field-value-mono" + (pkg.installedPath ? "" : " is-missing")}>
           {pkg.installedPath ? shortenPath(pkg.installedPath) : t("i18n.notFound")}
         </div>
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.cwd")}</div>
-        <div style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>
+        <div className="plugins-field-label">{t("i18n.cwd")}</div>
+        <div className="plugins-field-label-mono">
           {shortenPath(cwd)}
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="plugins-resources-section">
         <ConfigSectionTitle>{t("i18n.resolvedResources")}</ConfigSectionTitle>
         <ResourceList pkg={pkg} />
       </div>
 
       {actionMessage && (
-        <div style={{ fontSize: 12, color: "#16a34a" }}>
+        <div className="plugins-success">
           {actionMessage}
         </div>
       )}
       {actionError && (
-        <div style={{ fontSize: 12, color: "#ef4444", whiteSpace: "pre-wrap" }}>
+        <div className="plugins-error">
           {actionError}
         </div>
       )}
@@ -630,19 +505,11 @@ function StandaloneExtensionDetail({ extension }: { extension: PluginStandaloneE
           <ConfigDetailTitle>{extension.name}</ConfigDetailTitle>
         </ConfigDetailHeaderInfo>
       </ConfigDetailHeader>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(96px, 130px) minmax(0, 1fr)",
-          gap: "9px 14px",
-          fontSize: 12,
-          lineHeight: 1.45,
-        }}
-      >
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.status")}</div>
-        <div style={{ color: extension.enabled ? "var(--accent)" : "var(--text-dim)" }}>{status}</div>
-        <div style={{ color: "var(--text-dim)" }}>{t("i18n.installedPath")}</div>
-        <div style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>
+      <div className="plugins-detail-grid">
+        <div className="plugins-field-label">{t("i18n.status")}</div>
+        <div className={"plugins-status-value" + (extension.enabled ? " is-loaded" : " is-disabled")}>{status}</div>
+        <div className="plugins-field-label">{t("i18n.installedPath")}</div>
+        <div className="plugins-field-value-mono">
           {shortenPath(extension.path)}
         </div>
       </div>
@@ -1041,14 +908,14 @@ export function PluginsConfig({
 
         <ConfigFooter status={
             availableUpdateCount > 0 ? (
-              <span style={{ fontSize: 12, color: "var(--accent)" }}>
+              <span className="plugins-update-count">
                 {availableUpdateCount}{" "}
                 {availableUpdateCount === 1 ? t("i18n.update") : t("i18n.updates")}
               </span>
             ) : data?.diagnostics.length ? (
               <span
                 title={data.diagnostics.map((d) => `${d.type}: ${d.source ? `${d.source}: ` : ""}${d.message}`).join("\n")}
-                style={{ color: data.diagnostics.some((d) => d.type === "error") ? "#ef4444" : "#d97706" }}
+                className={"plugins-diagnostic" + (data.diagnostics.some((d) => d.type === "error") ? " is-error" : " is-warning")}
               >
                 {data.diagnostics.length} diagnostic{data.diagnostics.length === 1 ? "" : "s"}
               </span>
