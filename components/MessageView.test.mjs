@@ -48,6 +48,14 @@ test("matches response model aliases and otherwise includes the provider", () =>
   assert.equal(getModelDisplayName("gateway", "unknown-model", names), "gateway/unknown-model");
 });
 
+test("falls back to the session's known model when the message lacks provider/model", () => {
+  const html = renderMessage(
+    { role: "assistant", provider: "", model: "", content: [{ type: "text", text: "hi" }] },
+    { fallbackModel: { provider: "anthropic", modelId: "claude-sonnet-5" } },
+  );
+  assert.match(html, /anthropic\/claude-sonnet-5/);
+});
+
 test("shows the newest thinking line while collapsed and the full text when expanded", () => {
   const previousWindow = globalThis.window;
   try {

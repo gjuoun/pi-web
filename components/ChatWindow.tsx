@@ -1184,6 +1184,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                     message={msg}
                     toolResults={toolResultsMap}
                     modelNames={modelNames}
+                    fallbackModel={displayModelValue}
                     cwd={messageCwd}
                     onOpenFile={onOpenFile}
                     entryId={entryIds[idx]}
@@ -1329,7 +1330,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
               );
             })()}
             {streamState.isStreaming && hasStreamingContent && streamState.streamingMessage && (
-              <MessageView message={streamState.streamingMessage as AgentMessage} toolResults={toolResultsMap} isStreaming modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} />
+              <MessageView message={streamState.streamingMessage as AgentMessage} toolResults={toolResultsMap} isStreaming modelNames={modelNames} fallbackModel={displayModelValue} cwd={messageCwd} onOpenFile={onOpenFile} />
             )}
 
             {agentRunning && !hasStreamingContent && agentPhase && (
@@ -1346,6 +1347,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
 
             {pendingBash && (
               <MessageView
+                fallbackModel={displayModelValue}
                 message={{
                   role: "bashExecution",
                   command: pendingBash.command,

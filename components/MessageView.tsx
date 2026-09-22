@@ -188,6 +188,7 @@ interface Props {
   isStreaming?: boolean;
   toolResults?: Map<string, ToolResultMessage>;
   modelNames?: Record<string, string>;
+  fallbackModel?: { provider: string; modelId: string } | null;
   cwd?: string;
   onOpenFile?: (filePath: string) => void;
   entryId?: string;
@@ -273,12 +274,12 @@ function haveSameRelevantToolResults(
   return true;
 }
 
-export const MessageView = memo(function MessageView({ message, isStreaming, toolResults, modelNames, cwd, onOpenFile, entryId, searchBlock, onFork, forking, onNavigate, onEditContent, showTimestamp, prevTimestamp, sessionId, writtenFiles }: Props) {
+export const MessageView = memo(function MessageView({ message, isStreaming, toolResults, modelNames, fallbackModel, cwd, onOpenFile, entryId, searchBlock, onFork, forking, onNavigate, onEditContent, showTimestamp, prevTimestamp, sessionId, writtenFiles }: Props) {
   if (message.role === "user") {
     return <UserMessageView message={message as UserMessage} cwd={cwd} onOpenFile={onOpenFile} entryId={entryId} onFork={onFork} forking={forking} onNavigate={onNavigate} onEditContent={onEditContent} />;
   }
   if (message.role === "assistant") {
-    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} modelNames={modelNames} cwd={cwd} onOpenFile={onOpenFile} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} sessionId={sessionId} entryId={entryId} searchBlock={searchBlock} writtenFiles={writtenFiles} />;
+    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} modelNames={modelNames} fallbackModel={fallbackModel} cwd={cwd} onOpenFile={onOpenFile} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} sessionId={sessionId} entryId={entryId} searchBlock={searchBlock} writtenFiles={writtenFiles} />;
   }
   if (message.role === "toolResult") {
     // Rendered inline under its toolCall — skip standalone rendering if paired
@@ -600,6 +601,7 @@ function AssistantMessageView({
   isStreaming,
   toolResults,
   modelNames,
+  fallbackModel,
   cwd,
   onOpenFile,
   showTimestamp,
@@ -613,6 +615,7 @@ function AssistantMessageView({
   isStreaming?: boolean;
   toolResults?: Map<string, ToolResultMessage>;
   modelNames?: Record<string, string>;
+  fallbackModel?: { provider: string; modelId: string } | null;
   cwd?: string;
   onOpenFile?: (filePath: string) => void;
   showTimestamp?: boolean;
@@ -755,9 +758,15 @@ function AssistantMessageView({
           gap: 6,
         }}
       >
-        {message.provider && (
-          <span>{getModelDisplayName(message.provider, message.model, modelNames)}</span>
-        )}
+        {(() => {
+          const labelProvider = message.provider || fallbackModel?.provider;
+          const labelModel = message.model || fallbackModel?.modelId;
+          return (
+            labelProvider && (
+              <span>{getModelDisplayName(labelProvider, labelModel ?? "", modelNames)}</span>
+            )
+          );
+        })()}
         {isStreaming && (() => {
           const est = Math.round(estimatedTokens);
           return (
