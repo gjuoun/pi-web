@@ -347,6 +347,10 @@ export interface SessionInfo {
   /** True while the runtime session exists only in memory and its JSONL file
    *  has not been created yet. Disk-backed actions must wait until this clears. */
   transient?: boolean;
+  /** True when the user pinned this session to the top of the sidebar. */
+  pinned?: boolean;
+  /** True when the user archived this session (soft-hide from the default list). */
+  archived?: boolean;
 }
 
 export interface SessionContext {

@@ -20,6 +20,7 @@ import { computeSessionTotalActiveMs } from "@/lib/session-timing";
 import { computeSessionStats } from "@/lib/session-stats";
 import type { SessionEntry } from "@/lib/types";
 import { readSubagentRun, readSubagentSessionResources, SUBAGENT_META_TYPE } from "@/lib/subagents";
+import { SESSION_ARCHIVED_TYPE, SESSION_PINNED_TYPE } from "@/lib/session-flags";
 import { fail } from "@/lib/result/failures";
 import { respondJson } from "@/lib/result/route";
 import { safeAsync, safeJsonParse, safeRequestJson, safeSync, trySync } from "@/lib/result/safe";
@@ -148,7 +149,7 @@ export async function GET(
   return respondJson(req, result);
 }
 
-// PATCH /api/sessions/[id]  body: { name: string }
+// PATCH /api/sessions/[id]  body: { name?: string; pinned?: boolean; archived?: boolean }
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -156,16 +157,25 @@ export async function PATCH(
   const { id } = await params;
   const result = await safeTry(async function* () {
     const raw = yield* safeRequestJson(req).mapErr(fail.badRequest);
-    const { name } = (typeof raw === "object" && raw !== null ? raw : {}) as { name?: unknown };
-    if (typeof name !== "string") {
-      return err(fail.badRequest("name is required"));
+    const { name, pinned, archived } = (typeof raw === "object" && raw !== null ? raw : {}) as {
+      name?: unknown;
+      pinned?: unknown;
+      archived?: unknown;
+    };
+    const hasName = typeof name === "string";
+    const hasPinned = typeof pinned === "boolean";
+    const hasArchived = typeof archived === "boolean";
+    if (!hasName && !hasPinned && !hasArchived) {
+      return err(fail.badRequest("name, pinned, or archived is required"));
     }
     const filePath = yield* safeAsync(() => resolveSessionPath(id)).mapErr(fail.internal);
     if (!filePath) {
       return err(fail.notFound("Session not found"));
     }
     yield* safeSync(() => {
-      SessionManager.open(filePath).appendSessionInfo(name.trim());
+      if (hasName) SessionManager.open(filePath).appendSessionInfo((name as string).trim());
+      if (hasPinned) SessionManager.open(filePath).appendCustomEntry(SESSION_PINNED_TYPE, pinned);
+      if (hasArchived) SessionManager.open(filePath).appendCustomEntry(SESSION_ARCHIVED_TYPE, archived);
     }).mapErr(fail.internal);
     invalidateSessionListCache();
     return ok({ ok: true });
