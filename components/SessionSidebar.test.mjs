@@ -119,11 +119,43 @@ test("lifecycle refreshes bypass the cache while cross-window polling reuses it"
 
 test("does not expose disk-backed actions for transient sessions", () => {
   assert.match(sessionItemSource, /if \(session\.transient\) return;/);
-  assert.match(sessionItemSource, /\{hovered && !session\.transient && \(/);
+  assert.match(sessionItemSource, /\{\(hovered \|\| menuOpen\) && !session\.transient && \(/);
+});
+
+test("pin and archive actions call PATCH and refresh the list, collapsed into one menu", () => {
+  assert.match(sessionItemSource, /const togglePinned = useCallback[\s\S]*?pinned: !session\.pinned[\s\S]*?onRenamed\?\.\(\);/);
+  assert.match(sessionItemSource, /const toggleArchived = useCallback[\s\S]*?archived: !session\.archived[\s\S]*?onRenamed\?\.\(\);/);
+  // Pin/archive/rename/delete are collapsed behind a single "more actions" trigger
+  // (portaled dropdown, since the row itself is overflow:hidden) instead of four
+  // separate always-rendered hover icon buttons.
+  assert.match(sessionItemSource, /onClick=\{toggleMenu\}/);
+  assert.match(sessionItemSource, /createPortal\(/);
+  assert.match(sessionItemSource, /onClick=\{\(e\) => \{ togglePinned\(e\); setMenuOpen\(false\); \}\}/);
+  assert.match(sessionItemSource, /onClick=\{\(e\) => \{ toggleArchived\(e\); setMenuOpen\(false\); \}\}/);
+  assert.match(sessionItemSource, /onClick=\{\(e\) => \{ startRename\(e\); setMenuOpen\(false\); \}\}/);
+  assert.match(sessionItemSource, /onClick=\{\(e\) => \{ handleDeleteClick\(e\); setMenuOpen\(false\); \}\}/);
+  assert.match(sessionItemSource, /t\(session\.pinned \? "sidebar\.unpin" : "sidebar\.pin"\)/);
+  assert.match(sessionItemSource, /t\(session\.archived \? "sidebar\.unarchive" : "sidebar\.archive"\)/);
+});
+
+test("more-actions menu closes on outside click and Escape", () => {
+  assert.match(sessionItemSource, /document\.addEventListener\("mousedown", handleOutside\)/);
+  assert.match(sessionItemSource, /if \(e\.key === "Escape"\) setMenuOpen\(false\);/);
+});
+
+test("loadSessions conditionally includes includeArchived based on showArchived state", () => {
+  assert.match(source, /const url = showArchived \? `\$\{base\}\$\{force \? "&" : "\?"\}includeArchived=1` : base;/);
+});
+
+test("groups sessions pinned-first, then bucketFamilies runs on the full family set", () => {
+  assert.match(source, /const allFamilies = listSessionFamilies\(filteredSessions\)/);
+  assert.match(source, /const pinnedFamilies = allFamilies\.filter\(\(family\) => family\.root\.pinned === true\)/);
+  assert.match(source, /const unpinnedFamilies = allFamilies\.filter\(\(family\) => family\.root\.pinned !== true\)/);
+  assert.match(source, /const dateBuckets = bucketFamilies\(unpinnedFamilies, Date\.now\(\)\)/);
 });
 
 test("hides subagent rows and aggregates their state into the main session row", () => {
-  assert.match(source, /const sessionFamilies = listSessionFamilies\(filteredSessions\)/);
+  assert.match(source, /const allFamilies = listSessionFamilies\(filteredSessions\)/);
   assert.match(source, /familySessions\.some\(\(session\) => session\.id === selectedSessionId\)/);
   assert.match(source, /familySessions\.some\(\(session\) => runningSessionIds\.has\(session\.id\)\)/);
   assert.doesNotMatch(source, /function SessionTreeItem/);

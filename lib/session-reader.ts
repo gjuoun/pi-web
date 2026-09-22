@@ -180,6 +180,8 @@ async function loadAllSessions(): Promise<SessionInfo[]> {
           ? { relation: { kind: "fork" as const, ...(originSessionId ? { originSessionId } : {}) } }
           : {}),
       transient: false,
+      ...(s.pinned ? { pinned: true } : {}),
+      ...(s.archived ? { archived: true } : {}),
     };
   });
   return attachSessionProjectInfo(sessions);

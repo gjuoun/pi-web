@@ -76,6 +76,64 @@ test("list versions expose idle session creation, rename and deletion to other w
   assert.equal((await (await getRunningSessions(new Request("http://x/api/agent/running"))).json()).sessionListVersion, deleted.sessionListVersion);
 });
 
+test("PATCH accepts pinned/archived; GET excludes archived unless includeArchived=1", async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), "pi-web-pin-archive-"));
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = dir;
+  invalidateSessionListCache();
+  t.after(async () => {
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+    invalidateSessionListCache();
+    await rm(dir, { recursive: true, force: true });
+  });
+  const list = async (query = "") => {
+    const response = await getSessionList(new Request(`http://localhost/api/sessions${query}`));
+    assert.equal(response.status, 200);
+    return response.json();
+  };
+  const patch = async (id, body) => renameSession(
+    new Request(`http://localhost/api/sessions/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    { params: Promise.resolve({ id }) },
+  );
+
+  const pinnedManager = SessionManager.create(dir);
+  pinnedManager.appendMessage({ role: "user", content: "pin me", timestamp: Date.now() });
+  pinnedManager.appendMessage({ role: "assistant", content: [{ type: "text", text: "ok" }], timestamp: Date.now() });
+  const pinnedId = pinnedManager.getSessionId();
+
+  const archivedManager = SessionManager.create(dir);
+  archivedManager.appendMessage({ role: "user", content: "archive me", timestamp: Date.now() });
+  archivedManager.appendMessage({ role: "assistant", content: [{ type: "text", text: "ok" }], timestamp: Date.now() });
+  const archivedId = archivedManager.getSessionId();
+  invalidateSessionListCache();
+
+  const pinResponse = await patch(pinnedId, { pinned: true });
+  assert.equal(pinResponse.status, 200);
+  const afterPin = await list();
+  assert.equal(afterPin.sessions.find((s) => s.id === pinnedId).pinned, true);
+
+  const archiveResponse = await patch(archivedId, { archived: true });
+  assert.equal(archiveResponse.status, 200);
+  const afterArchive = await list();
+  assert.equal(afterArchive.sessions.some((s) => s.id === archivedId), false);
+  const withArchived = await list("?includeArchived=1");
+  const archivedSession = withArchived.sessions.find((s) => s.id === archivedId);
+  assert.ok(archivedSession);
+  assert.equal(archivedSession.archived, true);
+
+  // Setting both flags on the same session is independent (no cross-talk between the two custom entry types).
+  const bothPin = await patch(pinnedId, { archived: true });
+  assert.equal(bothPin.status, 200);
+  const withArchived2 = await list("?includeArchived=1");
+  const both = withArchived2.sessions.find((s) => s.id === pinnedId);
+  assert.equal(both.pinned, true);
+  assert.equal(both.archived, true);
+
+  const badBody = await patch(archivedId, {});
+  assert.equal(badBody.status, 400);
+});
+
 test("session listing returns a gzip-compressed response when the client accepts it", async (t) => {
   const dir = await mkdtemp(join(tmpdir(), "pi-web-list-gzip-"));
   const previousAgentDir = process.env.PI_CODING_AGENT_DIR;

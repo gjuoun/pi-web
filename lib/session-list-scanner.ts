@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { writePrivateFileAtomicSync } from "./atomic-file";
+import { SESSION_ARCHIVED_TYPE, SESSION_PINNED_TYPE } from "./session-flags";
 
 export interface ScannedSessionInfo {
 	path: string;
@@ -20,6 +21,8 @@ export interface ScannedSessionInfo {
 	messageCount: number;
 	firstMessage: string;
 	parentSessionPath?: string;
+	pinned?: boolean;
+	archived?: boolean;
 }
 
 interface Fingerprint {
@@ -95,6 +98,8 @@ export async function scanSessionFileInfo(
 		const stats = await stat(filePath);
 		let header: RawEntry | null = null;
 		let name: string | undefined;
+		let pinned: boolean | undefined;
+		let archived: boolean | undefined;
 		let messageCount = 0;
 		let firstMessage = "";
 		let lastActivityTime: number | undefined;
@@ -119,6 +124,12 @@ export async function scanSessionFileInfo(
 					typeof entry.name === "string" && entry.name.trim()
 						? entry.name.trim()
 						: undefined;
+			}
+			if (entry.type === "custom" && entry.customType === SESSION_PINNED_TYPE) {
+				if (typeof entry.data === "boolean") pinned = entry.data;
+			}
+			if (entry.type === "custom" && entry.customType === SESSION_ARCHIVED_TYPE) {
+				if (typeof entry.data === "boolean") archived = entry.data;
 			}
 			if (entry.type !== "message") continue;
 			messageCount++;
@@ -170,6 +181,8 @@ export async function scanSessionFileInfo(
 			modified,
 			messageCount,
 			firstMessage: firstMessage || "(no messages)",
+			...(pinned ? { pinned: true } : {}),
+			...(archived ? { archived: true } : {}),
 		};
 	} catch {
 		return null;
@@ -246,6 +259,8 @@ function loadPersistedIndex(): void {
 				typeof info.firstMessage !== "string" ||
 				(info.name !== undefined && typeof info.name !== "string") ||
 				(info.parentSessionPath !== undefined && typeof info.parentSessionPath !== "string") ||
+				(info.pinned !== undefined && typeof info.pinned !== "boolean") ||
+				(info.archived !== undefined && typeof info.archived !== "boolean") ||
 				typeof info.messageCount !== "number" || !Number.isSafeInteger(info.messageCount) || info.messageCount < 0 ||
 				typeof info.created !== "string" || typeof info.modified !== "string"
 			) continue;
@@ -264,6 +279,8 @@ function loadPersistedIndex(): void {
 					messageCount: info.messageCount,
 					created,
 					modified,
+					...(info.pinned === true ? { pinned: true } : {}),
+					...(info.archived === true ? { archived: true } : {}),
 				},
 			});
 		}

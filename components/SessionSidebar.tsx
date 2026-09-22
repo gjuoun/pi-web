@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { SessionInfo } from "@/lib/types";
 import { collapseHomePath } from "@/lib/path-display";
-import { listSessionFamilies } from "@/lib/session-family";
+import { listSessionFamilies, type SessionFamily } from "@/lib/session-family";
+import { bucketFamilies, type DateBucketLabel } from "@/lib/session-date-buckets";
 import { loadExplorerOpen, saveExplorerOpen } from "@/lib/file-explorer-state";
 import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
 import { skillExpansionToCommand } from "@/lib/slash-display";
@@ -275,6 +277,26 @@ function AnimatedDropdown({ open, children, style }: { open: boolean; children: 
   );
 }
 
+/** One row inside a SessionItem's collapsed "more actions" menu. */
+function SessionActionMenuItem({ icon, label, onClick, danger }: { icon: ReactNode; label: string; onClick: (e: React.MouseEvent) => void; danger?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", gap: 8, width: "100%",
+        padding: "7px 9px", background: "none", border: "none", borderRadius: 5,
+        color: danger ? "#ef4444" : "var(--text)", cursor: "pointer",
+        fontSize: 12, textAlign: "left", whiteSpace: "nowrap",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = danger ? "rgba(239,68,68,0.08)" : "var(--bg-hover)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+    >
+      <span style={{ display: "flex", flexShrink: 0, color: danger ? "#ef4444" : "var(--text-muted)" }}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
 
 
 export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, onOpenTerminal, explorerRefreshKey, onExplorerRefresh, onAtMention, onAtMentions, onBackgroundTaskDone, onRunningSessionIdsChange, onSessionsChange }: Props) {
@@ -285,6 +307,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const sessionLoadIdRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [selectedCwd, setSelectedCwd] = useState<string | null>(null);
   const [homeDir, setHomeDir] = useState<string>("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -358,7 +381,9 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     const loadId = ++sessionLoadIdRef.current;
     try {
       if (showLoading) setLoading(true);
-      const res = await fetch(force ? "/api/sessions?force=1" : "/api/sessions", {
+      const base = force ? "/api/sessions?force=1" : "/api/sessions";
+      const url = showArchived ? `${base}${force ? "&" : "?"}includeArchived=1` : base;
+      const res = await fetch(url, {
         cache: "no-store",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -398,7 +423,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     } finally {
       if (loadId === sessionLoadIdRef.current) setLoading(false);
     }
-  }, []);
+  }, [showArchived]);
 
   const initialLoadDone = useRef(false);
   useEffect(() => {
@@ -911,7 +936,28 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         }
       : null);
 
-  const sessionFamilies = listSessionFamilies(filteredSessions);
+  // listSessionFamilies() must run on the FULL filtered set (not a pinned/bucket split)
+  // or a subagent whose root falls in a different bucket becomes an orphan.
+  const allFamilies = listSessionFamilies(filteredSessions);
+  const pinnedFamilies = allFamilies.filter((family) => family.root.pinned === true);
+  const unpinnedFamilies = allFamilies.filter((family) => family.root.pinned !== true);
+  const dateBuckets = bucketFamilies(unpinnedFamilies, Date.now());
+  const DATE_BUCKET_LABEL_KEYS: Record<DateBucketLabel, string> = {
+    Today: "sidebar.dateBucketToday",
+    Yesterday: "sidebar.dateBucketYesterday",
+    "Previous 7 Days": "sidebar.dateBucketPrevious7Days",
+    Older: "sidebar.dateBucketOlder",
+  };
+  const sectionLabelBySessionId = new Map<string, string>();
+  if (pinnedFamilies.length > 0) sectionLabelBySessionId.set(pinnedFamilies[0].root.id, t("sidebar.pinnedSection"));
+  for (const bucket of dateBuckets) {
+    if (bucket.families.length === 0) continue;
+    sectionLabelBySessionId.set(bucket.families[0].root.id, t(DATE_BUCKET_LABEL_KEYS[bucket.label]));
+  }
+  const sessionFamilies: SessionFamily[] = [
+    ...pinnedFamilies,
+    ...dateBuckets.flatMap((bucket) => bucket.families),
+  ];
 
   const virtualIndices = getSessionListIndices(
     sessionFamilies.length,
@@ -996,6 +1042,20 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowArchived((v) => !v)}
+              title={t("sidebar.showArchived")}
+              aria-label={t("sidebar.showArchived")}
+              aria-pressed={showArchived}
+              className={`flex h-[32px] w-[32px] shrink-0 cursor-pointer items-center justify-center rounded-[7px] border border-border hover:bg-bg-selected focus-visible:outline-2 focus-visible:outline-accent ${showArchived ? "bg-bg-selected text-accent" : "bg-bg-hover text-text-muted"}`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="4" rx="1" />
+                <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+                <line x1="10" y1="12" x2="14" y2="12" />
               </svg>
             </button>
           </div>
@@ -1624,6 +1684,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 >
                   <SessionItem
                     session={displaySession}
+                    sectionLabel={sectionLabelBySessionId.get(family.root.id)}
                     isSelected={familySessions.some((session) => session.id === selectedSessionId)}
                     isRunning={familySessions.some((session) => runningSessionIds.has(session.id))}
                     isUnread={familySessions.some((session) => unreadSessionIds.has(session.id))}
@@ -1910,6 +1971,7 @@ function SessionItem({
   hasChildren = false,
   collapsed = false,
   onToggleCollapse,
+  sectionLabel,
 }: {
   session: SessionInfo;
   isSelected: boolean;
@@ -1922,6 +1984,7 @@ function SessionItem({
   hasChildren?: boolean;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  sectionLabel?: string;
 }) {
   const { locale, t } = useI18n();
   const [hovered, setHovered] = useState(false);
@@ -1984,6 +2047,76 @@ function SessionItem({
       setDeleting(false);
     }
   }, [session.id, session.transient, onDeleted]);
+
+  const togglePinned = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (session.transient) return;
+    try {
+      await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinned: !session.pinned }),
+      });
+      onRenamed?.();
+    } catch {
+      // ignore
+    }
+  }, [session.id, session.pinned, session.transient, onRenamed]);
+
+  const toggleArchived = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (session.transient) return;
+    try {
+      await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: !session.archived }),
+      });
+      onRenamed?.();
+    } catch {
+      // ignore
+    }
+  }, [session.id, session.archived, session.transient, onRenamed]);
+
+  // Collapsed "more actions" menu (pin/archive/rename/delete) — portaled to
+  // document.body since the row itself is `overflow: hidden` and would clip
+  // an inline-positioned dropdown.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
+  const MENU_WIDTH = 172;
+
+  const toggleMenu = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const rect = menuButtonRef.current?.getBoundingClientRect();
+    if (rect) {
+      setMenuPos({
+        top: rect.bottom + 4,
+        left: Math.max(8, Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8)),
+      });
+    }
+    setMenuOpen((open) => !open);
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (menuButtonRef.current?.contains(target)) return;
+      if (menuPanelRef.current?.contains(target)) return;
+      setMenuOpen(false);
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [menuOpen]);
 
   const handleDeleteClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -2121,6 +2254,11 @@ function SessionItem({
             </svg>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
+            {sectionLabel && (
+              <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 1 }}>
+                {sectionLabel}
+              </div>
+            )}
             <div
               style={{
                 display: "flex",
@@ -2184,65 +2322,96 @@ function SessionItem({
             </button>
           )}
 
-          {/* Action buttons — shown on hover */}
-          {hovered && !session.transient && (
-            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+          {/* Collapsed "more actions" menu — shown on hover (or while open) */}
+          {(hovered || menuOpen) && !session.transient && (
+            <>
               <button
-                onClick={startRename}
-                title={t("sidebar.rename")}
+                ref={menuButtonRef}
+                onClick={toggleMenu}
+                title={t("sidebar.moreActions")}
+                aria-label={t("sidebar.moreActions")}
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 32, height: 32, padding: 0,
-                  background: "var(--bg-hover)", border: "1px solid var(--border)",
-                  borderRadius: 7, color: "var(--text-muted)",
-                  cursor: "pointer", flexShrink: 0,
+                  width: 28, height: 28, padding: 0, flexShrink: 0,
+                  background: menuOpen ? "var(--bg-selected)" : "var(--bg-hover)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 7, color: menuOpen ? "var(--accent)" : "var(--text-muted)",
+                  cursor: "pointer",
                   transition: "background 0.12s, color 0.12s, border-color 0.12s",
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--bg-selected)";
-                  e.currentTarget.style.color = "var(--accent)";
-                  e.currentTarget.style.borderColor = "rgba(37,99,235,0.35)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text-muted)";
-                  e.currentTarget.style.borderColor = "var(--border)";
-                }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <circle cx="5" cy="12" r="1.8" />
+                  <circle cx="12" cy="12" r="1.8" />
+                  <circle cx="19" cy="12" r="1.8" />
                 </svg>
               </button>
-              <button
-                onClick={handleDeleteClick}
-                title={t("sidebar.deleteWithShiftClick")}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 32, height: 32, padding: 0,
-                  background: "var(--bg-hover)", border: "1px solid var(--border)",
-                  borderRadius: 7, color: "var(--text-muted)",
-                  cursor: "pointer", flexShrink: 0,
-                  transition: "background 0.12s, color 0.12s, border-color 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(239,68,68,0.08)";
-                  e.currentTarget.style.color = "#ef4444";
-                  e.currentTarget.style.borderColor = "rgba(239,68,68,0.35)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text-muted)";
-                  e.currentTarget.style.borderColor = "var(--border)";
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                  <path d="M10 11v6M14 11v6" />
-                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                </svg>
-              </button>
-            </div>
+              {menuOpen && menuPos && typeof document !== "undefined" && createPortal(
+                <div
+                  ref={menuPanelRef}
+                  role="menu"
+                  style={{
+                    position: "fixed",
+                    top: menuPos.top,
+                    left: menuPos.left,
+                    width: MENU_WIDTH,
+                    zIndex: 1000,
+                    background: "var(--bg)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    boxShadow: "0 6px 20px rgba(0,0,0,0.14)",
+                    padding: 4,
+                  }}
+                >
+                  <SessionActionMenuItem
+                    label={t(session.pinned ? "sidebar.unpin" : "sidebar.pin")}
+                    onClick={(e) => { togglePinned(e); setMenuOpen(false); }}
+                    icon={(
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="17" x2="12" y2="22" />
+                        <path d="M5 17h14l-1.5-7.5a3 3 0 0 0-1.2-1.9L15 6V4a1 1 0 0 0-1-1H10a1 1 0 0 0-1 1v2l-1.3 1.6a3 3 0 0 0-1.2 1.9L5 17z" />
+                      </svg>
+                    )}
+                  />
+                  <SessionActionMenuItem
+                    label={t(session.archived ? "sidebar.unarchive" : "sidebar.archive")}
+                    onClick={(e) => { toggleArchived(e); setMenuOpen(false); }}
+                    icon={(
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="4" rx="1" />
+                        <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+                        <line x1="10" y1="12" x2="14" y2="12" />
+                      </svg>
+                    )}
+                  />
+                  <SessionActionMenuItem
+                    label={t("sidebar.rename")}
+                    onClick={(e) => { startRename(e); setMenuOpen(false); }}
+                    icon={(
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                      </svg>
+                    )}
+                  />
+                  <SessionActionMenuItem
+                    label={t("sidebar.delete")}
+                    danger
+                    onClick={(e) => { handleDeleteClick(e); setMenuOpen(false); }}
+                    icon={(
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <path d="M10 11v6M14 11v6" />
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                      </svg>
+                    )}
+                  />
+                </div>,
+                document.body,
+              )}
+            </>
           )}
         </>
       )}

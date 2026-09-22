@@ -18,7 +18,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const result = await safeTry(async function* () {
-    const force = new URL(req.url).searchParams.get("force") === "1";
+    const searchParams = new URL(req.url).searchParams;
+    const force = searchParams.get("force") === "1";
+    const includeArchived = searchParams.get("includeArchived") === "1";
     const persistedSessionsPromise = listAllSessions({ force });
     // Capture before awaiting: mutations during the scan still require a later refresh.
     const sessionListVersion = getSessionListVersion();
@@ -26,7 +28,8 @@ export async function GET(req: Request) {
       persistedSessionsPromise,
       attachSessionProjectInfo(getRpcSessionInfos()),
     ])).mapErr(fail.internal);
-    const sessions = mergeSessionLists(persistedSessions, runtimeSessions);
+    const merged = mergeSessionLists(persistedSessions, runtimeSessions);
+    const sessions = includeArchived ? merged : merged.filter((session) => session.archived !== true);
     return ok({
       sessions,
       sessionListVersion,
