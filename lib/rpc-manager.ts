@@ -1926,14 +1926,19 @@ export async function startRpcSession(
     const restoredModel = savedModel
       ? services.modelRuntime.getModel(savedModel.provider, savedModel.modelId)
       : undefined;
-    const initial = hasExistingMessages ? null : selectInitialModelScope(scope, {
+    // A reopened session whose recorded model's provider has no configured auth on this host
+    // must still fall through to whatever model IS authenticated/visible, exactly like a
+    // brand-new session would — otherwise no model at all is passed below, and the SDK's own
+    // "unknown"/"unknown" sentinel state surfaces straight through to the UI.
+    const restoredModelUsable = Boolean(restoredModel && services.modelRuntime.hasConfiguredAuth(restoredModel.provider));
+    const initial = restoredModelUsable ? null : selectInitialModelScope(scope, {
         ...(effectiveInitialModel ? { requestedModel: effectiveInitialModel } : {}),
         ...(defaultProvider && defaultModelId
           ? { defaultModel: { provider: defaultProvider, modelId: defaultModelId } }
           : {}),
         ...(thinkingLevel ? { thinkingLevel } : {}),
       });
-    const startupModel = restoredModel && services.modelRuntime.hasConfiguredAuth(restoredModel.provider)
+    const startupModel = restoredModelUsable
       ? restoredModel
       : initial?.model;
     const { session: inner } = await createAgentSessionFromServices({
