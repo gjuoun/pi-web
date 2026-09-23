@@ -4,32 +4,27 @@ import test from "node:test";
 import { createJiti } from "jiti";
 
 const jiti = createJiti(import.meta.url, { jsx: { runtime: "automatic" }, tsconfigPaths: true });
-const { getSessionListIndices } = await jiti.import("./SessionSidebar.tsx");
+await jiti.import("./SessionSidebar.tsx");
 
 const source = await readFile(new URL("./SessionSidebar.tsx", import.meta.url), "utf8");
 const sessionItemSource = source.slice(source.indexOf("function SessionItem("));
 
-test("scrolling keeps the focused session and the viewport mounted without expanding the whole window", () => {
-  for (const [scrollTop, focusedIndex] of [[0, 1999], [10000, 0]]) {
-    const indices = getSessionListIndices(2000, scrollTop, 335, focusedIndex);
-    const firstVisible = Math.floor(scrollTop / 54);
-    const lastVisible = Math.ceil((scrollTop + 335) / 54) - 1;
-    for (let index = firstVisible; index <= lastVisible; index++) assert.ok(indices.includes(index));
-    assert.ok(indices.includes(focusedIndex));
-    assert.equal(indices.length, 24);
-    assert.equal(new Set(indices).size, indices.length);
-    assert.deepEqual(indices, [...indices].sort((a, b) => a - b));
-  }
-  assert.equal(getSessionListIndices(2000, 0, 335, 3).length, 23);
-  const blurred = getSessionListIndices(2000, 10000, 335);
-  assert.equal(blurred.length, 23);
-  assert.ok(!blurred.includes(0));
+// Row-heights-aware virtualization (getSidebarRowIndices/buildSidebarRenderRows)
+// moved to lib/sidebar-render-rows.ts and is covered by
+// lib/sidebar-render-rows.test.mjs; this file only asserts the component wires
+// it up correctly.
+test("builds a heterogeneous row list from lib/sidebar-render-rows and virtualizes via prefix sums", () => {
+  assert.match(source, /import \{\s*buildSidebarRenderRows,\s*buildRowPrefixSums,\s*getSidebarRowIndices,/);
+  assert.match(source, /const renderRows: SidebarRenderRow\[\] = \[/);
+  assert.match(source, /const rowPrefixSums = buildRowPrefixSums\(rowHeights\)/);
+  assert.match(source, /const virtualIndices = getSidebarRowIndices\(rowHeights, listScrollTop, listViewportH, focusedRowIndex\)/);
 });
 
-test("session windows stay valid after a project shrinks and before the viewport is measured", () => {
-  assert.deepEqual(getSessionListIndices(5, 80000, 335, 1999), [0, 1, 2, 3, 4]);
-  assert.deepEqual(getSessionListIndices(0, 80000, 335, 1999), []);
-  assert.equal(getSessionListIndices(2000, 0, 0).length, 28);
+test("project groups fold by default and persist expand state via lib/sidebar-expanded-projects", () => {
+  assert.match(source, /import \{ getExpandedProjects, setProjectExpanded \} from "@\/lib\/sidebar-expanded-projects"/);
+  assert.match(source, /const \[expandedProjectKeys, setExpandedProjectKeys\] = useState<Set<string>>\(\(\) => getExpandedProjects\(\)\)/);
+  assert.match(source, /const toggleProjectExpanded = useCallback\(\(projectKey: string\) => \{/);
+  assert.match(source, /setProjectExpanded\(projectKey, expanded\)/);
 });
 
 test("only Shift+click bypasses session deletion confirmation", () => {
@@ -76,21 +71,9 @@ test("subagent completion stays silent and never becomes unread", () => {
   );
 });
 
-test("includes project activity counts in accessible labels", () => {
-  assert.match(
-    source,
-    /aria-label=\{`\$\{t\("sidebar\.agentRunning"\)\} \(\$\{activity\.running\}\)`\}/,
-  );
-  assert.match(
-    source,
-    /aria-label=\{`\$\{t\("sidebar\.newSessionActivity"\)\} \(\$\{activity\.unread\}\)`\}/,
-  );
-});
-
-test("formats session timestamps with the active locale", () => {
-  assert.match(source, /import \{ formatRelativeTime \} from "@\/lib\/i18n\/format"/);
-  assert.match(sessionItemSource, /const \{ locale, t \} = useI18n\(\)/);
-  assert.match(sessionItemSource, /formatRelativeTime\(session\.modified, locale\)/);
+test("drops the relative-time and message-count text from session rows (decision 5: one-line rows)", () => {
+  assert.doesNotMatch(source, /formatRelativeTime/);
+  assert.doesNotMatch(source, /sidebar\.messagesCount/);
 });
 
 test("does not persist an unchanged fallback title ending in whitespace", () => {
@@ -147,11 +130,18 @@ test("loadSessions conditionally includes includeArchived based on showArchived 
   assert.match(source, /const url = showArchived \? `\$\{base\}\$\{force \? "&" : "\?"\}includeArchived=1` : base;/);
 });
 
-test("groups sessions pinned-first, then bucketFamilies runs on the full family set", () => {
+test("groups sessions pinned-first, then buildSidebarRenderRows clusters unpinned families by project", () => {
   assert.match(source, /const allFamilies = listSessionFamilies\(filteredSessions\)/);
   assert.match(source, /const pinnedFamilies = allFamilies\.filter\(\(family\) => family\.root\.pinned === true\)/);
   assert.match(source, /const unpinnedFamilies = allFamilies\.filter\(\(family\) => family\.root\.pinned !== true\)/);
-  assert.match(source, /const dateBuckets = bucketFamilies\(unpinnedFamilies, Date\.now\(\)\)/);
+  assert.match(source, /\.\.\.buildSidebarRenderRows\(unpinnedFamilies, expandedProjectKeys\),/);
+  assert.doesNotMatch(source, /bucketFamilies/);
+});
+
+test("project-header rows are dedicated rows, not stacked inline inside a session row", () => {
+  assert.match(source, /function ProjectHeaderRow\(/);
+  assert.match(source, /row\.kind === "project-header"/);
+  assert.doesNotMatch(sessionItemSource, /projectHeader/);
 });
 
 test("hides subagent rows and aggregates their state into the main session row", () => {

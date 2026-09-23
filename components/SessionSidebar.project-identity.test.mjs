@@ -4,7 +4,7 @@ import test from "node:test";
 
 const source = await readFile(new URL("./SessionSidebar.tsx", import.meta.url), "utf8");
 const customPathStart = source.indexOf("const commitCustomPath = useCallback");
-const customPathEnd = source.indexOf("const handleCustomPathClick", customPathStart);
+const customPathEnd = source.indexOf("const handleCreateWorktree", customPathStart);
 const customPathSource = source.slice(customPathStart, customPathEnd);
 
 test("custom cwd selection installs validated identity before changing cwd", () => {
