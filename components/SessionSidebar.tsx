@@ -4,34 +4,26 @@ import { useEffect, useLayoutEffect, useState, useCallback, useRef, type CSSProp
 import { createPortal } from "react-dom";
 import type { SessionInfo } from "@/lib/types";
 import { collapseHomePath } from "@/lib/path-display";
-import { listSessionFamilies, type SessionFamily } from "@/lib/session-family";
-import { bucketFamilies, type DateBucketLabel } from "@/lib/session-date-buckets";
+import { listSessionFamilies } from "@/lib/session-family";
 import { loadExplorerOpen, saveExplorerOpen } from "@/lib/file-explorer-state";
 import { dispatchSessionRowContextMenu } from "@/lib/session-row-context-menu";
 import { skillExpansionToCommand } from "@/lib/slash-display";
-import { getRecentProjects, groupFamiliesByProject } from "@/lib/project-groups";
+import { getRecentProjects } from "@/lib/project-groups";
 import { workspaceKeyOf } from "@/lib/workspace-memory";
-import { formatRelativeTime } from "@/lib/i18n/format";
+import {
+  buildSidebarRenderRows,
+  buildRowPrefixSums,
+  getSidebarRowIndices,
+  SIDEBAR_SESSION_ROW_HEIGHT,
+  SIDEBAR_PROJECT_HEADER_ROW_HEIGHT,
+  type SidebarRenderRow,
+} from "@/lib/sidebar-render-rows";
+import { getExpandedProjects, setProjectExpanded } from "@/lib/sidebar-expanded-projects";
 import { useI18n } from "@/hooks/useI18n";
 import { DirectoryPicker } from "./DirectoryPicker";
 import { FileExplorer, type FileExplorerHandle } from "./FileExplorer";
 import { SessionSearch } from "./SessionSearch";
 
-// Fixed row height for the session list. SessionItem renders at exactly this
-// height, so the list can be windowed (only the visible slice is mounted).
-const SESSION_LIST_ITEM_HEIGHT = 54;
-
-export function getSessionListIndices(count: number, scrollTop: number, viewportHeight: number, focusedIndex = -1): number[] {
-  const overscan = 8;
-  const visibleCount = Math.ceil((viewportHeight || 600) / SESSION_LIST_ITEM_HEIGHT) + overscan * 2;
-  const start = Math.max(0, Math.min(Math.floor(scrollTop / SESSION_LIST_ITEM_HEIGHT) - overscan, count - visibleCount));
-  const end = Math.min(count, start + visibleCount);
-  const indices = Array.from({ length: end - start }, (_, offset) => start + offset);
-  // Keep a focused row mounted so scrolling cannot discard an inline rename.
-  if (focusedIndex >= 0 && focusedIndex < start) indices.unshift(focusedIndex);
-  if (focusedIndex >= end && focusedIndex < count) indices.push(focusedIndex);
-  return indices;
-}
 
 declare global {
   interface Window {
@@ -349,6 +341,18 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [explorerRefreshDone, setExplorerRefreshDone] = useState(false);
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
   const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(() => loadUnreadSessionIds());
+  // Per-project fold state (Step 3): collapsed by default, persisted in localStorage.
+  const [expandedProjectKeys, setExpandedProjectKeys] = useState<Set<string>>(() => getExpandedProjects());
+  const toggleProjectExpanded = useCallback((projectKey: string) => {
+    setExpandedProjectKeys((current) => {
+      const expanded = !current.has(projectKey);
+      setProjectExpanded(projectKey, expanded);
+      const next = new Set(current);
+      if (expanded) next.add(projectKey);
+      else next.delete(projectKey);
+      return next;
+    });
+  }, []);
   const previousRunningSessionIdsRef = useRef<Set<string>>(new Set());
   const currentSuppressedCompletionSessionIdsRef = useRef<Set<string>>(new Set());
   const previousSuppressedCompletionSessionIdsRef = useRef<Set<string>>(new Set());
@@ -886,33 +890,11 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const allFamilies = listSessionFamilies(filteredSessions);
   const pinnedFamilies = allFamilies.filter((family) => family.root.pinned === true);
   const unpinnedFamilies = allFamilies.filter((family) => family.root.pinned !== true);
-  const dateBuckets = bucketFamilies(unpinnedFamilies, Date.now());
-  const DATE_BUCKET_LABEL_KEYS: Record<DateBucketLabel, string> = {
-    Today: "sidebar.dateBucketToday",
-    Yesterday: "sidebar.dateBucketYesterday",
-    "Previous 7 Days": "sidebar.dateBucketPrevious7Days",
-    Older: "sidebar.dateBucketOlder",
-  };
+
+  // "PINNED" is a curated-by-the-user label, not a date grouping, so it stays
+  // (decision 5's date-caption removal doesn't touch it).
   const sectionLabelBySessionId = new Map<string, string>();
   if (pinnedFamilies.length > 0) sectionLabelBySessionId.set(pinnedFamilies[0].root.id, t("sidebar.pinnedSection"));
-
-  // Step 3: nest a project sub-header inside each date bucket. Each bucket's
-  // families are reclustered by project (recency order preserved within a
-  // cluster), and the first row of each (bucket, project) cluster gets a
-  // header entry keyed by that row's session id.
-  const projectHeaderBySessionId = new Map<string, { project: { key: string; root: string }; count: number }>();
-  const reclusteredDateBuckets = dateBuckets.map((bucket) => {
-    if (bucket.families.length === 0) return bucket;
-    sectionLabelBySessionId.set(bucket.families[0].root.id, t(DATE_BUCKET_LABEL_KEYS[bucket.label]));
-    const groups = groupFamiliesByProject(bucket.families);
-    for (const group of groups) {
-      projectHeaderBySessionId.set(group.families[0].root.id, {
-        project: group.project,
-        count: group.families.length,
-      });
-    }
-    return { ...bucket, families: groups.flatMap((group) => group.families) };
-  });
 
   // Decision 4: pinned rows are never grouped under a project header, so they
   // always carry an inline project label instead.
@@ -922,17 +904,24 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     pinnedProjectLabelBySessionId.set(family.root.id, projectBasename(root));
   }
 
-  const sessionFamilies: SessionFamily[] = [
-    ...pinnedFamilies,
-    ...reclusteredDateBuckets.flatMap((bucket) => bucket.families),
+  // Heterogeneous row list: pinned rows stay flat/ungrouped, then unpinned
+  // families flatten into dedicated project-header rows (collapsed by
+  // default) followed by their sessions when expanded (Step 1/3).
+  const renderRows: SidebarRenderRow[] = [
+    ...pinnedFamilies.map((family): SidebarRenderRow => ({
+      kind: "session",
+      height: SIDEBAR_SESSION_ROW_HEIGHT,
+      family,
+    })),
+    ...buildSidebarRenderRows(unpinnedFamilies, expandedProjectKeys),
   ];
-
-  const virtualIndices = getSessionListIndices(
-    sessionFamilies.length,
-    listScrollTop,
-    listViewportH,
-    sessionFamilies.findIndex((family) => family.root.id === focusedSessionId),
+  const rowHeights = renderRows.map((row) => row.height);
+  const rowPrefixSums = buildRowPrefixSums(rowHeights);
+  const focusedRowIndex = renderRows.findIndex(
+    (row) => row.kind === "session" && row.family.root.id === focusedSessionId,
   );
+
+  const virtualIndices = getSidebarRowIndices(rowHeights, listScrollTop, listViewportH, focusedRowIndex);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
@@ -1334,44 +1323,55 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
             {error}
           </div>
         )}
-        {!loading && !error && sessionFamilies.length === 0 && (
+        {!loading && !error && renderRows.length === 0 && (
           <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
             {t("sidebar.noSessions")}
           </div>
         )}
-        {sessionFamilies.length > 0 && (
+        {renderRows.length > 0 && (
           <div
             style={{
               position: "relative",
-              height: sessionFamilies.length * SESSION_LIST_ITEM_HEIGHT,
+              height: rowPrefixSums[rowPrefixSums.length - 1],
             }}
           >
             {virtualIndices.map((index) => {
-              const family = sessionFamilies[index];
+              const row = renderRows[index];
+              const top = rowPrefixSums[index];
+
+              if (row.kind === "project-header") {
+                return (
+                  <div key={`project-header:${row.projectKey}`} style={{ position: "absolute", top, left: 0, right: 0 }}>
+                    <ProjectHeaderRow
+                      label={`${projectBasename(row.project.root)} (${row.count})`}
+                      collapsed={row.collapsed}
+                      onToggleCollapse={() => toggleProjectExpanded(row.projectKey)}
+                      onNewSession={() => newSessionForProject(row.project.root)}
+                      onToggleWorktrees={() => {
+                        setSelectedCwd(row.project.root);
+                        setWtDropdownOpen((open) => !open || selectedCwd !== row.project.root);
+                      }}
+                    />
+                  </div>
+                );
+              }
+
+              const { family } = row;
               const familySessions = [family.root, ...family.subagents];
               const displaySession = family.latestModified === family.root.modified
                 ? family.root
                 : { ...family.root, modified: family.latestModified };
-              const headerEntry = projectHeaderBySessionId.get(family.root.id);
               // Bubble blur after the input's save handler before unpinning the row.
               return (
                 <div
                   key={family.root.id}
                   onFocus={() => setFocusedSessionId(family.root.id)}
                   onBlur={() => setFocusedSessionId(null)}
-                  style={{ position: "absolute", top: index * SESSION_LIST_ITEM_HEIGHT, left: 0, right: 0 }}
+                  style={{ position: "absolute", top, left: 0, right: 0 }}
                 >
                   <SessionItem
                     session={displaySession}
                     sectionLabel={sectionLabelBySessionId.get(family.root.id)}
-                    projectHeader={headerEntry ? {
-                      label: `${projectBasename(headerEntry.project.root)} (${headerEntry.count})`,
-                      onNewSession: () => newSessionForProject(headerEntry.project.root),
-                      onToggleWorktrees: () => {
-                        setSelectedCwd(headerEntry.project.root);
-                        setWtDropdownOpen((open) => !open || selectedCwd !== headerEntry.project.root);
-                      },
-                    } : undefined}
                     pinnedProjectLabel={pinnedProjectLabelBySessionId.get(family.root.id)}
                     isSelected={familySessions.some((session) => session.id === selectedSessionId)}
                     isRunning={familySessions.some((session) => runningSessionIds.has(session.id))}
@@ -1605,6 +1605,105 @@ function UnreadSessionIndicator() {
   );
 }
 
+function ProjectHeaderRow({
+  label,
+  collapsed,
+  onToggleCollapse,
+  onNewSession,
+  onToggleWorktrees,
+}: {
+  label: string;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  onNewSession: () => void;
+  onToggleWorktrees?: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      onClick={onToggleCollapse}
+      role="button"
+      aria-expanded={!collapsed}
+      style={{
+        height: SIDEBAR_PROJECT_HEADER_ROW_HEIGHT,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "0 14px",
+        cursor: "pointer",
+        userSelect: "none",
+      }}
+    >
+      <svg
+        width="10"
+        height="10"
+        viewBox="0 0 10 10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{
+          flexShrink: 0,
+          color: "var(--text-dim)",
+          transform: collapsed ? "rotate(-90deg)" : "none",
+          transition: "transform 0.15s",
+        }}
+      >
+        <polyline points="2 3.5 5 6.5 8 3.5" />
+      </svg>
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          fontSize: 11,
+          fontWeight: 600,
+          color: "var(--text-muted)",
+        }}
+      >
+        {label}
+      </span>
+      {onToggleWorktrees && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onToggleWorktrees(); }}
+          title={t("sidebar.worktrees")}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 16, height: 16, padding: 0, flexShrink: 0,
+            background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer",
+          }}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="6" y1="3" x2="6" y2="15" />
+            <circle cx="18" cy="6" r="3" />
+            <circle cx="6" cy="18" r="3" />
+            <path d="M18 9a9 9 0 0 1-9 9" />
+          </svg>
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onNewSession(); }}
+        title={t("sidebar.new")}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          width: 16, height: 16, padding: 0, flexShrink: 0,
+          background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer",
+        }}
+      >
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+          <line x1="6" y1="1" x2="6" y2="11" />
+          <line x1="1" y1="6" x2="11" y2="6" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 function SessionItem({
   session,
   isSelected,
@@ -1618,7 +1717,6 @@ function SessionItem({
   collapsed = false,
   onToggleCollapse,
   sectionLabel,
-  projectHeader,
   pinnedProjectLabel,
 }: {
   session: SessionInfo;
@@ -1633,10 +1731,9 @@ function SessionItem({
   collapsed?: boolean;
   onToggleCollapse?: () => void;
   sectionLabel?: string;
-  projectHeader?: { label: string; onNewSession: () => void; onToggleWorktrees?: () => void };
   pinnedProjectLabel?: string;
 }) {
-  const { locale, t } = useI18n();
+  const { t } = useI18n();
   const [hovered, setHovered] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
@@ -1810,7 +1907,7 @@ function SessionItem({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); }}
       style={{
-        height: SESSION_LIST_ITEM_HEIGHT,
+        height: SIDEBAR_SESSION_ROW_HEIGHT,
         display: "flex",
         alignItems: "center",
         paddingLeft: depth > 0 ? depth * 12 + 14 : 14,
@@ -1909,52 +2006,14 @@ function SessionItem({
                 {sectionLabel}
               </div>
             )}
-            {projectHeader && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
-                  {projectHeader.label}
-                </span>
-                {projectHeader.onToggleWorktrees && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); projectHeader.onToggleWorktrees?.(); }}
-                    title={t("sidebar.worktrees")}
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      width: 16, height: 16, padding: 0,
-                      background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", flexShrink: 0,
-                    }}
-                  >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="6" y1="3" x2="6" y2="15" />
-                      <circle cx="18" cy="6" r="3" />
-                      <circle cx="6" cy="18" r="3" />
-                      <path d="M18 9a9 9 0 0 1-9 9" />
-                    </svg>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); projectHeader.onNewSession(); }}
-                  title={t("sidebar.new")}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    width: 16, height: 16, padding: 0,
-                    background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", flexShrink: 0,
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                    <line x1="6" y1="1" x2="6" y2="11" />
-                    <line x1="1" y1="6" x2="11" y2="6" />
-                  </svg>
-                </button>
-              </div>
-            )}
+            {/* One-line row (decision 5): status dot (if any) + title + branch
+                chip/pinned-project-label — relative-time and message-count text
+                are dropped, recency now comes purely from sort order. */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 5,
+                gap: 6,
                 minWidth: 0,
                 fontSize: 12,
                 fontWeight: isSelected ? 500 : 400,
@@ -1963,23 +2022,18 @@ function SessionItem({
               }}
               title={title}
             >
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
-                {title}
-              </span>
-            </div>
-            <div style={{ marginTop: 2, display: "flex", alignItems: "center", gap: 8, color: "var(--text-dim)", fontSize: 11, minWidth: 0 }}>
               {isRunning ? (
                 <RunningSessionIndicator />
               ) : isUnread ? (
                 <UnreadSessionIndicator />
-              ) : (
-                <span title={session.modified}>{formatRelativeTime(session.modified, locale)}</span>
-              )}
-              <span>{t("sidebar.messagesCount", { count: session.messageCount })}</span>
+              ) : null}
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                {title}
+              </span>
               {pinnedProjectLabel && (
                 <span
                   title={pinnedProjectLabel}
-                  style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-dim)" }}
+                  style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-dim)", fontSize: 11, flexShrink: 0 }}
                 >
                   {pinnedProjectLabel}
                 </span>
@@ -1987,7 +2041,7 @@ function SessionItem({
               {session.isWorktree && session.branch && (
                 <span
                   title={`Worktree: ${session.cwd}`}
-                  style={{ display: "flex", alignItems: "center", gap: 3, color: "var(--accent)", minWidth: 0, overflow: "hidden" }}
+                  style={{ display: "flex", alignItems: "center", gap: 3, color: "var(--accent)", minWidth: 0, overflow: "hidden", fontSize: 11, flexShrink: 0 }}
                 >
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                     <line x1="6" y1="3" x2="6" y2="15" />
