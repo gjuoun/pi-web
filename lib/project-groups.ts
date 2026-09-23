@@ -1,3 +1,4 @@
+import type { SessionFamily } from "./session-family";
 import type { SessionInfo } from "./types";
 import { workspaceKeyOf } from "./workspace-memory";
 
@@ -45,9 +46,34 @@ export function getProjectActivity(
   return counts;
 }
 
-export function sessionsForProject(
-  sessions: readonly SessionInfo[],
-  projectKey: string,
-): SessionInfo[] {
-  return sessions.filter((session) => workspaceKeyOf(session) === projectKey);
+export interface ProjectFamilyGroup {
+  project: RecentProject;
+  families: SessionFamily[];
+}
+
+/**
+ * Clusters families by project identity, preserving each cluster's internal
+ * order, then sorts clusters by each cluster's own max `latestModified`.
+ */
+export function groupFamiliesByProject(
+  families: readonly SessionFamily[],
+): ProjectFamilyGroup[] {
+  const groups = new Map<string, ProjectFamilyGroup>();
+
+  for (const family of families) {
+    const key = workspaceKeyOf(family.root);
+    let group = groups.get(key);
+    if (!group) {
+      const root = family.root.projectRoot ?? family.root.cwd;
+      group = { project: { key, root }, families: [] };
+      groups.set(key, group);
+    }
+    group.families.push(family);
+  }
+
+  return [...groups.values()].sort((a, b) => {
+    const aLatest = Math.max(...a.families.map((f) => Date.parse(f.latestModified)));
+    const bLatest = Math.max(...b.families.map((f) => Date.parse(f.latestModified)));
+    return bLatest - aLatest;
+  });
 }
