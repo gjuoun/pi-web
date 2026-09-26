@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createJiti } from "jiti";
 
@@ -132,16 +131,16 @@ test("keeps one-line widgets compact but expandable", () => {
     widgets: [{ key: "single-line-widget", lines: ["ready"], placement: "belowEditor" }],
   });
 
-  assert.match(html, /extension-widget-triggers/);
-  assert.match(html, /<svg[^>]*extension-widget-placement-icon/);
+  assert.match(html, /data-slot="extension-widget-triggers"/);
+  assert.match(html, /<svg[^>]*data-slot="extension-widget-placement-icon"/);
   assert.match(html, /data-direction="down"/);
   assert.doesNotMatch(html, /[\u2191\u2193]/);
   assert.match(html, /Below editor widget/);
-  assert.match(html, /<button[^>]*class="extension-widget-trigger/);
+  assert.match(html, /<button[^>]*data-slot="extension-widget-trigger"/);
   assert.match(html, /aria-expanded="false"/);
   assert.match(html, /title="single-line-widget - Below editor widget - Expand"/);
-  assert.match(html, /extension-widget-key/);
-  assert.match(html, /extension-widget-update-pulse/);
+  assert.match(html, /data-slot="extension-widget-key"/);
+  assert.match(html, /data-slot="extension-widget-update-pulse"/);
   assert.doesNotMatch(html, /extension-widget-preview/);
   assert.doesNotMatch(html, /extension-widget-line-count/);
   assert.doesNotMatch(html, />ready</);
@@ -153,18 +152,20 @@ test("keeps empty widgets non-interactive", () => {
     widgets: [{ key: "empty-widget", lines: [], placement: "aboveEditor" }],
   });
 
-  assert.match(html, /<div class="extension-widget-trigger/);
+  assert.match(html, /<div data-slot="extension-widget-trigger"/);
   assert.doesNotMatch(html, /<button/);
   assert.doesNotMatch(html, /aria-expanded/);
   assert.match(html, /title="empty-widget - Above editor widget"/);
 });
 
-test("the widget content is sized with the chrome, and only its font was reduced", async () => {
-  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  const rule = css.match(/\.extension-widget-content\s*\{([^}]*)\}/)?.[1] ?? "";
+test("the widget content is sized with the chrome, and only its font was reduced", () => {
   // 14px was the only non-11/12px text in the chrome; its own panel heading is 11px.
-  assert.match(rule, /font-size:\s*12px/, "the content drops to the chrome's own scale");
-  // "Font only": the block's spacing was deliberately left alone, so pin it or it drifts back.
-  assert.match(rule, /padding:\s*3px 12px 8px/, "padding must stay as it was");
-  assert.match(rule, /line-height:\s*1\.45/, "leading must stay as it was");
+  // "Font only": the block's spacing was deliberately left alone, so it stays pinned on the
+  // rendered element's utility classes instead of a stylesheet rule.
+  const html = renderWidgets({
+    widgets: [{ key: "compact", lines: ["a", "b", "c"], placement: "aboveEditor" }],
+  });
+  assert.match(html, /text-xs/, "the content drops to the chrome's own scale");
+  assert.match(html, /pt-\[3px\]/, "padding must stay as it was");
+  assert.match(html, /leading-\[1\.45\]/, "leading must stay as it was");
 });

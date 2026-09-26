@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { getFileIcon } from "./FileIcons";
 import { useI18n } from "@/hooks/useI18n";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { FileViewerDisplayMode, FileViewerState } from "@/lib/file-viewer-state";
 
 export interface Tab {
@@ -26,20 +27,9 @@ interface Props {
 
 export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
   const { t } = useI18n();
-  const [hoveredClose, setHoveredClose] = useState<string | null>(null);
 
   return (
-    <div
-      role="tablist"
-      style={{
-        display: "flex",
-        alignItems: "flex-end",
-        background: "var(--bg-panel)",
-        overflowX: "auto",
-        flexShrink: 0,
-        height: 36,
-      }}
-    >
+    <div role="tablist" className="flex h-9 shrink-0 items-end overflow-x-auto bg-sidebar">
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
         return (
@@ -73,27 +63,12 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
               e.stopPropagation();
               if (!tab.closing) onCloseTab(tab.id);
             }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              height: 36,
-              paddingLeft: 12,
-              paddingRight: 6,
-              borderRight: "1px solid var(--border)",
-              background: isActive ? "var(--bg)" : "var(--bg-panel)",
-              cursor: "pointer",
-              fontSize: 12,
-              color: isActive ? "var(--text)" : "var(--text-muted)",
-              whiteSpace: "nowrap",
-              maxWidth: 180,
-              minWidth: 80,
-              flexShrink: 0,
-              userSelect: "none",
-              transition: "background 0.1s, color 0.1s",
-            }}
+            className={cn(
+              "flex h-9 min-w-20 max-w-45 shrink-0 cursor-pointer items-center gap-1.5 border-r border-border pr-1.5 pl-3 text-xs whitespace-nowrap select-none transition-colors",
+              isActive ? "bg-background text-foreground" : "bg-sidebar text-muted-foreground",
+            )}
           >
-            <span style={{ flexShrink: 0, opacity: isActive ? 1 : 0.7, display: "flex", alignItems: "center" }}>
+            <span className={cn("flex shrink-0 items-center", isActive ? "opacity-100" : "opacity-70")}>
               {tab.kind === "terminal" ? (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
@@ -101,41 +76,26 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
               ) : getFileIcon(tab.label, 13)}
             </span>
             <span
-              style={{
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                flex: 1,
-                fontWeight: isActive ? 500 : 400,
-              }}
+              className={cn("flex-1 overflow-hidden text-ellipsis", isActive ? "font-medium" : "font-normal")}
               title={tab.filePath}
             >
               {tab.label}
             </span>
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
               disabled={tab.closing}
               onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
-              onMouseEnter={() => setHoveredClose(tab.id)}
-              onMouseLeave={() => setHoveredClose(null)}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: 24, height: 24,
-                background: hoveredClose === tab.id ? "var(--bg-hover)" : "transparent",
-                border: "none",
-                borderRadius: 4,
-                color: hoveredClose === tab.id ? "var(--text)" : "var(--text-dim)",
-                cursor: "pointer",
-                padding: 0,
-                flexShrink: 0,
-                transition: "background 0.1s, color 0.1s",
-              }}
-               title={t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")}
-               aria-label={`${t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")} ${tab.label}`}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+              title={t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")}
+              aria-label={`${t(tab.kind === "terminal" ? "terminal.close" : "i18n.close")} ${tab.label}`}
             >
               <svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
                 <line x1="2" y1="2" x2="8" y2="8" />
                 <line x1="8" y1="2" x2="2" y2="8" />
               </svg>
-            </button>
+            </Button>
           </div>
         );
       })}

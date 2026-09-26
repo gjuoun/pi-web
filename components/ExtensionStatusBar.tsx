@@ -35,11 +35,12 @@ export function ExtensionStatusLine({ statuses }: { statuses: ExtensionStatusIte
   return (
     <div
       role="status"
-      className="chat-status-ext"
+      data-slot="chat-status-ext"
+      className="px-1 font-mono text-[11px] whitespace-pre text-muted-foreground"
       aria-label={plainStatusLine}
       title={plainStatusLine}
     >
-      <span className="extension-status-text">
+      <span data-slot="extension-status-text" className="min-w-0 flex-1 font-mono text-[11px] leading-[1.45] whitespace-pre text-muted-foreground">
         <AnsiText text={statusLine} />
       </span>
     </div>
@@ -51,7 +52,7 @@ export function ExtensionStatusBar({ widgets = [] }: { widgets?: ExtensionWidget
   if (widgets.length === 0) return null;
 
   return (
-    <div className="extension-status-shelf has-widgets">
+    <div data-slot="extension-status-shelf" data-state="has-widgets" className="flex min-w-0 shrink-0 flex-wrap items-stretch">
       <ExtensionWidgets widgets={widgets} />
     </div>
   );

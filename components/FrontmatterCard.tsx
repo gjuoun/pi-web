@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { formatFrontmatterValue, getFrontmatterTitle } from "@/lib/frontmatter";
+import { Card } from "@/components/ui/card";
 
 interface FrontmatterCardProps {
   data: Record<string, unknown> | null;
@@ -44,27 +45,30 @@ export function FrontmatterCard({ data }: FrontmatterCardProps) {
   const rows = entries.filter(([key]) => key !== tagKey && (key !== "title" || !title));
 
   return (
-    <div className="markdown-frontmatter">
-      {title && <div className="markdown-frontmatter-title">{title}</div>}
+    <Card className="mb-5 gap-2 rounded-lg border-border bg-sidebar px-4 py-3.5">
+      {title && <div className="text-[1.3em] leading-[1.35] font-semibold text-foreground">{title}</div>}
       {tags.length > 0 && (
-        <div className="markdown-frontmatter-tags">
+        <div className="mt-2 flex flex-wrap gap-1.5">
           {tags.map((tag, index) => (
-            <span className="markdown-frontmatter-tag" key={`${tag}-${index}`}>
+            <span
+              className="rounded-full border border-border bg-muted/40 px-2.5 text-xs leading-[1.6] text-muted-foreground"
+              key={`${tag}-${index}`}
+            >
               {tag}
             </span>
           ))}
         </div>
       )}
       {rows.length > 0 && (
-        <dl className="markdown-frontmatter-rows">
+        <dl className="mt-2.5 grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-1.5 text-[13px] leading-[1.55]">
           {rows.map(([key, value]) => (
-            <div className="markdown-frontmatter-row" key={key}>
-              <dt>{key}</dt>
-              <dd>{renderValue(value)}</dd>
+            <div className="contents" key={key}>
+              <dt className="font-mono text-[0.92em] whitespace-nowrap text-muted-foreground">{key}</dt>
+              <dd className="m-0 min-w-0 text-foreground break-words [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2">{renderValue(value)}</dd>
             </div>
           ))}
         </dl>
       )}
-    </div>
+    </Card>
   );
 }

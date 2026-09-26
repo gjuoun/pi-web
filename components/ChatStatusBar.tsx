@@ -175,8 +175,8 @@ export function formatSessionName(name?: string | null): string {
 /** pi colours the context segment by band: `>90` error, `>70` warning. */
 export function contextColor(percent: number | null | undefined): string | undefined {
   if (typeof percent !== "number") return undefined;
-  if (percent > 90) return "#ef4444";
-  if (percent > 70) return "rgba(234,179,8,0.95)";
+  if (percent > 90) return "var(--destructive)";
+  if (percent > 70) return "var(--warning)";
   return undefined;
 }
 
@@ -247,10 +247,13 @@ export function ChatStatusBar({
 
   // A plain text trigger. The list it opens is the one shared picker — the bar keeps no popover
   // state of its own, so both segments behave identically to the composer's /model and /thinking.
+  const segmentClass = "cursor-pointer border-none bg-transparent p-0 whitespace-nowrap text-inherit not-disabled:hover:text-foreground aria-expanded:text-foreground disabled:cursor-default disabled:opacity-60";
+
   const modelSegment = onOpenModelPicker ? (
     <button
       type="button"
-      className="chat-status-segment"
+      data-slot="chat-status-segment"
+      className={segmentClass}
       title={modelName}
       aria-label={t("chat.commandModel")}
       aria-haspopup="listbox"
@@ -263,10 +266,11 @@ export function ChatStatusBar({
 
   const thinkingSegment = thinkingSuffix
     ? (onOpenThinkingPicker ? (
-      <span className="chat-status-thinking">
+      <span data-slot="chat-status-thinking">
         <button
           type="button"
-          className="chat-status-segment"
+          data-slot="chat-status-segment"
+          className={segmentClass}
           title={t("chat.changeReasoningLabel")}
           aria-label={t("chat.changeReasoningLabel")}
           aria-haspopup="listbox"
@@ -282,7 +286,7 @@ export function ChatStatusBar({
   // The model cluster closes whichever line it rides on: the only line when the session is new,
   // line 2 once the run has counters to report.
   const modelCluster = (
-    <span className="chat-status-model">
+    <span data-slot="chat-status-model" className="inline-flex items-baseline gap-1.5 pl-2 whitespace-nowrap">
       {modelSegment}
       {thinkingSegment}
     </span>
@@ -290,24 +294,26 @@ export function ChatStatusBar({
 
   return (
     <div
-      className={`chat-status-bar${fresh ? " is-fresh" : ""}`}
+      data-slot="chat-status-bar"
+      data-state={fresh ? "fresh" : undefined}
       role="status"
       aria-label={t("chat.status")}
+      className="flex w-full flex-col px-1 font-mono text-[11px] leading-[1.5] text-muted-foreground"
     >
       {fresh ? (
         // No counters and no name yet: the workspace against the pickers it was chosen with.
-        <div className="chat-status-line">
-          <span className="chat-status-project">{projectLine}</span>
+        <div data-slot="chat-status-line" className="flex items-baseline justify-between gap-x-3 max-sm:justify-start">
+          <span data-slot="chat-status-project" className="shrink-0 whitespace-nowrap">{projectLine}</span>
           {modelCluster}
         </div>
       ) : (
         <>
-          <div className="chat-status-line">
-            <span className="chat-status-project">{projectLine}</span>
-            {nameLine && <span className="chat-status-name">{nameLine}</span>}
+          <div data-slot="chat-status-line" className="flex items-baseline justify-between gap-x-3 max-sm:justify-start">
+            <span data-slot="chat-status-project" className="shrink-0 whitespace-nowrap">{projectLine}</span>
+            {nameLine && <span data-slot="chat-status-name" className="shrink-0 pl-2 whitespace-nowrap text-muted-foreground">{nameLine}</span>}
           </div>
-          <div className="chat-status-line">
-            <span className="chat-status-stats">
+          <div data-slot="chat-status-line" className="flex items-baseline justify-between gap-x-3 max-sm:justify-start">
+            <span data-slot="chat-status-stats" className="inline-flex shrink-0 flex-nowrap gap-x-[5px]">
               {items.map((item) => {
                 const tint = item.kind === "context" ? contextColor(item.percent) : undefined;
                 return (

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { AnsiText } from "@/components/AnsiText";
+import { cn } from "@/lib/utils";
 import type { ExtensionWidgetItem } from "@/lib/types";
 
 export const DEFAULT_EXPANDED_WIDGET_LINES = 3;
@@ -45,6 +46,8 @@ export function getNextExpandedWidgetKey(
 ): string | null {
   return currentKey === requestedKey ? null : requestedKey;
 }
+
+const TRIGGER_CLASS = "group relative flex h-[35px] w-[108px] shrink-0 items-center gap-[5px] overflow-hidden border-0 border-r border-border/[0.78] bg-transparent px-[7px] text-left font-mono text-[11px] text-muted-foreground transition-colors data-[state=expanded]:bg-accent data-[state=expanded]:text-foreground";
 
 export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }) {
   const { t } = useI18n();
@@ -116,7 +119,10 @@ export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }
   return (
     <>
       {expandedWidget && (
-        <div className="extension-widget-panels">
+        <div
+          data-slot="extension-widget-panels"
+          className="flex max-h-[min(144px,18dvh)] flex-[0_0_100%] flex-col overflow-x-hidden overflow-y-auto overscroll-contain border-b border-border/[0.78] bg-sidebar [scrollbar-gutter:stable]"
+        >
           {(() => {
             const widget = expandedWidget;
             const index = widgets.indexOf(widget);
@@ -126,11 +132,20 @@ export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }
               <section
                 key={widget.key}
                 id={panelId}
-                className="extension-widget-panel"
+                data-slot="extension-widget-panel"
+                className="min-w-0 shrink-0 overflow-hidden bg-transparent"
                 aria-labelledby={triggerId}
               >
-                <div className="extension-widget-panel-heading">{widget.key}</div>
-                <pre className="extension-widget-content">
+                <div
+                  data-slot="extension-widget-panel-heading"
+                  className="h-[26px] overflow-hidden px-3 pt-[5px] font-mono text-[11px] font-semibold text-ellipsis whitespace-nowrap text-foreground"
+                >
+                  {widget.key}
+                </div>
+                <pre
+                  data-slot="extension-widget-content"
+                  className="m-0 px-3 pt-[3px] pb-2 font-mono text-xs leading-[1.45] break-words whitespace-pre-wrap text-muted-foreground"
+                >
                   <AnsiText text={formatExtensionWidgetContent(widget.lines)} />
                 </pre>
               </section>
@@ -138,7 +153,11 @@ export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }
           })()}
         </div>
       )}
-      <div className="extension-widget-triggers" aria-label={t("chat.extensionWidgets")}>
+      <div
+        data-slot="extension-widget-triggers"
+        className="flex h-[35px] min-w-0 flex-[1_1_100%] items-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        aria-label={t("chat.extensionWidgets")}
+      >
         {widgets.map((widget, index) => {
           const expandable = widget.lines.length > 0;
           const expanded = expandable && widget.key === expandedWidget?.key;
@@ -156,10 +175,22 @@ export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }
           const panelId = `${idPrefix}-panel-${index}`;
           const content = (
             <>
-              <span className="extension-widget-update-pulse" aria-hidden="true" />
-              <span className="extension-widget-placement" aria-hidden="true">
+              <span
+                data-slot="extension-widget-update-pulse"
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-180 group-data-[updating=true]:opacity-100"
+              >
+                <span
+                  className={cn(
+                    "absolute inset-0 bg-primary opacity-12",
+                    "group-data-[updating=true]:motion-safe:animate-[extension-widget-update-pulse_900ms_ease-in-out_infinite_alternate]",
+                  )}
+                />
+              </span>
+              <span data-slot="extension-widget-placement" aria-hidden="true" className="relative z-1 flex w-2.5 shrink-0 items-center justify-center text-muted-foreground">
                 <svg
-                  className="extension-widget-placement-icon"
+                  data-slot="extension-widget-placement-icon"
+                  className="block h-1.5 w-2 shrink-0 fill-current"
                   viewBox="0 0 8 6"
                   width="8"
                   height="6"
@@ -173,7 +204,7 @@ export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }
                   />
                 </svg>
               </span>
-              <span className="extension-widget-key">{widget.key}</span>
+              <span data-slot="extension-widget-key" className="relative z-1 min-w-0 flex-1 overflow-hidden font-semibold text-ellipsis whitespace-nowrap text-foreground">{widget.key}</span>
             </>
           );
 
@@ -182,7 +213,10 @@ export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }
               key={widget.key}
               id={triggerId}
               type="button"
-              className={`extension-widget-trigger${expanded ? " is-expanded" : ""}${updating ? " is-updating" : ""}`}
+              data-slot="extension-widget-trigger"
+              data-state={expanded ? "expanded" : undefined}
+              data-updating={updating ? "true" : undefined}
+              className={cn(TRIGGER_CLASS, "group cursor-pointer hover:bg-accent hover:text-foreground focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-primary")}
               aria-controls={panelId}
               aria-expanded={expanded}
               aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
@@ -194,7 +228,9 @@ export function ExtensionWidgets({ widgets }: { widgets: ExtensionWidgetItem[] }
           ) : (
             <div
               key={widget.key}
-              className={`extension-widget-trigger${updating ? " is-updating" : ""}`}
+              data-slot="extension-widget-trigger"
+              data-updating={updating ? "true" : undefined}
+              className={cn(TRIGGER_CLASS, "group")}
               aria-label={`${placementLabel}: ${widget.key}, ${lineCountLabel}`}
               title={`${widget.key} - ${placementLabel}`}
             >

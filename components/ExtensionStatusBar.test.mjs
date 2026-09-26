@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createJiti } from "jiti";
 
@@ -58,21 +57,13 @@ test("preserves status line breaks while normalizing horizontal whitespace", () 
   );
 });
 
-test("keeps the status bar text unwrapped and never truncates it", async () => {
-  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  const extRule = css.match(/\.chat-status-ext\s*\{([^}]*)\}/)?.[1] ?? "";
-  const statusTextRule = css.match(/\.extension-status-text\s*\{([^}]*)\}/)?.[1] ?? "";
-
+test("keeps the status bar text unwrapped and never truncates it", () => {
   // The shared surface in ChatWindow owns the cap and the scrolling; this strip owns the text's
-  // shape only, so it declares no overflow of its own.
-  assert.match(extRule, /white-space:\s*pre\s*;/);
-  assert.match(extRule, /padding:\s*0 4px/);
-  assert.doesNotMatch(extRule, /overflow/);
-  assert.doesNotMatch(extRule, /text-overflow:\s*ellipsis/);
-  assert.match(statusTextRule, /white-space:\s*pre\s*;/);
-  assert.doesNotMatch(statusTextRule, /overflow[^:]*:\s*hidden/);
-  assert.doesNotMatch(statusTextRule, /overflow-wrap:\s*anywhere/);
-  assert.doesNotMatch(statusTextRule, /text-overflow:\s*ellipsis/);
+  // shape only, so it declares no overflow utility of its own.
+  const html = renderStatusLine({ statuses: [{ key: "20-memory", text: "memory" }] });
+  assert.match(html, /whitespace-pre/);
+  assert.doesNotMatch(html, /text-ellipsis/);
+  assert.doesNotMatch(html, /overflow-hidden/);
 });
 
 test("renders the status text into its own bar without identifier keys", () => {
@@ -84,13 +75,13 @@ test("renders the status text into its own bar without identifier keys", () => {
   });
 
   assert.match(html, /aria-label="ponytail memory"/);
-  assert.match(html, /class="chat-status-ext"/);
-  assert.match(html, /extension-status-text/);
+  assert.match(html, /data-slot="chat-status-ext"/);
+  assert.match(html, /data-slot="extension-status-text"/);
   assert.match(html, />ponytail <span style=/);
   assert.match(html, />memory</);
   // The old two-line shelf element is gone; line 3 is its own full-width bar now.
   assert.doesNotMatch(html, /extension-status-line/);
-  assert.doesNotMatch(html, /extension-status-shelf/);
+  assert.doesNotMatch(html, /data-slot="extension-status-shelf"/);
   assert.doesNotMatch(html, /05-ponytail|20-memory/);
 });
 
@@ -107,12 +98,12 @@ test("renders the widget shelf without any status text", () => {
     }],
   });
 
-  assert.match(html, /extension-status-shelf has-widgets/);
-  assert.match(html, /extension-widget-triggers/);
+  assert.match(html, /data-slot="extension-status-shelf" data-state="has-widgets"/);
+  assert.match(html, /data-slot="extension-widget-triggers"/);
   assert.match(html, /usage/);
   // Line 3 moved to the row slot: the shelf carries widgets only.
   assert.doesNotMatch(html, /extension-status-line/);
-  assert.doesNotMatch(html, /chat-status-ext/);
+  assert.doesNotMatch(html, /data-slot="chat-status-ext"/);
   assert.doesNotMatch(html, /has-status/);
 });
 
