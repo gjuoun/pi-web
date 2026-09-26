@@ -89,7 +89,7 @@ test("pins the collapsed chip to the newest characters instead of the first", as
   // A one-line chip cannot wrap, so the head has to overflow and be clipped while its end stays in
   // view — that is what makes a streaming block read as motion rather than a frozen first line.
   assert.match(source, /element\.scrollLeft = element\.scrollWidth/);
-  assert.match(source, /ref=\{tailRef\} style=\{\{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" \}\}/);
+  assert.match(source, /ref=\{tailRef\} className="min-w-0 flex-1 overflow-hidden whitespace-nowrap"/);
   assert.match(source, /const tail = getThinkingTail\(block\.thinking\) \|\| preview;/);
 });
 
@@ -258,7 +258,7 @@ test("renders a package Agent call as a standard tool call with no session link"
     toolResults: new Map([[block.toolCallId, result]]),
   });
 
-  assert.match(html, /border:1px solid rgba\(34,197,94,0\.25\)/);
+  assert.match(html, /border-success\/25/);
   assert.match(html, />Agent</);
   assert.match(html, />Explore</);
   assert.doesNotMatch(html, /Open sub-agent session/);

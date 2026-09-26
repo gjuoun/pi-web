@@ -114,36 +114,15 @@ function SafeMarkdownBody({ children, className, ...props }: React.ComponentProp
     return (
       <button
         onClick={() => setShowRaw(true)}
-        style={{
-          display: "block",
-          width: "100%",
-          margin: "4px 0",
-          padding: "7px 10px",
-          border: "1px solid var(--border)",
-          borderRadius: 6,
-          background: "var(--bg-panel)",
-          color: "var(--text-muted)",
-          cursor: "pointer",
-          fontSize: 12,
-          textAlign: "left",
-        }}
+        className="my-1 block w-full rounded-md border border-border bg-sidebar px-2.5 py-1.5 text-left text-xs text-muted-foreground"
       >
         ⚠ {t("i18n.largeMessageReveal", { size: formatMessageBytes(children.length) })}
       </button>
     );
   }
   return (
-    <div className={className} style={{ maxHeight: 420, overflow: "auto", fontSize: "calc(12px + var(--chat-font-size-offset, 0px))", lineHeight: 1.5 }}>
-      <pre
-        style={{
-          margin: 0,
-          padding: "8px 10px",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-          fontFamily: "var(--font-mono)",
-          color: "var(--text-muted)",
-        }}
-      >
+    <div className={`${className} max-h-[420px] overflow-auto text-[calc(12px+var(--chat-font-size-offset,0px))] leading-normal`}>
+      <pre className="m-0 px-2.5 py-2 font-mono whitespace-pre-wrap break-words text-muted-foreground">
         {children}
       </pre>
     </div>
@@ -357,7 +336,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   const editTarget = commandText ? replaceUserMessageText(message, commandText) : message;
 
   const imageBlocksNode = imageBlocks.length > 0 && (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: content ? 8 : 0 }}>
+    <div className={`flex flex-wrap gap-1.5 ${content ? "mb-2" : ""}`}>
       {imageBlocks.map((img, i) => {
         // lib/types.ts ImageContent uses {source:{type,data,media_type,url}}
         // pi-ai on-disk format uses flat {data, mimeType} — handle both
@@ -375,7 +354,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             <img
               src={src}
               alt=""
-              style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid rgba(59,130,246,0.15)" }}
+              className="block max-h-60 max-w-60 rounded-md border border-primary/15 object-contain"
             />
           </ImagePreview>
         );
@@ -393,51 +372,25 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
 
   return (
     <div
-      style={{ marginBottom: 16, display: "flex", flexDirection: "column", alignItems: "flex-end" }}
+      className="mb-4 flex flex-col items-end"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 6, maxWidth: "85%" }}>
+      <div className="flex max-w-[85%] items-end gap-1.5">
         <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            background: "var(--user-bg)",
-            border: "1px solid rgba(59,130,246,0.2)",
-            borderRadius: 12,
-            padding: "8px 12px",
-            fontSize: "calc(14px + var(--chat-font-size-offset, 0px))",
-            lineHeight: 1.6,
-            color: "var(--text)",
-            wordBreak: "break-word",
-            maxHeight: USER_BUBBLE_MAX_HEIGHT,
-            overflowY: "auto",
-          }}
+          className="max-h-[300px] flex-1 min-w-0 overflow-y-auto rounded-xl border border-primary/20 bg-muted px-3 py-2 text-[calc(14px+var(--chat-font-size-offset,0px))] leading-relaxed break-words text-foreground"
         >
           {commandText ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+            <div className="flex min-w-0 flex-col gap-1.5">
               {imageBlocksNode}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
+              <div className="flex flex-wrap items-start gap-2">
                 <button
                   onClick={() => setExpanded((prev) => !prev)}
                   title={expanded ? t("i18n.collapse") : t("i18n.expand")}
                   aria-expanded={expanded}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    flexShrink: 0,
-                    padding: 0,
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--accent)",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "calc(13px + var(--chat-font-size-offset, 0px))",
-                    textAlign: "left",
-                  }}
+                  className="flex shrink-0 items-center gap-1.5 border-none bg-transparent p-0 text-left font-mono text-[calc(13px+var(--chat-font-size-offset,0px))] text-primary"
                 >
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">
                     {commandName}
                   </span>
                   <svg
@@ -449,22 +402,14 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    style={{ flexShrink: 0, opacity: 0.75, transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}
+                    className={`shrink-0 opacity-75 transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}
                     aria-hidden="true"
                   >
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
                 </button>
                 {commandArgs && (
-                  <span style={{
-                    color: "var(--text)",
-                    fontSize: "calc(14px + var(--chat-font-size-offset, 0px))",
-                    lineHeight: 1.6,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                    minWidth: 0,
-                    flex: 1,
-                  }}>
+                  <span className="min-w-0 flex-1 text-[calc(14px+var(--chat-font-size-offset,0px))] leading-relaxed whitespace-pre-wrap break-words text-foreground">
                     {commandArgs}
                   </span>
                 )}
@@ -485,32 +430,12 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
 
       {/* Bottom row: action buttons + timestamp */}
       {(time || canFork || canNavigate || true) && (
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "flex-end",
-          gap: 6, marginTop: 3,
-        }}>
-          <div style={{
-            display: "flex", gap: 3,
-            opacity: hovered ? 1 : 0,
-            pointerEvents: hovered ? "auto" : "none",
-            transition: "opacity 0.12s",
-          }}>
+        <div className="mt-[3px] flex items-center justify-end gap-1.5">
+          <div className={`flex gap-[3px] transition-opacity duration-100 ${hovered ? "opacity-100" : "pointer-events-none opacity-0"}`}>
             <button
               onClick={copyContent}
                title={t("i18n.copyMessage")}
-              style={{
-                display: "flex", alignItems: "center", gap: 4,
-                padding: "3px 8px", height: 22,
-                background: "none", border: "none",
-                borderRadius: 5,
-                color: copied ? "var(--accent)" : "var(--text-dim)",
-                cursor: "pointer",
-                fontSize: 11, fontWeight: 400,
-                whiteSpace: "nowrap",
-                transition: "color 0.12s",
-              }}
-              onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = "var(--accent)"; }}
-              onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = "var(--text-dim)"; }}
+              className={`flex h-[22px] items-center gap-1 rounded-[5px] border-none bg-none px-2 text-[11px] font-normal whitespace-nowrap transition-colors ${copied ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
             >
               {copied ? (
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -526,31 +451,14 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             </button>
           </div>
           {(canFork || canNavigate) && (
-            <div style={{
-              display: "flex", gap: 3,
-              opacity: (hovered || forking) ? 1 : 0,
-              pointerEvents: (hovered || forking) ? "auto" : "none",
-              transition: "opacity 0.12s",
-            }}>
+            <div className={`flex gap-[3px] transition-opacity duration-100 ${(hovered || forking) ? "opacity-100" : "pointer-events-none opacity-0"}`}>
               {canNavigate && (
                 <button
                   onClick={() => void onNavigate!(entryId!).then((navigated) => {
                     if (navigated) onEditContent?.(editTarget);
                   })}
                    title={t("i18n.editFromHereTitle")}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 4,
-                    padding: "3px 8px", height: 22,
-                    background: "none", border: "none",
-                    borderRadius: 5,
-                    color: "var(--text-dim)",
-                    cursor: "pointer",
-                    fontSize: 11, fontWeight: 400,
-                    whiteSpace: "nowrap",
-                    transition: "color 0.12s",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-dim)"; }}
+                  className="flex h-[22px] items-center gap-1 rounded-[5px] border-none bg-none px-2 text-[11px] font-normal whitespace-nowrap text-muted-foreground transition-colors hover:text-primary"
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="15 10 20 15 15 20" />
@@ -564,19 +472,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   onClick={() => { onFork!(entryId!); }}
                   disabled={forking}
                    title={forking ? t("i18n.creatingSession") : t("i18n.newSessionTitle")}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 4,
-                    padding: "3px 8px", height: 22,
-                    background: "none", border: "none",
-                    borderRadius: 5,
-                    color: forking ? "var(--accent)" : "var(--text-dim)",
-                    cursor: forking ? "not-allowed" : "pointer",
-                    fontSize: 11, fontWeight: 400,
-                    whiteSpace: "nowrap",
-                    transition: "color 0.12s",
-                  }}
-                  onMouseEnter={(e) => { if (!forking) e.currentTarget.style.color = "var(--accent)"; }}
-                  onMouseLeave={(e) => { if (!forking) e.currentTarget.style.color = "var(--text-dim)"; }}
+                  className={`flex h-[22px] items-center gap-1 rounded-[5px] border-none bg-none px-2 text-[11px] font-normal whitespace-nowrap transition-colors ${forking ? "cursor-not-allowed text-primary" : "text-muted-foreground hover:text-primary"}`}
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="6" y1="3" x2="6" y2="15" />
@@ -589,7 +485,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               )}
             </div>
           )}
-          {time && <span style={{ fontSize: 10, color: "var(--text-dim)" }}>{time}</span>}
+          {time && <span className="text-[10px] text-muted-foreground">{time}</span>}
         </div>
       )}
     </div>
@@ -743,21 +639,12 @@ function AssistantMessageView({
     <div
       data-message-role="assistant"
       data-entry-id={entryId}
-      style={{ marginBottom: 16 }}
+      className="mb-4"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       {/* Model label */}
-      <div
-        style={{
-          fontSize: 11,
-          color: "var(--text-dim)",
-          marginBottom: 4,
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
+      <div className="mb-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
         {(() => {
           const labelProvider = message.provider || fallbackModel?.provider;
           const labelModel = message.model || fallbackModel?.modelId;
@@ -773,8 +660,8 @@ function AssistantMessageView({
             <>
 
               {est > 0 && (
-                <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)" }} title={t("i18n.estimatedTokens")}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 11, fontWeight: 400 }}>
+                <span className="flex items-center gap-1 text-foreground" title={t("i18n.estimatedTokens")}>
+                  <span className="flex items-center gap-0.5 text-[11px] font-normal">
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="5" y1="1.5" x2="5" y2="8.5" /><polyline points="2 6 5 8.5 8 6" />
                     </svg>
@@ -787,7 +674,7 @@ function AssistantMessageView({
         })()}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="flex flex-col gap-2">
         {blockItems.map(({ block, originalIndex }) => (
           <BlockView key={`${entryId ?? "stream"}-${originalIndex}`} block={block} searchTarget={block === searchBlock} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} toolCallDurations={toolCallDurations} cwd={cwd} onOpenFile={onOpenFile} sessionId={sessionId} entryId={entryId} blockIndex={originalIndex} />
         ))}
@@ -796,19 +683,7 @@ function AssistantMessageView({
       {providerError && (
         <div
           role="alert"
-          style={{
-            marginTop: blocks.length > 0 ? 8 : 0,
-            padding: "7px 10px",
-            border: "1px solid rgba(239,68,68,0.3)",
-            borderRadius: 6,
-            background: "rgba(239,68,68,0.07)",
-            color: "#ef4444",
-            fontFamily: "var(--font-mono)",
-            fontSize: 12,
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-          }}
+          className={`${blocks.length > 0 ? "mt-2" : "mt-0"} rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap text-destructive`}
         >
           Error: {providerError}
         </div>
@@ -818,11 +693,9 @@ function AssistantMessageView({
         <TurnWrittenFiles files={writtenFiles} onOpenFile={onOpenFile} />
       )}
 
-      <div style={{
-        display: "flex", alignItems: "center", gap: 8, marginTop: 4,
-      }}>
+      <div className="mt-1 flex items-center gap-2">
         {message.usage && !isStreaming && (
-          <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+          <div className="text-[11px] text-muted-foreground">
             {formatUsage(message.usage)}
           </div>
         )}
@@ -830,21 +703,7 @@ function AssistantMessageView({
           <button
             onClick={copyContent}
              title={t("i18n.copyMessage")}
-            style={{
-              display: "flex", alignItems: "center", gap: 4,
-              padding: "3px 8px", height: 22,
-              background: "none", border: "none",
-              borderRadius: 5,
-              color: copied ? "var(--accent)" : "var(--text-dim)",
-              cursor: "pointer",
-              fontSize: 11, fontWeight: 400,
-              whiteSpace: "nowrap",
-              opacity: hovered ? 1 : 0,
-              pointerEvents: hovered ? "auto" : "none",
-              transition: "opacity 0.12s, color 0.12s",
-            }}
-            onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = "var(--accent)"; }}
-            onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = "var(--text-dim)"; }}
+            className={`flex h-[22px] items-center gap-1 rounded-[5px] border-none bg-none px-2 text-[11px] font-normal whitespace-nowrap transition-opacity transition-colors duration-100 ${hovered ? "opacity-100" : "pointer-events-none opacity-0"} ${copied ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
           >
             {copied ? (
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -860,7 +719,7 @@ function AssistantMessageView({
           </button>
         )}
         {time && !isStreaming && (
-          <span style={{ fontSize: 10, color: "var(--text-dim)", marginLeft: "auto" }}>{time}</span>
+          <span className="ml-auto text-[10px] text-muted-foreground">{time}</span>
         )}
       </div>
     </div>
@@ -953,61 +812,29 @@ export function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex 
   }, [expanded, block.deferred, content, sessionId, entryId, blockIndex]);
 
   return (
-    <div style={{
-      display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0,
-      border: "1px solid var(--border)",
-      borderRadius: 7,
-      padding: "6px 10px",
-      background: "var(--bg)",
-      fontFamily: "var(--font-mono)",
-      fontSize: "calc(11px + var(--chat-font-size-offset, 0px))",
-      lineHeight: 1.5,
-    }}>
+    <div className="flex min-w-0 items-start gap-1.5 rounded-[7px] border border-border bg-background px-2.5 py-1.5 font-mono text-[calc(11px+var(--chat-font-size-offset,0px))] leading-relaxed">
       <button
         type="button"
         aria-expanded={expanded}
         aria-label={`${t("i18n.thinking")}${tail ? `: ${tail}` : ""}`}
         title={t("i18n.thinking")}
         onClick={() => setExpanded((v) => !v)}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          width: expanded ? 14 : "100%",
-          flexShrink: expanded ? 0 : 1,
-          minWidth: 0,
-          minHeight: "1.5em",
-          padding: 0,
-          background: "transparent",
-          border: "none",
-          color: "var(--text-muted)",
-          cursor: "pointer",
-          font: "inherit",
-          textAlign: "left",
-        }}
+        className={`inline-flex min-h-[1.5em] min-w-0 items-center gap-1.5 border-none bg-transparent p-0 text-left font-inherit text-muted-foreground ${expanded ? "w-3.5 shrink-0" : "w-full shrink"}`}
       >
         <ThinkingIcon active={expanded} />
         {!expanded && (
-          <span ref={tailRef} style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" }}>
+          <span ref={tailRef} className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
             {tail ? <ReactMarkdown allowedElements={[]} unwrapDisallowed skipHtml>{tail}</ReactMarkdown> : "..."}
           </span>
         )}
       </button>
       {expanded && (
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            color: error ? "#f87171" : "var(--text-muted)",
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-          }}
-        >
+        <div className={`min-w-0 flex-1 overflow-wrap-anywhere whitespace-pre-wrap ${error ? "text-destructive" : "text-muted-foreground"}`}>
            {loading ? t("i18n.loadingThinking") : error ?? (block.deferred ? content : block.thinking)}
         </div>
       )}
       {duration !== undefined && (
-        <span style={{ flexShrink: 0, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}>{duration}s</span>
+        <span className="shrink-0 text-muted-foreground tabular-nums">{duration}s</span>
       )}
     </div>
   );
@@ -1048,43 +875,24 @@ function ToolCallBlock({ block, result, duration }: { block: ToolCallContent; re
 
   return (
     <div
-      style={{
-        borderRadius: 7,
-        overflow: "hidden",
-        fontSize: 12,
-        border: isError ? "1px solid rgba(248,113,113,0.45)" : "1px solid rgba(34,197,94,0.25)",
-        background: isError ? "rgba(248,113,113,0.05)" : "rgba(34,197,94,0.04)",
-      }}
+      className={`overflow-hidden rounded-[7px] text-xs ${isError ? "border border-destructive/45 bg-destructive/5" : "border border-success/25 bg-success/4"}`}
     >
       {/* ── Tool call header ── */}
-      <div style={{ display: "flex", alignItems: "stretch", minWidth: 0 }}>
+      <div className="flex min-w-0 items-stretch">
         <button
           onClick={() => setExpanded((v) => !v)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            flex: 1,
-            minWidth: 0,
-            padding: "6px 10px",
-            background: "none",
-            border: "none",
-            color: "var(--text-muted)",
-            cursor: "pointer",
-            fontSize: 12,
-            textAlign: "left",
-          }}
+          className="flex min-w-0 flex-1 items-center gap-1.5 border-none bg-none px-2.5 py-1.5 text-left text-xs text-muted-foreground"
         >
-          <span style={{ color: isError ? "#f87171" : "#16a34a", fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 11, flexShrink: 0 }}>
+          <span className={`shrink-0 font-mono text-[11px] font-semibold ${isError ? "text-destructive" : "text-success"}`}>
             {block.toolName}
           </span>
-          <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+          <span className="min-w-0 flex-1 overflow-hidden font-mono text-[11px] text-ellipsis whitespace-nowrap text-muted-foreground">
             {isStreamingInput ? t("chat.generatingToolInput") : getToolPreview(block)}
           </span>
           {duration !== undefined && (
-            <span style={{ fontSize: 11, color: "var(--text-dim)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{duration}s</span>
+            <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{duration}s</span>
           )}
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--text-dim)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 text-muted-foreground transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}>
             <polyline points="2 3.5 5 6.5 8 3.5" />
           </svg>
         </button>
@@ -1094,16 +902,9 @@ function ToolCallBlock({ block, result, duration }: { block: ToolCallContent; re
       {packageAgent && (
         <div
           data-testid="pi-subagents-agent-card"
-          style={{
-            display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
-            padding: "5px 10px",
-            borderTop: "1px solid var(--border)",
-            background: "var(--bg-subtle)",
-            color: "var(--text-muted)",
-            fontSize: 11, lineHeight: 1.4, fontVariantNumeric: "tabular-nums",
-          }}
+          className="flex flex-wrap items-center gap-2 border-t border-border bg-foreground/4 px-2.5 py-[5px] text-[11px] leading-tight text-muted-foreground tabular-nums"
         >
-          <span data-testid="pi-subagents-agent-status" style={{ color: packageAgentStatusColor(packageAgent.status), fontWeight: 600 }}>
+          <span data-testid="pi-subagents-agent-status" className={`font-semibold ${packageAgentStatusColor(packageAgent.status)}`}>
             {t(`piSubagents.status.${packageAgentStatusKey(packageAgent.status)}`)}
           </span>
           {packageAgent.modelName && <span>{packageAgent.modelName}</span>}
@@ -1118,7 +919,7 @@ function ToolCallBlock({ block, result, duration }: { block: ToolCallContent; re
           {packageAgent.tokens && <span>{packageAgent.tokens}</span>}
           {typeof packageAgent.durationMs === "number" && <span>{formatPackageDuration(packageAgent.durationMs)}</span>}
           {typeof packageAgent.cost === "number" && packageAgent.cost > 0 && <span>${packageAgent.cost.toFixed(4)}</span>}
-          {packageAgent.error && <span style={{ color: "#dc2626" }}>{packageAgent.error}</span>}
+          {packageAgent.error && <span className="text-destructive">{packageAgent.error}</span>}
         </div>
       )}
 
@@ -1128,18 +929,7 @@ function ToolCallBlock({ block, result, duration }: { block: ToolCallContent; re
           <CodeBlock code={junCode} lang="typescript" />
         ) : (
           <pre
-            style={{
-              margin: 0,
-              padding: "8px 10px",
-              color: "var(--text-muted)",
-              fontSize: "calc(12px + var(--chat-font-size-offset, 0px))",
-              lineHeight: 1.5,
-              overflow: "auto",
-              background: "var(--bg-subtle)",
-              borderTop: isError ? "1px solid rgba(248,113,113,0.25)" : "1px solid rgba(34,197,94,0.2)",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-all",
-            }}
+            className={`m-0 overflow-auto bg-foreground/4 px-2.5 py-2 text-[calc(12px+var(--chat-font-size-offset,0px))] leading-relaxed break-all whitespace-pre-wrap text-muted-foreground ${isError ? "border-t border-destructive/25" : "border-t border-success/20"}`}
           >
             {inputStr}
           </pre>
@@ -1173,12 +963,7 @@ function PairedDiffResult({ diff }: {
   diff: ResultDiff;
 }) {
   return (
-    <div
-      style={{
-        borderTop: "1px solid rgba(34,197,94,0.15)",
-        background: "var(--bg)",
-      }}
-    >
+    <div className="border-t border-success/15 bg-background">
       <SplitPatchView text={diff.text} />
     </div>
   );
@@ -1191,43 +976,27 @@ function SplitPatchView({ text }: { text: string }) {
   const showFileHeaders = files.length > 1;
 
   return (
-    <div style={{ maxHeight: 560, overflowY: "auto", overflowX: "hidden", background: "var(--bg)" }}>
+    <div className="max-h-[560px] overflow-x-hidden overflow-y-auto bg-background">
       {files.map((file, fileIndex) => (
         <div
           key={fileIndex}
-          style={{
-            minWidth: 0,
-            borderTop: fileIndex === 0 ? "none" : "1px solid var(--border)",
-            fontFamily: "var(--font-mono)",
-            fontSize: "calc(12px + var(--chat-font-size-offset, 0px))",
-            lineHeight: 1.55,
-          }}
+          className={`min-w-0 font-mono text-[calc(12px+var(--chat-font-size-offset,0px))] leading-relaxed ${fileIndex === 0 ? "border-t-0" : "border-t border-border"}`}
         >
           {showFileHeaders && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-                position: "sticky",
-                top: 0,
-                zIndex: 1,
-                background: "var(--bg-panel)",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
+            <div className="sticky top-0 z-1 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] border-b border-border bg-sidebar">
                <SplitDiffHeader title={file.oldPath || t("i18n.before")} side="left" />
                <SplitDiffHeader title={file.newPath || t("i18n.after")} side="right" />
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" }}>
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             {file.rows.map((row, rowIndex) => {
               if (row.type === "hunk") {
                 return null;
               }
 
               return (
-                <div key={rowIndex} style={{ display: "contents" }}>
+                <div key={rowIndex} className="contents">
                   <SplitDiffCellView cell={row.left} side="left" />
                   <SplitDiffCellView cell={row.right} side="right" />
                 </div>
@@ -1244,14 +1013,7 @@ function SplitDiffHeader({ title, side }: { title: string; side: "left" | "right
   return (
     <div
       title={title}
-      style={{
-        padding: "5px 10px",
-        color: "var(--text-dim)",
-        borderRight: side === "left" ? "1px solid var(--border)" : "none",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-      }}
+      className={`overflow-hidden px-2.5 py-[5px] text-ellipsis whitespace-nowrap text-muted-foreground ${side === "left" ? "border-r border-border" : ""}`}
     >
       {title}
     </div>
@@ -1259,63 +1021,33 @@ function SplitDiffHeader({ title, side }: { title: string; side: "left" | "right
 }
 
 function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" | "right" }) {
-  const bg =
+  const bgClass =
     cell.type === "added"
-      ? "rgba(34,197,94,0.12)"
+      ? "bg-success/12"
       : cell.type === "removed"
-      ? "rgba(248,113,113,0.13)"
+      ? "bg-destructive/13"
       : cell.type === "empty"
-      ? "var(--bg-subtle)"
-      : "transparent";
+      ? "bg-foreground/4"
+      : "bg-transparent";
   const marker =
     cell.type === "added" ? "+" : cell.type === "removed" ? "-" : " ";
-  const markerColor =
-    cell.type === "added" ? "#22c55e" : cell.type === "removed" ? "#f87171" : "var(--text-dim)";
+  const markerClass =
+    cell.type === "added" ? "text-success" : cell.type === "removed" ? "text-destructive" : "text-muted-foreground";
 
   return (
     <div
-      style={{
-        display: "flex",
-        minWidth: 0,
-        background: bg,
-        borderRight: side === "left" ? "1px solid var(--border)" : "none",
-      }}
+      className={`flex min-w-0 ${bgClass} ${side === "left" ? "border-r border-border" : ""}`}
     >
-      <span
-        style={{
-          width: 42,
-          padding: "0 6px",
-          textAlign: "right",
-          color: "var(--text-dim)",
-          userSelect: "none",
-          background: "var(--bg-panel)",
-          borderRight: "1px solid var(--border)",
-          flexShrink: 0,
-        }}
-      >
+      <span className="w-[42px] shrink-0 border-r border-border bg-sidebar px-1.5 text-right text-muted-foreground select-none">
         {cell.lineNo ?? ""}
       </span>
       <span
-        style={{
-          width: 18,
-          padding: "0 5px",
-          color: markerColor,
-          userSelect: "none",
-          fontWeight: cell.type === "context" || cell.type === "empty" ? 400 : 700,
-          flexShrink: 0,
-        }}
+        className={`w-[18px] shrink-0 px-[5px] select-none ${markerClass} ${cell.type === "context" || cell.type === "empty" ? "font-normal" : "font-bold"}`}
       >
         {marker}
       </span>
       <span
-        style={{
-          flex: 1,
-          minWidth: 0,
-          padding: "0 10px 0 0",
-          color: cell.type === "empty" ? "var(--text-dim)" : "var(--text)",
-          whiteSpace: "pre-wrap",
-          overflowWrap: "anywhere",
-        }}
+        className={`min-w-0 flex-1 py-0 pr-2.5 pl-0 overflow-wrap-anywhere whitespace-pre-wrap ${cell.type === "empty" ? "text-muted-foreground" : "text-foreground"}`}
       >
         {cell.text || "\u00a0"}
       </span>
@@ -1327,54 +1059,38 @@ function PatchTextView({ text }: { text: string }) {
   const lines = text.split(/\r?\n/);
 
   return (
-    <div style={{ maxHeight: 520, overflowY: "auto", overflowX: "hidden", fontFamily: "var(--font-mono)", fontSize: "calc(12px + var(--chat-font-size-offset, 0px))", lineHeight: 1.55, minWidth: 0 }}>
+    <div className="min-w-0 max-h-[520px] overflow-x-hidden overflow-y-auto font-mono text-[calc(12px+var(--chat-font-size-offset,0px))] leading-relaxed">
       {lines.map((line, i) => {
         const kind =
           line.startsWith("@@") ? "hunk" :
           line.startsWith("+") && !line.startsWith("+++") ? "added" :
           line.startsWith("-") && !line.startsWith("---") ? "removed" :
           "context";
-        const bg =
-          kind === "added" ? "rgba(34,197,94,0.12)" :
-          kind === "removed" ? "rgba(248,113,113,0.13)" :
-          kind === "hunk" ? "rgba(96,165,250,0.12)" :
-          "transparent";
-        const color =
-          kind === "added" ? "#22c55e" :
-          kind === "removed" ? "#f87171" :
-          kind === "hunk" ? "var(--accent)" :
-          "var(--text)";
+        const bgClass =
+          kind === "added" ? "bg-success/12" :
+          kind === "removed" ? "bg-destructive/13" :
+          kind === "hunk" ? "bg-primary/12" :
+          "bg-transparent";
+        const borderClass =
+          kind === "added" ? "border-l-3 border-success" :
+          kind === "removed" ? "border-l-3 border-destructive" :
+          kind === "hunk" ? "border-l-3 border-primary" :
+          "border-l-3 border-transparent";
+        const textClass =
+          kind === "added" ? "text-success" :
+          kind === "removed" ? "text-destructive" :
+          kind === "hunk" ? "text-primary" :
+          "text-foreground";
 
         return (
           <div
             key={i}
-            style={{
-              display: "flex",
-              background: bg,
-              borderLeft: kind === "added"
-                ? "3px solid #22c55e"
-                : kind === "removed"
-                ? "3px solid #f87171"
-                : kind === "hunk"
-                ? "3px solid var(--accent)"
-                : "3px solid transparent",
-            }}
+            className={`flex ${bgClass} ${borderClass}`}
           >
-            <span
-              style={{
-                width: 48,
-                padding: "0 8px",
-                color: "var(--text-dim)",
-                background: "var(--bg-panel)",
-                borderRight: "1px solid var(--border)",
-                textAlign: "right",
-                userSelect: "none",
-                flexShrink: 0,
-              }}
-            >
+            <span className="w-12 shrink-0 border-r border-border bg-sidebar px-2 text-right text-muted-foreground select-none">
               {i + 1}
             </span>
-            <span style={{ padding: "0 10px", whiteSpace: "pre-wrap", overflowWrap: "anywhere", color }}>
+            <span className={`overflow-wrap-anywhere px-2.5 whitespace-pre-wrap ${textClass}`}>
               {line || "\u00a0"}
             </span>
           </div>
@@ -1411,13 +1127,10 @@ function PairedResult({ text, images, isEmpty, isError }: {
   const showText = !isEmpty || images.length === 0;
   return (
     <div
-      style={{
-        borderTop: `1px solid ${isError ? "rgba(248,113,113,0.3)" : "rgba(34,197,94,0.15)"}`,
-        background: isError ? "rgba(248,113,113,0.04)" : "var(--bg-subtle)",
-      }}
+      className={`border-t ${isError ? "border-destructive/30 bg-destructive/4" : "border-success/15 bg-foreground/4"}`}
     >
       {images.length > 0 && (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px", background: "var(--bg)" }}>
+        <div className="flex flex-wrap gap-2 bg-background p-2.5">
           {images.map((image, index) => {
             const src = imageSource(image);
             if (!src) return null;
@@ -1425,21 +1138,14 @@ function PairedResult({ text, images, isEmpty, isError }: {
               <ImagePreview
                 key={`${src}-${index}`}
                 src={src}
-                style={{ maxWidth: "100%" }}
+                className="max-w-full"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={src}
                   alt=""
                   loading="lazy"
-                  style={{
-                    display: "block",
-                    maxWidth: "min(100%, 720px)",
-                    maxHeight: 520,
-                    borderRadius: 6,
-                    objectFit: "contain",
-                    border: "1px solid var(--border)",
-                  }}
+                  className="block max-h-[520px] max-w-[min(100%,720px)] rounded-md border border-border object-contain"
                 />
               </ImagePreview>
             );
@@ -1448,20 +1154,7 @@ function PairedResult({ text, images, isEmpty, isError }: {
       )}
       {showText && (
         <pre
-          style={{
-            margin: 0,
-            padding: "8px 10px",
-            color: isError ? "#f87171" : (isEmpty ? "var(--text-dim)" : "var(--text-muted)"),
-            fontSize: "calc(12px + var(--chat-font-size-offset, 0px))",
-            lineHeight: 1.5,
-            overflow: "auto",
-            maxHeight: 400,
-            background: "var(--bg)",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-all",
-            fontStyle: isEmpty ? "italic" : "normal",
-            opacity: isEmpty ? 0.6 : 1,
-          }}
+          className={`m-0 max-h-[400px] overflow-auto bg-background px-2.5 py-2 text-[calc(12px+var(--chat-font-size-offset,0px))] leading-relaxed break-all whitespace-pre-wrap ${isEmpty ? "italic opacity-60" : "not-italic opacity-100"} ${isError ? "text-destructive" : (isEmpty ? "text-muted-foreground" : "text-muted-foreground")}`}
         >
            {isEmpty ? t("i18n.noOutput") : text}
         </pre>
@@ -1477,43 +1170,26 @@ function CompactionMessageView({ message }: { message: CustomMessage }) {
   const time = formatTime(message.timestamp);
 
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div
-        style={{
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          overflow: "hidden",
-          background: "var(--bg)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "7px 10px",
-            borderBottom: "1px solid var(--border)",
-            background: "var(--bg-panel)",
-            color: "var(--text-muted)",
-          }}
-        >
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 650 }}>
+    <div className="mb-4">
+      <div className="overflow-hidden rounded-lg border border-border bg-background">
+        <div className="flex items-center gap-2 border-b border-border bg-sidebar px-2.5 py-1.5 text-muted-foreground">
+          <span className="font-mono text-[11px] font-semibold">
             compaction
           </span>
-          {time && <span style={{ marginLeft: "auto", color: "var(--text-dim)", fontSize: 10 }}>{time}</span>}
+          {time && <span className="ml-auto text-[10px] text-muted-foreground">{time}</span>}
         </div>
 
-        <div style={{ padding: "11px 13px 12px" }}>
-          <div style={{ color: "var(--text)", fontSize: "calc(15px + var(--chat-font-size-offset, 0px))", fontWeight: 700, lineHeight: 1.35 }}>
+        <div className="px-[13px] pt-[11px] pb-3">
+          <div className="text-[calc(15px+var(--chat-font-size-offset,0px))] leading-snug font-bold text-foreground">
              {t("i18n.conversationCompacted")}
           </div>
-          <div style={{ marginTop: 3, marginBottom: 10, color: "var(--text)", fontSize: "calc(14px + var(--chat-font-size-offset, 0px))", lineHeight: 1.5 }}>
+          <div className="mt-[3px] mb-2.5 text-[calc(14px+var(--chat-font-size-offset,0px))] leading-relaxed text-foreground">
              {t("i18n.compactionDescription")}
           </div>
           {parsedSummary.body ? (
             <MarkdownBody className="markdown-compaction-message">{parsedSummary.body}</MarkdownBody>
           ) : (
-             <span style={{ color: "var(--text-dim)", fontSize: 12 }}>{t("i18n.noSummary")}</span>
+             <span className="text-xs text-muted-foreground">{t("i18n.noSummary")}</span>
           )}
           <CompactionFileMetadata readFiles={parsedSummary.readFiles} modifiedFiles={parsedSummary.modifiedFiles} />
         </div>
@@ -1532,8 +1208,8 @@ function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: strin
   if (modifiedFiles.length > 0) parts.push(`${modifiedFiles.length} modified`);
 
   return (
-    <details className="compaction-file-details">
-       <summary>{t("i18n.fileContext", { details: parts.join(", ") })}</summary>
+    <details className="mt-2.5 border-t border-border pt-2 text-xs text-muted-foreground">
+       <summary className="cursor-pointer leading-snug font-semibold">{t("i18n.fileContext", { details: parts.join(", ") })}</summary>
        {modifiedFiles.length > 0 && <CompactionFileList title={t("i18n.modifiedFiles")} files={modifiedFiles} />}
        {readFiles.length > 0 && <CompactionFileList title={t("i18n.readFiles")} files={readFiles} />}
     </details>
@@ -1542,9 +1218,9 @@ function CompactionFileMetadata({ readFiles, modifiedFiles }: { readFiles: strin
 
 function CompactionFileList({ title, files }: { title: string; files: string[] }) {
   return (
-    <div className="compaction-file-section">
-      <div className="compaction-file-title">{title}</div>
-      <ul className="compaction-file-list">
+    <div className="mt-2">
+      <div className="mb-1 text-[11px] font-semibold text-foreground">{title}</div>
+      <ul className="m-0 max-h-[180px] list-none overflow-auto rounded-md border border-border bg-sidebar px-2 py-[7px] font-mono text-[11px] leading-snug [&_li]:overflow-wrap-anywhere [&_li+li]:mt-[3px]">
         {files.map((file) => (
           <li key={file}>{file}</li>
         ))}
@@ -1574,39 +1250,22 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
   };
 
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div className="mb-4">
       <div
-        style={{
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          overflow: "hidden",
-          background: isHiddenDisplay ? "var(--bg-subtle)" : "var(--bg)",
-          opacity: isHiddenDisplay && !contentExpanded ? 0.82 : 1,
-        }}
+        className={`overflow-hidden rounded-lg border border-border ${isHiddenDisplay ? "bg-foreground/4" : "bg-background"} ${isHiddenDisplay && !contentExpanded ? "opacity-[0.82]" : "opacity-100"}`}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "7px 10px",
-            borderBottom: "1px solid var(--border)",
-            background: "var(--bg-panel)",
-            color: "var(--text-muted)",
-            fontSize: 12,
-          }}
-        >
-          <span style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 650 }}>
+        <div className="flex items-center gap-2 border-b border-border bg-sidebar px-2.5 py-1.5 text-xs text-muted-foreground">
+          <span className="font-mono text-[11px] font-semibold text-muted-foreground">
             {title}
           </span>
-           {isHiddenDisplay && <span style={{ color: "var(--text-dim)", fontSize: 11 }}>{t("i18n.hiddenExtensionMessage")}</span>}
-          {time && <span style={{ marginLeft: "auto", color: "var(--text-dim)", fontSize: 10 }}>{time}</span>}
+           {isHiddenDisplay && <span className="text-[11px] text-muted-foreground">{t("i18n.hiddenExtensionMessage")}</span>}
+          {time && <span className="ml-auto text-[10px] text-muted-foreground">{time}</span>}
         </div>
 
         {contentExpanded ? (
-          <div style={{ padding: "6px 9px" }}>
+          <div className="px-[9px] py-1.5">
             {images.length > 0 && (
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: text ? 8 : 0 }}>
+              <div className={`flex flex-wrap gap-1.5 ${text ? "mb-2" : ""}`}>
                 {images.map((img, i) => {
                   const src = imageSource(img);
                   if (!src) return null;
@@ -1616,55 +1275,29 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
                       <img
                         src={src}
                         alt=""
-                        style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid var(--border)" }}
+                        className="block max-h-60 max-w-60 rounded-md border border-border object-contain"
                       />
                     </ImagePreview>
                   );
                 })}
               </div>
             )}
-             {text ? <MarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</MarkdownBody> : <span style={{ color: "var(--text-dim)", fontSize: 12 }}>{t("i18n.noMessage")}</span>}
+             {text ? <MarkdownBody className="markdown-custom-message" cwd={cwd} onOpenFile={onOpenFile}>{text}</MarkdownBody> : <span className="text-xs text-muted-foreground">{t("i18n.noMessage")}</span>}
           </div>
         ) : (
           <button
             onClick={() => setContentExpanded(true)}
-            style={{
-              display: "block",
-              width: "100%",
-              padding: "8px 10px",
-              border: "none",
-              background: "transparent",
-              color: "var(--text-dim)",
-              cursor: "pointer",
-              fontSize: 12,
-              textAlign: "left",
-            }}
+            className="block w-full border-none bg-transparent px-2.5 py-2 text-left text-xs text-muted-foreground"
           >
              {text ? previewText(text) : t("i18n.showExtensionMessage")}
           </button>
         )}
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "4px 9px",
-            borderTop: "1px solid var(--border)",
-            background: "var(--bg-subtle)",
-          }}
-        >
+        <div className="flex items-center gap-2 border-t border-border bg-foreground/4 px-[9px] py-1">
           {text || detailsText ? (
             <button
               onClick={copyContent}
-              style={{
-                padding: "3px 7px",
-                border: "none",
-                background: "none",
-                color: copied ? "var(--accent)" : "var(--text-dim)",
-                cursor: "pointer",
-                fontSize: 11,
-              }}
+              className={`border-none bg-none px-[7px] py-[3px] text-[11px] ${copied ? "text-primary" : "text-muted-foreground"}`}
             >
                {copied ? t("i18n.copied") : t("i18n.copy")}
             </button>
@@ -1675,15 +1308,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
                 if (isHiddenDisplay) setContentExpanded((v) => !v);
                 else setDetailsExpanded((v) => !v);
               }}
-              style={{
-                marginLeft: "auto",
-                padding: "3px 7px",
-                border: "none",
-                background: "none",
-                color: "var(--text-dim)",
-                cursor: "pointer",
-                fontSize: 11,
-              }}
+              className="ml-auto border-none bg-none px-[7px] py-[3px] text-[11px] text-muted-foreground"
             >
               {isHiddenDisplay
                  ? (contentExpanded ? t("i18n.collapse") : t("i18n.expand"))
@@ -1694,20 +1319,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
 
         {hasDetails && ((isHiddenDisplay && contentExpanded) || (!isHiddenDisplay && detailsExpanded)) && (
           <pre
-            style={{
-              margin: 0,
-              padding: "9px 10px",
-              borderTop: "1px solid var(--border)",
-              background: "var(--bg)",
-              color: "var(--text-muted)",
-              fontSize: "calc(12px + var(--chat-font-size-offset, 0px))",
-              lineHeight: 1.5,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-              maxHeight: 360,
-              overflow: "auto",
-              fontFamily: "var(--font-mono)",
-            }}
+            className="m-0 max-h-[360px] overflow-auto border-t border-border bg-background px-2.5 py-[9px] font-mono text-[calc(12px+var(--chat-font-size-offset,0px))] leading-relaxed break-words whitespace-pre-wrap text-muted-foreground"
           >
             {detailsText}
           </pre>
@@ -1779,13 +1391,13 @@ function packageAgentStatusColor(status: string): string {
     case "running":
     case "steered":
     case "starting":
-      return "var(--accent)";
-    case "completed": return "#16a34a";
-    case "error": return "#dc2626";
+      return "text-primary";
+    case "completed": return "text-success";
+    case "error": return "text-destructive";
     case "aborted":
     case "stopped":
-      return "#d97706";
-    default: return "var(--text-muted)";
+      return "text-warning";
+    default: return "text-muted-foreground";
   }
 }
 
@@ -1894,26 +1506,26 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
       };
 
   return (
-    <div style={{ margin: "6px 0" }}>
+    <div className="my-1.5">
       <ToolCallBlock block={block} result={result} />
       {message.truncated && fullOutputUrl && (
-        <div style={{ padding: "4px 10px", fontSize: 11, marginTop: -1 }}>
+        <div className="-mt-px px-2.5 py-1 text-[11px]">
           {showFullButton && (
             <button
               onClick={loadFullOutput}
               disabled={loadingFull}
-              style={{ background: "none", border: "none", color: "var(--accent)", cursor: loadingFull ? "default" : "pointer", fontSize: 11, padding: 0, textDecoration: "underline" }}
+              className={`border-none bg-none p-0 text-[11px] text-primary underline ${loadingFull ? "cursor-default" : "cursor-pointer"}`}
             >
               {loadingFull ? "loading…" : "view full output"}
             </button>
           )}
           <a
             href={`${fullOutputUrl}&download=1`}
-            style={{ marginLeft: showFullButton ? 10 : 0, color: "var(--accent)", fontSize: 11, textDecoration: "underline" }}
+            className={`text-[11px] text-primary underline ${showFullButton ? "ml-2.5" : "ml-0"}`}
           >
             download full output
           </a>
-          {fullError && <span style={{ marginLeft: 6, color: "var(--text-dim)", fontSize: 11 }}>({fullError})</span>}
+          {fullError && <span className="ml-1.5 text-[11px] text-muted-foreground">({fullError})</span>}
         </div>
       )}
     </div>
