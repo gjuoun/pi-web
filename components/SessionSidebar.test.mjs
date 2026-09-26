@@ -105,25 +105,29 @@ test("does not expose disk-backed actions for transient sessions", () => {
   assert.match(sessionItemSource, /\{\(hovered \|\| menuOpen\) && !session\.transient && \(/);
 });
 
-test("pin and archive actions call PATCH and refresh the list, collapsed into one menu", () => {
+test("pin and archive actions call PATCH and refresh the list, collapsed into one DropdownMenu", () => {
   assert.match(sessionItemSource, /const togglePinned = useCallback[\s\S]*?pinned: !session\.pinned[\s\S]*?onRenamed\?\.\(\);/);
   assert.match(sessionItemSource, /const toggleArchived = useCallback[\s\S]*?archived: !session\.archived[\s\S]*?onRenamed\?\.\(\);/);
   // Pin/archive/rename/delete are collapsed behind a single "more actions" trigger
-  // (portaled dropdown, since the row itself is overflow:hidden) instead of four
-  // separate always-rendered hover icon buttons.
-  assert.match(sessionItemSource, /onClick=\{toggleMenu\}/);
-  assert.match(sessionItemSource, /createPortal\(/);
-  assert.match(sessionItemSource, /onClick=\{\(e\) => \{ togglePinned\(e\); setMenuOpen\(false\); \}\}/);
-  assert.match(sessionItemSource, /onClick=\{\(e\) => \{ toggleArchived\(e\); setMenuOpen\(false\); \}\}/);
-  assert.match(sessionItemSource, /onClick=\{\(e\) => \{ startRename\(e\); setMenuOpen\(false\); \}\}/);
-  assert.match(sessionItemSource, /onClick=\{\(e\) => \{ handleDeleteClick\(e\); setMenuOpen\(false\); \}\}/);
+  // rendered as a shadcn DropdownMenu (Radix owns positioning/outside-click/Escape)
+  // instead of four separate always-rendered hover icon buttons or a hand-rolled
+  // portal + document-listener implementation.
+  assert.match(sessionItemSource, /<DropdownMenu open=\{menuOpen\} onOpenChange=\{setMenuOpen\}>/);
+  assert.match(sessionItemSource, /<DropdownMenuTrigger asChild>/);
+  assert.match(sessionItemSource, /onSelect=\{\(e\) => togglePinned\(e as unknown as React\.MouseEvent\)\}/);
+  assert.match(sessionItemSource, /onSelect=\{\(e\) => toggleArchived\(e as unknown as React\.MouseEvent\)\}/);
+  assert.match(sessionItemSource, /onSelect=\{\(e\) => startRename\(e as unknown as React\.MouseEvent\)\}/);
+  assert.match(sessionItemSource, /variant="destructive"[\s\S]*?onSelect=\{\(e\) => handleDeleteClick\(e as unknown as React\.MouseEvent\)\}/);
   assert.match(sessionItemSource, /t\(session\.pinned \? "sidebar\.unpin" : "sidebar\.pin"\)/);
   assert.match(sessionItemSource, /t\(session\.archived \? "sidebar\.unarchive" : "sidebar\.archive"\)/);
 });
 
-test("more-actions menu closes on outside click and Escape", () => {
-  assert.match(sessionItemSource, /document\.addEventListener\("mousedown", handleOutside\)/);
-  assert.match(sessionItemSource, /if \(e\.key === "Escape"\) setMenuOpen\(false\);/);
+test("more-actions menu delegates outside-click and Escape handling to Radix DropdownMenu", () => {
+  // Positioning, outside-click dismissal and Escape are Radix DropdownMenu
+  // behaviour now (proven live in e2e/drive, per the repo's SSR-portal test
+  // policy) instead of the row's own document listeners.
+  assert.match(sessionItemSource, /<DropdownMenu open=\{menuOpen\} onOpenChange=\{setMenuOpen\}>/);
+  assert.doesNotMatch(sessionItemSource, /document\.addEventListener\("mousedown", handleOutside\)/);
 });
 
 test("loadSessions conditionally includes includeArchived based on showArchived state", () => {
