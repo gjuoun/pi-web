@@ -18,7 +18,7 @@ test("sorts running subagents first and enables search only for larger families"
   assert.match(source, /if \(aRunning !== bRunning\) return aRunning \? -1 : 1/);
   assert.match(source, /subagents\.length > 8/);
   assert.match(source, /relation\?\.description, relation\?\.profile, session\.name, session\.firstMessage/);
-  assert.match(source, /maxHeight: "min\(58dvh, 480px\)"/);
+  assert.match(source, /max-h-\[min\(58dvh,480px\)\]/);
 });
 
 test("labels a child by the engine that ran it", () => {
@@ -30,9 +30,10 @@ test("labels a child by the engine that ran it", () => {
 });
 
 test("renders as a compact left-positioned dropdown without a centered inner width", () => {
-  assert.match(source, /borderLeft: "1px solid var\(--border\)"/);
-  assert.match(source, /borderRadius: "0 0 6px 6px"/);
+  assert.match(source, /border-x border-b border-border/);
+  assert.match(source, /rounded-b-md/);
   assert.doesNotMatch(source, /maxWidth: 680/);
+  assert.doesNotMatch(source, /mx-auto/);
 });
 
 test("shows persisted completion states while live running state takes precedence", () => {
@@ -40,6 +41,10 @@ test("shows persisted completion states while live running state takes precedenc
   assert.match(source, /t\(`agentSwitcher\.status\.\$\{status\}`\)/);
   assert.match(source, /status === "failed"/);
   assert.match(source, /status === "aborted" \|\| status === "interrupted"/);
+  // Semantic colours moved from literal hex to tokens.
+  assert.match(source, /text-success/);
+  assert.match(source, /text-destructive/);
+  assert.match(source, /text-warning/);
 });
 
 test("enriches a family row with the package run that produced it", () => {

@@ -12,15 +12,18 @@ import assert from "node:assert/strict";
  * and the absence of a posted message are.
  */
 
-const PICKER = ".list-picker";
-const COMPOSER = "textarea.chat-input-textarea";
+const PICKER = "[data-slot=list-picker]";
+const COMPOSER = 'textarea[data-slot="chat-input-textarea"]';
 
 export async function checkModelPicker(page, { base, sessionId }) {
   // get_state is a POST command; the GET route does not answer with the {success, data} envelope.
-  /** The class of whatever currently owns focus — the focus assertions read this. */
+  /** The class (plus data-slot, since shadcn hooks live there, not in the class string) of whatever
+   *  currently owns focus — the focus assertions read this. */
   const activeClass = (target) => target.evaluate(() => {
     const el = document.activeElement;
-    return el ? String(el.className || el.tagName) : "";
+    if (!el) return "";
+    const slot = el.getAttribute && el.getAttribute("data-slot");
+    return String((slot ? slot + " " : "") + (el.className || el.tagName));
   });
 
   const stateOf = async () => {
@@ -30,7 +33,7 @@ export async function checkModelPicker(page, { base, sessionId }) {
   };
 
   await page.goto(base + "/?session=" + sessionId, { waitUntil: "domcontentloaded" });
-  await page.locator(".chat-status-bar").waitFor();
+  await page.locator('[data-slot="chat-status-bar"]').waitFor();
   const composer = page.locator(COMPOSER);
   await composer.waitFor();
   const before = await stateOf();
@@ -49,14 +52,11 @@ export async function checkModelPicker(page, { base, sessionId }) {
   await composer.fill("/model");
   await page.keyboard.press("Enter");
   await page.locator(PICKER).waitFor({ timeout: 15000 });
-  const focused = await page.evaluate(() => {
-    const el = document.activeElement;
-    return el ? String(el.className || el.tagName) : "";
-  });
-  assert.ok(focused.includes("list-picker-input"), "the picker's own input must take focus, got " + focused);
-  const rows = await page.locator(".list-picker-item").count();
-  const emptyLabel = (await page.locator(".list-picker-empty").count()) > 0
-    ? (await page.locator(".list-picker-empty").innerText()).trim()
+  const focused = await activeClass(page);
+  assert.ok(focused.includes("command-input"), "the picker's own input must take focus, got " + focused);
+  const rows = await page.locator("[data-slot=command-item]").count();
+  const emptyLabel = (await page.locator("[data-slot=command-empty]").count()) > 0
+    ? (await page.locator("[data-slot=command-empty]").innerText()).trim()
     : "";
   assert.ok(
     rows > 0 || emptyLabel.length > 0,
@@ -90,7 +90,7 @@ export async function checkModelPicker(page, { base, sessionId }) {
   await composer.fill("/model");
   await page.keyboard.press("Enter");
   await page.locator(PICKER).waitFor({ timeout: 15000 });
-  const selectableRows = await page.locator(".list-picker-item").count();
+  const selectableRows = await page.locator("[data-slot=command-item]").count();
   if (selectableRows > 0) {
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Enter");

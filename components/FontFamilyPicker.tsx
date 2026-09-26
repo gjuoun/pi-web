@@ -6,6 +6,7 @@ import { loadInstalledFonts, useInstalledFonts } from "@/hooks/useInstalledFonts
 import { isDefaultFont, type FontPreset, type FontRole } from "@/lib/fonts";
 import { pickerFamilies } from "@/lib/fonts-installed";
 import { ConfigButton } from "./SettingsUi";
+import { cn } from "@/lib/utils";
 
 /**
  * One selectable font role: a free-text family field plus a visible list of suggestions.
@@ -142,13 +143,12 @@ export function FontFamilyPicker({
   };
 
   return (
-    <div className="settings-font-option" ref={rootRef} onKeyDown={handleKeyDown}>
-      <div className="settings-font-option-header">
+    <div className="w-full text-xs text-foreground" ref={rootRef} onKeyDown={handleKeyDown}>
+      <div className="flex items-center justify-between gap-2">
         <label htmlFor={inputId}>{label}</label>
         <ConfigButton
           variant="ghost"
           size="small"
-          className="settings-chat-reset"
           title={resetLabel}
           aria-label={resetLabel}
           disabled={isDefaultFont(value)}
@@ -159,11 +159,11 @@ export function FontFamilyPicker({
           </svg>
         </ConfigButton>
       </div>
-      <div className="settings-font-picker">
+      <div className="relative mt-1.5 flex items-center gap-1.5">
         <input
           id={inputId}
           ref={inputRef}
-          className="settings-font-input"
+          className="mt-1.5 w-full rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground focus:border-primary focus:outline-none"
           type="text"
           role="combobox"
           aria-label={label}
@@ -183,7 +183,7 @@ export function FontFamilyPicker({
         <ConfigButton
           variant="ghost"
           size="small"
-          className="settings-font-picker-toggle"
+          className={cn("size-7 shrink-0 p-0", open ? "text-foreground" : "text-muted-foreground")}
           title={t("settings.fontSuggestions")}
           aria-label={t("settings.fontSuggestions")}
           aria-haspopup="listbox"
@@ -213,11 +213,11 @@ export function FontFamilyPicker({
             id={listId}
             role="listbox"
             aria-label={label}
-            className="settings-font-picker-popover"
+            className="fixed z-[400] m-0 min-w-[180px] list-none overflow-y-auto overscroll-contain rounded-lg border border-border bg-background p-1 shadow-[0_8px_20px_rgba(0,0,0,0.14)]"
             style={{ ...verticalPosition, left: anchor.left, width: anchor.width, maxHeight }}
           >
             {visible.length === 0 && (
-              <li className="settings-font-picker-empty" role="presentation">{t("settings.fontNoMatches")}</li>
+              <li className="px-2 py-1.5 text-[11px] text-muted-foreground" role="presentation">{t("settings.fontNoMatches")}</li>
             )}
             {visible.map((preset, index) => (
               <li
@@ -225,15 +225,18 @@ export function FontFamilyPicker({
                 role="option"
                 data-family={preset.family}
                 aria-selected={index === activeIndex}
-                className={`settings-font-picker-option${index === activeIndex ? " is-active" : ""}${preset.family === "" ? " is-default" : ""}`}
+                className={cn(
+                  "flex cursor-pointer items-baseline justify-between gap-2.5 rounded-md px-2 py-1.5 text-xs text-muted-foreground",
+                  index === activeIndex && "bg-accent text-foreground",
+                )}
                 // onMouseMove, not onMouseEnter: a list that renders under a stationary cursor must not
                 // steal the keyboard's highlighted item before the first arrow key.
                 onMouseMove={() => setActiveIndex(index)}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(preset)}
               >
-                <span className="settings-font-picker-label">{preset.label}</span>
-                <span className="settings-font-picker-family">
+                <span className="text-foreground">{preset.label}</span>
+                <span className="overflow-hidden font-mono text-[11px] whitespace-nowrap text-ellipsis text-muted-foreground">
                   {preset.family === "" ? t("settings.fontDefaultBadge") : preset.family}
                 </span>
               </li>

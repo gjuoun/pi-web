@@ -1,9 +1,39 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { createJiti } from "jiti";
+
+const jiti = createJiti(import.meta.url, {
+  jsx: { runtime: "automatic" },
+  tsconfigPaths: true,
+});
+const React = await jiti.import("react");
+const { renderToStaticMarkup } = await jiti.import("react-dom/server");
+const {
+  ConfigPanelShell,
+  ConfigSplitView,
+  ConfigSidebar,
+  ConfigSidebarList,
+  ConfigSidebarGroupLabel,
+  ConfigSidebarItem,
+  ConfigSidebarText,
+  ConfigDetail,
+  ConfigDetailStack,
+  ConfigDetailHeader,
+  ConfigDetailHeaderInfo,
+  ConfigDetailActions,
+  ConfigDetailTitle,
+  ConfigSectionTitle,
+  ConfigField,
+  ConfigEmptyState,
+  ConfigFooter,
+  ConfigButton,
+  ConfigSwitch,
+  ConfigListAction,
+  ConfigStatusDot,
+} = await jiti.import("./SettingsUi.tsx");
 
 const templateSource = await readFile(new URL("./SettingsUi.tsx", import.meta.url), "utf8");
-const cssSource = await readFile(new URL("../app/settings.css", import.meta.url), "utf8");
 const globalCssSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const layoutSource = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const enSource = await readFile(new URL("../lib/i18n/messages/en.ts", import.meta.url), "utf8");
@@ -14,6 +44,10 @@ const configSources = await Promise.all(
     await readFile(new URL(`./${name}.tsx`, import.meta.url), "utf8"),
   ]),
 );
+
+function render(el) {
+  return renderToStaticMarkup(el);
+}
 
 test("provides one template for config layout and controls", () => {
   for (const primitive of [
@@ -40,19 +74,21 @@ test("provides one template for config layout and controls", () => {
   ]) {
     assert.match(templateSource, new RegExp(`export function ${primitive}`));
   }
-  assert.match(templateSource, /className="config-sidebar"/);
-  assert.match(templateSource, /className="config-detail"/);
-  assert.match(cssSource, /\.config-sidebar \{[\s\S]*?width: 240px/);
-  assert.match(cssSource, /\.config-detail \{[\s\S]*?padding: 20px/);
-  assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.config-sidebar \{[\s\S]*?width: 100%/);
-  assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.config-detail \{[\s\S]*?padding: 14px/);
 });
 
-test("loads settings presentation from its dedicated stylesheet", () => {
-  assert.match(layoutSource, /import "\.\/globals\.css";\s*import "\.\/settings\.css";/);
-  assert.match(cssSource, /\.config-panel-root \{/);
-  assert.match(cssSource, /\.settings-dialog-backdrop \{/);
-  assert.doesNotMatch(globalCssSource, /\.config-panel-root \{/);
+test("keeps every export composing raw components/ui — never hand-rolled markup", () => {
+  assert.doesNotMatch(templateSource, /<style>/);
+  assert.doesNotMatch(templateSource, /onMouseEnter|onMouseLeave/);
+  assert.match(templateSource, /from "@\/components\/ui\/button"/);
+  assert.match(templateSource, /from "@\/components\/ui\/switch"/);
+  assert.match(templateSource, /from "@\/components\/ui\/dialog"/);
+  assert.match(templateSource, /from "@\/components\/ui\/label"/);
+  assert.match(templateSource, /from "@\/components\/ui\/empty"/);
+});
+
+test("loads settings presentation from globals.css, with no dedicated settings stylesheet", () => {
+  assert.match(layoutSource, /import "\.\/globals\.css";/);
+  assert.doesNotMatch(layoutSource, /settings\.css/);
   assert.doesNotMatch(globalCssSource, /\.settings-dialog-backdrop \{/);
 });
 
@@ -64,33 +100,17 @@ test("all four settings sections use the shared list-detail layout", () => {
   }
 });
 
-test("all subpanel sidebars share one typography scale", () => {
+test("all subpanel sidebars share one interactive item template", () => {
   const sources = Object.fromEntries(configSources);
-  assert.match(cssSource, /\.config-sidebar-text \{[\s\S]*?font-family: inherit[\s\S]*?font-size: 12px/);
-  assert.match(cssSource, /\.config-sidebar-group-label \{[\s\S]*?font-family: inherit[\s\S]*?font-size: 10px/);
   for (const source of Object.values(sources)) {
     assert.match(source, /<ConfigSidebarText/);
   }
   for (const name of ["SkillsConfig", "PluginsConfig"]) {
     assert.match(sources[name], /<ConfigSidebarGroupLabel/);
-  }
-});
-
-test("skills and sub-agents share interactive sidebar rows", () => {
-  const sources = Object.fromEntries(configSources);
-  for (const name of ["SkillsConfig", "PluginsConfig"]) {
     assert.match(sources[name], /<ConfigSidebarItem/);
   }
-  assert.match(templateSource, /export function ConfigSidebarItem[\s\S]*?className=\{\["config-sidebar-item"/);
-  assert.match(cssSource, /\.config-sidebar-item:not\(:disabled\):hover,[\s\S]*?background: var\(--bg-hover\)/);
-  assert.match(cssSource, /\.config-sidebar-item:focus-visible \{[\s\S]*?outline: 2px solid var\(--accent\)/);
   assert.doesNotMatch(templateSource, /setHovered|setFocusVisible|useState/);
-  assert.doesNotMatch(sources.SkillsConfig, /onMouseEnter[\s\S]*?var\(--bg-hover\)/);
-});
-
-test("all shared config sidebar items use a fixed 30px height", () => {
-  assert.match(cssSource, /\.config-sidebar-item \{[\s\S]*?height: 30px[\s\S]*?padding: 0 8px/);
-  assert.match(cssSource, /\.config-list-action-button \{[\s\S]*?height: 30px[\s\S]*?min-height: 30px/);
+  assert.doesNotMatch(sources.SkillsConfig, /onMouseEnter[\s\S]*?bg-/);
 });
 
 test("plugin sidebar rows omit detail metadata", () => {
@@ -114,10 +134,6 @@ test("skill scope group labels are localized", () => {
 
 test("all subpanel detail panes share one content hierarchy", () => {
   const sources = Object.fromEntries(configSources);
-  assert.match(cssSource, /\.config-detail-stack \{[\s\S]*?gap: 16px[\s\S]*?width: 100%/);
-  assert.doesNotMatch(cssSource, /\.config-detail-stack \{[\s\S]*?max-width: 720px/);
-  assert.match(cssSource, /\.config-field-label \{[\s\S]*?font-size: 11px/);
-  assert.match(cssSource, /\.config-empty-state \{[\s\S]*?font-size: 12px/);
   for (const source of Object.values(sources)) {
     assert.match(source, /<ConfigDetailStack/);
     assert.match(source, /<ConfigEmptyState/);
@@ -126,28 +142,10 @@ test("all subpanel detail panes share one content hierarchy", () => {
 
 test("detail header actions keep buttons and switches aligned to the right", () => {
   const sources = Object.fromEntries(configSources);
-  assert.match(cssSource, /\.config-detail-actions \{[\s\S]*?justify-content: flex-end[\s\S]*?margin-left: auto/);
   for (const name of ["SkillsConfig", "PluginsConfig"]) {
     assert.match(sources[name], /<ConfigDetailActions>/);
   }
   assert.match(sources.PluginsConfig, /<ConfigDetailActions>[\s\S]*?<ConfigSwitch[\s\S]*?<\/ConfigDetailActions>/);
-});
-
-test("keeps shared static presentation in the stylesheet", () => {
-  assert.doesNotMatch(templateSource, /<style>/);
-  assert.doesNotMatch(templateSource, /style=\{\{/);
-  assert.doesNotMatch(templateSource, /onMouseEnter|onMouseLeave/);
-  for (const className of [
-    "config-panel-surface",
-    "config-split-view",
-    "config-sidebar-item",
-    "config-detail-stack",
-    "config-button",
-    "config-switch",
-  ]) {
-    assert.match(templateSource, new RegExp(className));
-    assert.match(cssSource, new RegExp(`\\.${className}\\b`));
-  }
 });
 
 test("embedded sections do not repeat Settings close actions", () => {
@@ -157,12 +155,8 @@ test("embedded sections do not repeat Settings close actions", () => {
   assert.match(sources.PluginsConfig, /!embedded && <ConfigButton onClick=\{onClose\}>\{t\("i18n\.close"\)\}/);
 });
 
-test("subpanel footers share sizing while maintenance actions stay secondary", () => {
+test("subpanel footers keep the primary save action recognizable", () => {
   const sources = Object.fromEntries(configSources);
-  assert.match(cssSource, /\.config-footer-actions \{[\s\S]*?justify-content: flex-end/);
-  assert.match(cssSource, /\.config-footer-actions \.config-button-default \{[\s\S]*?min-width: 96px/);
-  assert.match(cssSource, /\.config-button \{[\s\S]*?font-family: inherit/);
-  assert.match(cssSource, /\.config-button-default \{[\s\S]*?height: 32px/);
   assert.match(sources.ModelsConfig, /<ConfigButton\s+variant="primary"[\s\S]*?onClick=\{handleSave\}/);
   assert.match(sources.SkillsConfig, /<ConfigButton variant="secondary" onClick=\{\(\) => void checkForUpdates\(\)\}/);
   assert.match(sources.PluginsConfig, /<ConfigButton variant="secondary" onClick=\{\(\) => void loadPlugins\(\)\}/);
@@ -174,4 +168,76 @@ test("skills and plugins share enabled and disabled controls", () => {
     assert.match(sources[name], /<ConfigSwitch/);
     assert.match(sources[name], /<ConfigStatusDot/);
   }
+});
+
+test("ConfigSidebarItem renders as a real button honoring active/current state", () => {
+  const html = render(React.createElement(ConfigSidebarItem, { active: true }, "Row"));
+  assert.match(html, /<button/);
+  assert.match(html, /aria-current="page"/);
+  assert.match(html, /data-slot="config-sidebar-item"/);
+});
+
+test("ConfigButton renders shadcn Button with data-slot and mapped variant", () => {
+  const html = render(React.createElement(ConfigButton, { variant: "danger" }, "Delete"));
+  assert.match(html, /data-slot="button"/);
+  assert.match(html, /data-variant="destructive"/);
+});
+
+test("ConfigSwitch renders a real switch role with aria-checked and busy state", () => {
+  const html = render(
+    React.createElement(ConfigSwitch, {
+      checked: true,
+      loading: true,
+      label: "Enabled",
+      onChange: () => {},
+    }),
+  );
+  assert.match(html, /role="switch"/);
+  assert.match(html, /aria-checked="true"/);
+  assert.match(html, /aria-busy="true"/);
+  assert.match(html, /data-slot="spinner"/);
+});
+
+test("ConfigListAction renders as a button with data-slot and aria-current", () => {
+  const html = render(React.createElement(ConfigListAction, { active: true }, "Add"));
+  assert.match(html, /data-slot="config-list-action-button"/);
+  assert.match(html, /aria-current="page"/);
+});
+
+test("ConfigStatusDot exposes an aria-hidden data-slot marker", () => {
+  const html = render(React.createElement(ConfigStatusDot, { active: true }));
+  assert.match(html, /data-slot="config-status-dot"/);
+  assert.match(html, /aria-hidden="true"/);
+});
+
+test("ConfigField labels its content with a real label element", () => {
+  const html = render(React.createElement(ConfigField, { label: "Name" }, React.createElement("input")));
+  assert.match(html, /data-slot="label"/);
+  assert.match(html, />Name</);
+});
+
+test("ConfigPanelShell embedded branch renders children without a dialog wrapper", () => {
+  const html = render(
+    React.createElement(
+      ConfigPanelShell,
+      { embedded: true, title: "Models", onClose: () => {} },
+      "content",
+    ),
+  );
+  assert.doesNotMatch(html, /data-slot="dialog"/);
+  assert.match(html, /content/);
+});
+
+test("ConfigPanelShell modal branch is a Radix dialog (portal content is not SSR-visible)", () => {
+  const html = render(
+    React.createElement(
+      ConfigPanelShell,
+      { embedded: false, title: "Models", onClose: () => {} },
+      "content",
+    ),
+  );
+  // Dialog root + trigger area render; the portal content itself is invisible under SSR
+  // (see plan Decision 6 / probe ssr.txt: "dialog-open: empty"). Open-state proof for the
+  // title/close-button/overlay behaviour belongs to e2e / drive-themes, not this unit test.
+  assert.doesNotMatch(html, /content/);
 });

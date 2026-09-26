@@ -10,7 +10,6 @@ import {
 import { isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
 import type { AgentMessage, AssistantMessage, CustomMessage, TextContent, UserMessage } from "@/lib/types";
 import { useI18n } from "@/hooks/useI18n";
-import styles from "./ChatMinimap.module.css";
 
 interface Props {
   messages: AgentMessage[];
@@ -76,7 +75,7 @@ function PreviewHeading({
   return (
     <button
       type="button"
-      className={styles.heading}
+      className="block w-[calc(100%+34px)] min-h-[26px] min-w-0 -ml-[34px] py-1 px-2.5 pl-10 border-0 bg-transparent font-[inherit] tracking-normal leading-[18px] overflow-hidden text-left text-ellipsis whitespace-nowrap cursor-pointer transition-[background,color] duration-100 hover:bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)] hover:text-foreground focus-visible:outline-0 focus-visible:bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)] focus-visible:shadow-[inset_2px_0_0_color-mix(in_srgb,var(--muted-foreground)_65%,transparent)] data-[level='1']:min-h-8 data-[level='1']:py-[7px] data-[level='1']:text-foreground data-[level='1']:text-sm data-[level='1']:font-semibold data-[level='2']:min-h-7 data-[level='2']:py-[5px] data-[level='2']:pl-[50px] data-[level='2']:text-[color-mix(in_srgb,var(--foreground)_88%,var(--muted-foreground))] data-[level='2']:text-xs data-[level='2']:font-medium data-[level='3']:pl-[60px] data-[level='3']:text-muted-foreground data-[level='3']:text-[11px] data-[level='3']:font-normal"
       data-level={level}
       data-preview-heading-index={headingIndex ?? undefined}
       disabled={headingIndex === null || !onClick}
@@ -150,7 +149,7 @@ export const AssistantOutline = memo(function AssistantOutline({
   const normalizedMarkdown = useMemo(() => normalizeDisplayMath(markdown), [markdown]);
   if (!markdown) return null;
   return (
-    <div className={styles.outline}>
+    <div className="grid min-w-0 gap-0 [&_.katex]:text-[1em] [&_.katex-display]:inline [&_.katex-display]:m-0">
       <ReactMarkdown
         remarkPlugins={previewRemarkPlugins}
         rehypePlugins={previewRehypePlugins}
@@ -164,7 +163,7 @@ export const AssistantOutline = memo(function AssistantOutline({
           p: ({ children }) => (
             <button
               type="button"
-              className={styles.paragraph}
+              className="block w-[calc(100%+34px)] min-h-[26px] min-w-0 -ml-[34px] py-1 px-2.5 pl-10 border-0 bg-transparent font-[inherit] tracking-normal leading-[18px] overflow-hidden text-left text-ellipsis whitespace-nowrap cursor-pointer transition-[background,color] duration-100 text-muted-foreground text-sm font-normal hover:bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)] hover:text-foreground focus-visible:outline-0 focus-visible:bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)] focus-visible:shadow-[inset_2px_0_0_color-mix(in_srgb,var(--muted-foreground)_65%,transparent)]"
               onClick={onAnswerClick}
             >
               {children}
@@ -611,28 +610,11 @@ export function ChatMinimap({
         const rect = event.currentTarget.getBoundingClientRect();
         setMouseYRatio((event.clientY - rect.top) / rect.height);
       }}
-      style={{
-        width: MINIMAP_WIDTH,
-        flexShrink: 0,
-        position: "relative",
-        cursor: "pointer",
-        userSelect: "none",
-        borderLeft: "1px solid var(--border)",
-        background: "var(--bg-panel)",
-        overflow: "visible",
-      }}
+      className="relative w-9 flex-shrink-0 cursor-pointer select-none overflow-visible border-l border-border bg-muted"
     >
       <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          top: MINIMAP_PADDING,
-          height: railHeight,
-          width: 1,
-          background: "var(--border)",
-          transform: "translateX(-50%)",
-          zIndex: 0,
-        }}
+        className="absolute left-1/2 w-px -translate-x-1/2 bg-border z-0"
+        style={{ top: MINIMAP_PADDING, height: railHeight }}
       />
 
       {positionedNodes.map((node) => {
@@ -644,29 +626,18 @@ export function ChatMinimap({
             key={node.index}
             data-minimap-node-index={node.index}
             data-minimap-node-active={isActive ? "" : undefined}
+            className="absolute inset-x-0 flex items-center justify-center pointer-events-none z-2 -translate-y-1/2"
             style={{
-              position: "absolute",
               top: `${node.topRatio * 100}%`,
-              transform: "translateY(-50%)",
-              left: 0,
-              right: 0,
               height: Math.max(1, nodeGap),
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              pointerEvents: "none",
-              zIndex: 2,
             }}
           >
             <div
+              className="w-2 h-2 rounded-sm transition-[transform,background] duration-100"
               style={{
-                width: 8,
-                height: 8,
-                borderRadius: 2,
                 background: isActive ? "rgba(128,128,128,0.42)" : "rgba(128,128,128,0.16)",
                 border: `1.5px solid ${isActive ? "rgba(128,128,128,0.95)" : "rgba(128,128,128,0.58)"}`,
-                boxShadow: isActive ? "0 0 0 2px var(--bg-panel)" : "none",
-                transition: "transform 0.1s, background 0.1s",
+                boxShadow: isActive ? "0 0 0 2px var(--muted)" : "none",
                 transform: isNearest ? "scale(1.25)" : "scale(1)",
               }}
             />
@@ -677,7 +648,7 @@ export function ChatMinimap({
       {minimapHovered && allNodes.length > 0 && (
         <div
           ref={previewBoxRef}
-          className={styles.preview}
+          className="absolute top-0 bottom-0 right-full z-100 w-80 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-width:thin] [scrollbar-color:var(--border)_transparent] bg-background border-l border-[color-mix(in_srgb,var(--border)_82%,transparent)] shadow-[-10px_0_26px_rgba(0,0,0,0.07)] pointer-events-auto cursor-default select-text"
           data-minimap-preview-box=""
           onMouseEnter={showPreview}
           onMouseDown={(event) => event.stopPropagation()}
@@ -692,23 +663,23 @@ export function ChatMinimap({
                   if (element) previewItemRefs.current.set(node.index, element);
                   else previewItemRefs.current.delete(node.index);
                 }}
-                className={styles.turn}
+                className="relative grid grid-cols-[34px_minmax(0,1fr)] p-0 border-b border-[color-mix(in_srgb,var(--border)_68%,transparent)] bg-transparent transition-[background,box-shadow] duration-[120ms] data-[located=true]:bg-[color-mix(in_srgb,var(--foreground)_4%,var(--background))] data-[located=true]:shadow-[inset_2px_0_0_color-mix(in_srgb,var(--muted-foreground)_70%,transparent)] [&[data-located=true]_[data-slot=minimap-number]]:text-muted-foreground"
                 data-minimap-preview-index={node.index}
                 data-located={isLocated ? "true" : undefined}
               >
-                <span className={styles.number} aria-hidden="true">
+                <span data-slot="minimap-number" className="relative z-1 col-start-1 flex items-center justify-center w-[34px] h-8 p-0 text-muted-foreground font-mono text-[10px] [font-variant-numeric:tabular-nums] leading-[18px] text-center" aria-hidden="true">
                   {String(node.index + 1).padStart(2, "0")}
                 </span>
-                <div className={styles.content}>
+                <div className="col-start-2 min-w-0">
                   <button
                     type="button"
-                    className={styles.user}
+                    className="block w-[calc(100%+34px)] min-h-8 max-h-[86px] -ml-[34px] py-[7px] px-2.5 pl-10 border-0 bg-transparent text-foreground font-[inherit] text-sm font-medium tracking-normal leading-[18px] text-left cursor-pointer overflow-hidden transition-[background] duration-100 hover:bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)] focus-visible:outline-0 focus-visible:bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)] focus-visible:shadow-[inset_2px_0_0_color-mix(in_srgb,var(--muted-foreground)_65%,transparent)]"
                     data-minimap-preview-user={node.index}
                     onClick={() => {
                       scrollToNode(node, "smooth");
                     }}
                   >
-                    <span className={styles.userText}>
+                    <span className="[display:-webkit-box] overflow-hidden [overflow-wrap:anywhere] whitespace-pre-wrap [-webkit-box-orient:vertical] [-webkit-line-clamp:4] [line-clamp:4]">
                       {getUserPreview(node.targetTurn.userMessage)}
                     </span>
                   </button>
@@ -716,11 +687,12 @@ export function ChatMinimap({
                   {node.targetTurn.assistantPreviews.map((assistant, assistantIndex) => (
                     <div
                       key={assistantIndex}
-                      className={styles.assistant}
+                      className="relative block p-0 border-t border-[color-mix(in_srgb,var(--border)_52%,transparent)] [&:has([data-level='1']:first-child)_[data-slot=minimap-assistant-jump]]:h-8 [&:has([data-level='1']:first-child)_[data-slot=minimap-assistant-jump]]:leading-8 [&:has([data-level='2']:first-child)_[data-slot=minimap-assistant-jump]]:h-7 [&:has([data-level='2']:first-child)_[data-slot=minimap-assistant-jump]]:leading-7"
                     >
                       <button
                         type="button"
-                        className={styles.assistantJump}
+                        data-slot="minimap-assistant-jump"
+                        className="absolute top-0 -left-[29px] z-2 w-6 h-[26px] p-0 border-0 bg-transparent text-muted-foreground font-mono text-[10px] font-semibold tracking-normal leading-[26px] text-center cursor-pointer transition-[color,background] duration-100 hover:text-foreground hover:bg-[color-mix(in_srgb,var(--foreground)_4%,transparent)] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[color-mix(in_srgb,var(--muted-foreground)_65%,transparent)] focus-visible:outline-offset-1"
                         data-minimap-preview-assistant={`${node.index}-${assistantIndex}`}
                         onClick={() => scrollToAssistant(node, assistantIndex)}
                         aria-label={t("chatMinimap.locateAssistant")}

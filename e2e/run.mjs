@@ -359,7 +359,7 @@ try {
     await checkExtensionDialogs(page, artifacts, viewport.width);
     if (viewport.width > 600) {
       await page.goto(`${base}/?session=${RICH}`, { waitUntil: "domcontentloaded" });
-      await page.locator(".markdown-code-block pre").waitFor();
+      await page.locator("[data-slot=\"markdown-code-block\"] pre").waitFor();
       await checkChatAppearance(page);
       await checkFontSelection(page);
       await checkModelPicker(page, { base, cwd: project, sessionId: RICH });

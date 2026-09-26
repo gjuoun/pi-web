@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, useMemo, type CSSProperties, type MouseEvent } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, type MouseEvent } from "react";
 import {
   Prism as SyntaxHighlighter,
   createElement as renderSyntaxNode,
   type SyntaxHighlighterProps,
 } from "react-syntax-highlighter";
-import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import ReactMarkdown from "react-markdown";
 import { useTheme } from "@/hooks/useTheme";
+import { getPrismStyle } from "@/lib/code-themes";
+import { IconButton } from "./IconButton";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   DOCX_PREVIEW_MAX_BYTES,
   getFileExt,
@@ -65,29 +66,9 @@ const DISPLAY_MODE_LABELS: Record<DisplayMode, string> = {
   diff: "Diff",
 };
 
-const FILE_CODE_STYLE: CSSProperties = {
-  fontFamily: "var(--font-mono)",
-  fontSize: 13,
-  lineHeight: 1.6,
-};
+const FILE_CODE_CLASS = "font-mono text-[13px] leading-[1.6]";
 
-const FILE_LINE_NUMBER_STYLE: CSSProperties = {
-  width: 48,
-  minWidth: 48,
-  padding: "0 10px",
-  textAlign: "right",
-  color: "var(--text-dim)",
-  background: "var(--bg-panel)",
-  borderRight: "1px solid var(--border)",
-  fontFamily: "var(--font-mono)",
-  fontSize: 11,
-  fontStyle: "normal",
-  fontVariantNumeric: "tabular-nums",
-  lineHeight: "20.8px",
-  userSelect: "none",
-  flexShrink: 0,
-  verticalAlign: "top",
-};
+const FILE_LINE_NUMBER_CLASS = "w-12 min-w-12 shrink-0 border-r border-border bg-sidebar px-2.5 py-0 text-right align-top font-mono text-[11px] leading-[20.8px] tabular-nums select-none";
 
 type SourceCodeRendererProps = Parameters<NonNullable<SyntaxHighlighterProps["renderer"]>>[0] & {
   wrapLines: boolean;
@@ -176,10 +157,9 @@ function SourceCodeRenderer({ rows, stylesheet, useInlineStyles, wrapLines }: So
 
     return (
       <span
-        className="file-source-line"
+        className="file-source-line flex min-w-full"
         data-line-number={lineIndex + 1}
         key={`source-line-${lineIndex}`}
-        style={{ display: "flex", minWidth: "100%" }}
       >
         {lineNumberNode && renderSyntaxNode({
           node: lineNumberNode,
@@ -188,13 +168,7 @@ function SourceCodeRenderer({ rows, stylesheet, useInlineStyles, wrapLines }: So
           key: `source-line-number-${lineIndex}`,
         })}
         <span
-          className="file-source-line-content"
-          style={{
-            flex: "1 1 auto",
-            minWidth: 0,
-            overflowWrap: wrapLines ? "anywhere" : "normal",
-            whiteSpace: wrapLines ? "pre-wrap" : "pre",
-          }}
+          className={`file-source-line-content min-w-0 flex-1 ${wrapLines ? "break-words whitespace-pre-wrap" : "whitespace-pre"}`}
         >
           {contentNodes.map((node, tokenIndex) => renderSyntaxNode({
             node,
@@ -231,7 +205,7 @@ function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceS
       download={getFileName(filePath)}
       title={t("i18n.downloadFile")}
       aria-label={t("i18n.downloadFile")}
-      className="file-viewer-icon-button"
+      className="inline-flex size-6 shrink-0 items-center justify-center rounded-[5px] border border-border text-muted-foreground no-underline hover:bg-accent hover:text-foreground"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -239,6 +213,30 @@ function DownloadLink({ filePath, sourceSessionId }: { filePath: string; sourceS
         <line x1="12" y1="15" x2="12" y2="3" />
       </svg>
     </a>
+  );
+}
+
+/** The small "live"/"static" watch-status dot + label shared by the media viewers. */
+function WatchIndicator({ watching, t }: { watching: boolean; t: ReturnType<typeof useI18n>["t"] }) {
+  return (
+    <span
+      title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
+      className={`flex shrink-0 items-center gap-1 ${watching ? "text-success" : "text-muted-foreground"}`}
+    >
+      <span
+        className={`inline-block size-[7px] rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--success)]" : "bg-border"}`}
+      />
+      {watching ? "live" : "static"}
+    </span>
+  );
+}
+
+/** The toolbar row shared by the media viewers (image/audio/video/document). */
+function MediaToolbar({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex h-auto flex-shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-1 text-[11px] text-muted-foreground">
+      {children}
+    </div>
   );
 }
 
@@ -298,7 +296,7 @@ function DiffView({ patch }: { patch: string }) {
   const hasChanges = diff.some((l) => l.type !== "unchanged");
   if (!hasChanges) {
     return (
-      <div style={{ padding: "12px 16px", fontSize: 12, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
+      <div className="px-4 py-3 font-mono text-xs text-muted-foreground">
         {t("i18n.noChanges")}
       </div>
     );
@@ -336,84 +334,50 @@ function DiffView({ patch }: { patch: string }) {
 
   return (
     <div
-      className="file-diff-view"
-      style={{
-        width: "max-content",
-        minWidth: "100%",
-        ...FILE_CODE_STYLE,
-      }}
+      className={`file-diff-view w-max min-w-full ${FILE_CODE_CLASS}`}
     >
       {segments.map((seg, si) => {
         if (seg.hidden) {
-          const result = (
+          return (
             <div
               key={si}
-              style={{
-                padding: "2px 16px",
-                color: "var(--text-dim)",
-                background: "var(--bg-panel)",
-                fontSize: 11,
-                borderTop: "1px solid var(--border)",
-                borderBottom: "1px solid var(--border)",
-              }}
+              className="border-y border-border bg-sidebar px-4 py-0.5 text-[11px] text-muted-foreground"
             >
               ... {seg.count} unchanged lines ...
             </div>
           );
-          return result;
         }
         const lines = seg.lines.map((line, li) => {
-          const bg =
+          const bgClass =
             line.type === "added"
-              ? "rgba(0,200,80,0.12)"
+              ? "bg-success/12"
               : line.type === "removed"
-              ? "rgba(240,60,60,0.14)"
-              : "transparent";
+              ? "bg-destructive/14"
+              : "";
           const prefix =
             line.type === "added" ? "+" : line.type === "removed" ? "-" : " ";
-          const prefixColor =
-            line.type === "added" ? "#4ade80" : line.type === "removed" ? "#f87171" : "var(--text-dim)";
+          const prefixClass =
+            line.type === "added" ? "text-success" : line.type === "removed" ? "text-destructive" : "text-muted-foreground";
+          const borderClass =
+            line.type === "added"
+              ? "border-l-success"
+              : line.type === "removed"
+              ? "border-l-destructive"
+              : "border-l-transparent";
 
           return (
             <div
               key={li}
-              className="file-diff-line"
-              style={{
-                display: "flex",
-                minWidth: "100%",
-                background: bg,
-                borderLeft: line.type === "added"
-                  ? "3px solid #4ade80"
-                  : line.type === "removed"
-                  ? "3px solid #f87171"
-                  : "3px solid transparent",
-              }}
+              className={`file-diff-line flex min-w-full border-l-[3px] ${bgClass} ${borderClass}`}
             >
-              <span
-                style={FILE_LINE_NUMBER_STYLE}
-              >
+              <span className={FILE_LINE_NUMBER_CLASS}>
                 {line.type === "removed" ? line.oldLineNo : line.newLineNo}
               </span>
-              <span
-                style={{
-                  minWidth: 16,
-                  padding: "0 6px",
-                  color: prefixColor,
-                  userSelect: "none",
-                  flexShrink: 0,
-                  fontWeight: 600,
-                }}
-              >
+              <span className={`shrink-0 px-1.5 py-0 font-semibold select-none ${prefixClass}`}>
                 {prefix}
               </span>
               <span
-                className="file-diff-line-content"
-                style={{
-                  flexShrink: 0,
-                  padding: "0 8px 0 0",
-                  whiteSpace: "pre",
-                  color: "var(--text)",
-                }}
+                className="file-diff-line-content shrink-0 py-0 pr-2 pl-0 whitespace-pre text-foreground"
               >
                 {line.text || "\u00a0"}
               </span>
@@ -512,61 +476,22 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
   const formatSizeStr = size != null ? formatSize(size) : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "4px 16px",
-          borderBottom: "1px solid var(--border)",
-          fontSize: 11,
-          color: "var(--text-dim)",
-          background: "var(--bg)",
-          flexShrink: 0,
-        }}
-      >
-        <span style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
+    <div className="flex h-full flex-col overflow-hidden">
+      <MediaToolbar>
+        <span className="font-mono" title={filePath}>
           {getRelativeFilePath(filePath, cwd)}
         </span>
-        <span style={{ marginLeft: "auto" }}>{ext || "image"}</span>
+        <span className="ml-auto">{ext || "image"}</span>
         {naturalSize && <span>{naturalSize.w} × {naturalSize.h}</span>}
         {formatSizeStr && <span>{formatSizeStr}</span>}
-        <span
-          title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-          style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)" }}
-        >
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: watching ? "#4ade80" : "var(--border)",
-              display: "inline-block",
-              boxShadow: watching ? "0 0 4px #4ade80" : "none",
-            }}
-          />
-          {watching ? "live" : "static"}
-        </span>
+        <WatchIndicator watching={watching} t={t} />
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />
-      </div>
+      </MediaToolbar>
       <div
-        style={{
-          flex: 1,
-          overflow: "auto",
-          background: "var(--bg-panel)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 16,
-          backgroundImage:
-            "linear-gradient(45deg, var(--bg) 25%, transparent 25%), linear-gradient(-45deg, var(--bg) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--bg) 75%), linear-gradient(-45deg, transparent 75%, var(--bg) 75%)",
-          backgroundSize: "16px 16px",
-          backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0px",
-        }}
+        className="flex flex-1 items-center justify-center overflow-auto bg-sidebar bg-[length:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0px] bg-[image:linear-gradient(45deg,var(--background)_25%,transparent_25%),linear-gradient(-45deg,var(--background)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,var(--background)_75%),linear-gradient(-45deg,transparent_75%,var(--background)_75%)] p-4"
       >
         {error ? (
-          <div style={{ color: "#f87171", fontSize: 13 }}>{error}</div>
+          <div className="text-sm text-destructive">{error}</div>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -577,12 +502,7 @@ function ImageViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
               setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
             }}
             onError={() => setError("Failed to load image")}
-            style={{
-              maxWidth: "100%",
-              maxHeight: "100%",
-              objectFit: "contain",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-            }}
+            className="max-h-full max-w-full object-contain shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
           />
         )}
       </div>
@@ -682,57 +602,21 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
   const src = getFileApiUrl(filePath, "read", sourceSessionId, bust ? { v: bust } : undefined);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "4px 16px",
-          borderBottom: "1px solid var(--border)",
-          fontSize: 11,
-          color: "var(--text-dim)",
-          background: "var(--bg)",
-          flexShrink: 0,
-        }}
-      >
-        <span style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
+    <div className="flex h-full flex-col overflow-hidden">
+      <MediaToolbar>
+        <span className="font-mono" title={filePath}>
           {getRelativeFilePath(filePath, cwd)}
         </span>
-        <span style={{ marginLeft: "auto" }}>{ext || "audio"}</span>
+        <span className="ml-auto">{ext || "audio"}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
         {size != null && <span>{formatSize(size)}</span>}
-        <span
-          title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-          style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)" }}
-        >
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: watching ? "#4ade80" : "var(--border)",
-              display: "inline-block",
-              boxShadow: watching ? "0 0 4px #4ade80" : "none",
-            }}
-          />
-          {watching ? "live" : "static"}
-        </span>
+        <WatchIndicator watching={watching} t={t} />
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />
-      </div>
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 24,
-          background: "var(--bg-panel)",
-        }}
-      >
-        <div style={{ width: "min(680px, 100%)" }}>
+      </MediaToolbar>
+      <div className="flex flex-1 items-center justify-center bg-sidebar p-6">
+        <div className="w-full max-w-[680px]">
           {error && (
-            <div style={{ color: "#f87171", fontSize: 13, marginBottom: 12, textAlign: "center" }}>
+            <div className="mb-3 text-center text-sm text-destructive">
               {error}
             </div>
           )}
@@ -743,7 +627,7 @@ function AudioViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
             src={src}
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
             onError={() => setError("Failed to load audio")}
-            style={{ width: "100%" }}
+            className="w-full"
           />
         </div>
       </div>
@@ -835,58 +719,21 @@ function VideoViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
   const src = getFileApiUrl(filePath, "read", sourceSessionId, bust ? { v: bust } : undefined);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "4px 16px",
-          borderBottom: "1px solid var(--border)",
-          fontSize: 11,
-          color: "var(--text-dim)",
-          background: "var(--bg)",
-          flexShrink: 0,
-        }}
-      >
-        <span style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
+    <div className="flex h-full flex-col overflow-hidden">
+      <MediaToolbar>
+        <span className="font-mono" title={filePath}>
           {getRelativeFilePath(filePath, cwd)}
         </span>
-        <span style={{ marginLeft: "auto" }}>{ext || "video"}</span>
+        <span className="ml-auto">{ext || "video"}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
         {size != null && <span>{formatSize(size)}</span>}
-        <span
-          title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-          style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)" }}
-        >
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: watching ? "#4ade80" : "var(--border)",
-              display: "inline-block",
-              boxShadow: watching ? "0 0 4px #4ade80" : "none",
-            }}
-          />
-          {watching ? "live" : "static"}
-        </span>
+        <WatchIndicator watching={watching} t={t} />
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />
-      </div>
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 24,
-          background: "var(--bg-panel)",
-          minHeight: 0,
-        }}
-      >
-        <div style={{ width: "min(960px, 100%)", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
+      </MediaToolbar>
+      <div className="flex min-h-0 flex-1 items-center justify-center bg-sidebar p-6">
+        <div className="flex h-full min-h-0 w-full max-w-[960px] flex-col items-center justify-center">
           {error && (
-            <div style={{ color: "#f87171", fontSize: 13, marginBottom: 12, textAlign: "center" }}>
+            <div className="mb-3 text-center text-sm text-destructive">
               {error}
             </div>
           )}
@@ -898,7 +745,7 @@ function VideoViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }: Pr
             src={src}
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
             onError={() => setError("Failed to load video")}
-            style={{ maxWidth: "100%", maxHeight: "100%" }}
+            className="max-h-full max-w-full"
           />
         </div>
       </div>
@@ -1022,46 +869,19 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }:
   }, [filePath, isPdf, sourceSessionId, watchEnabled]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "4px 16px",
-          borderBottom: "1px solid var(--border)",
-          fontSize: 11,
-          color: "var(--text-dim)",
-          background: "var(--bg)",
-          flexShrink: 0,
-        }}
-      >
-        <span style={{ fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={filePath}>
+    <div className="flex h-full flex-col overflow-hidden">
+      <MediaToolbar>
+        <span className="overflow-hidden font-mono text-ellipsis whitespace-nowrap" title={filePath}>
           {getRelativeFilePath(filePath, cwd)}
         </span>
-        <span style={{ marginLeft: "auto" }}>{ext === "docx" ? "docx preview" : "pdf"}</span>
+        <span className="ml-auto">{ext === "docx" ? "docx preview" : "pdf"}</span>
         {size != null && <span>{formatSize(size)}</span>}
         <DownloadLink filePath={filePath} sourceSessionId={sourceSessionId} />
-        <span
-          title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-          style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)", flexShrink: 0 }}
-        >
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: watching ? "#4ade80" : "var(--border)",
-              display: "inline-block",
-              boxShadow: watching ? "0 0 4px #4ade80" : "none",
-            }}
-          />
-          {watching ? "live" : "static"}
-        </span>
-      </div>
-      <div style={{ flex: 1, minHeight: 0, background: "var(--bg-panel)" }}>
+        <WatchIndicator watching={watching} t={t} />
+      </MediaToolbar>
+      <div className="min-h-0 flex-1 bg-sidebar">
         {error ? (
-          <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, color: "#f87171", fontSize: 13, textAlign: "center" }}>
+          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-destructive">
             {error}
           </div>
         ) : (
@@ -1070,7 +890,7 @@ function DocumentViewer({ filePath, cwd, sourceSessionId, watchEnabled = true }:
             src={previewUrl}
             sandbox={isPdf ? undefined : "allow-same-origin"}
             title={t("i18n.previewFile", { file: getFileName(filePath) })}
-            style={{ width: "100%", height: "100%", border: "none", background: isPdf ? "var(--bg)" : "#eef1f5" }}
+            className={`h-full w-full border-0 ${isPdf ? "bg-background" : "bg-muted"}`}
           />
         )}
       </div>
@@ -1133,7 +953,7 @@ function TextFileViewer({
   onStateChange,
   watchEnabled = true,
 }: Props) {
-  const { isDark } = useTheme();
+  const { theme } = useTheme();
   const { t } = useI18n();
   const [data, setData] = useState<FileData | null>(null);
   const [gitDiff, setGitDiff] = useState<GitFileDiffResponse | null>(null);
@@ -1379,17 +1199,13 @@ function TextFileViewer({
       <SyntaxHighlighter
         className={wrapLines ? "file-source-view is-wrapped" : "file-source-view"}
         language={language === "text" ? "plaintext" : language}
-        style={isDark ? vscDarkPlus : vs}
+        style={getPrismStyle(theme)}
         showLineNumbers
-        lineNumberStyle={{
-          ...FILE_LINE_NUMBER_STYLE,
-        }}
         customStyle={{
           margin: 0,
           padding: 0,
           border: 0,
-          background: "var(--bg)",
-          ...FILE_CODE_STYLE,
+          background: "transparent",
           width: wrapLines ? "100%" : "max-content",
           minWidth: "100%",
           minHeight: "100%",
@@ -1409,27 +1225,20 @@ function TextFileViewer({
         {viewerContent}
       </SyntaxHighlighter>
     ),
-    [isDark, language, viewerContent, wrapLines],
+    [theme, language, viewerContent, wrapLines],
   );
   const lightweightSourceLines = useMemo(
     () => useLightweightSource ? sourceLines.map((line, lineIndex) => (
       <span
-        className="file-source-line"
+        className="file-source-line flex min-w-full"
         data-line-number={lineIndex + 1}
         key={`source-line-${lineIndex}`}
-        style={{ display: "flex", minWidth: "100%" }}
       >
-        <span aria-hidden="true" style={FILE_LINE_NUMBER_STYLE}>
+        <span aria-hidden="true" className={FILE_LINE_NUMBER_CLASS}>
           {lineIndex + 1}
         </span>
         <span
-          className="file-source-line-content"
-          style={{
-            flex: "1 1 auto",
-            minWidth: 0,
-            overflowWrap: wrapLines ? "anywhere" : "normal",
-            whiteSpace: wrapLines ? "pre-wrap" : "pre",
-          }}
+          className={`file-source-line-content min-w-0 flex-1 ${wrapLines ? "break-words whitespace-pre-wrap" : "whitespace-pre"}`}
         >
           {line}
         </span>
@@ -1515,7 +1324,7 @@ function TextFileViewer({
 
   if (loading || (requestedInitialDisplayMode === "diff" && gitDiffLoading && !data)) {
     return (
-      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         {t("i18n.loading")}
       </div>
     );
@@ -1523,7 +1332,7 @@ function TextFileViewer({
 
   if (error && !isDeletedDiff) {
     return (
-      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#f87171", fontSize: 13 }}>
+      <div className="flex h-full items-center justify-center text-sm text-destructive">
         {error}
       </div>
     );
@@ -1546,67 +1355,49 @@ function TextFileViewer({
     : `${language} · ${lines.length} lines · ${formatSize(data!.size)}`;
 
   return (
-    <div className="file-viewer-shell" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", position: "relative" }}>
-      <div
-        className="file-viewer-toolbar"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "5px 12px",
-          borderBottom: "1px solid var(--border)",
-          fontSize: 11,
-          color: "var(--text-dim)",
-          background: "var(--bg)",
-          flexShrink: 0,
-        }}
-      >
-        <span className="file-viewer-path" style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
+    <div className="relative flex h-full flex-col overflow-hidden">
+      <div className="flex min-h-[35px] flex-shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-[5px] text-[11px] text-muted-foreground">
+        <span className="min-w-12 flex-1 overflow-hidden font-mono text-ellipsis whitespace-nowrap" title={filePath}>
           {getRelativeFilePath(filePath, cwd)}
         </span>
 
-        <span className="file-viewer-meta" title={metadata}>{metadata}</span>
+        <span className="min-w-0 flex-none overflow-hidden text-ellipsis whitespace-nowrap max-[640px]:hidden" title={metadata}>{metadata}</span>
         {!isDeletedDiff && (
           <span
             title={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
             aria-label={watching ? t("i18n.liveSync") : t("i18n.notWatching")}
-            className="file-viewer-live-indicator"
-            style={{
-              background: watching ? "#4ade80" : "var(--border)",
-              boxShadow: watching ? "0 0 4px #4ade80" : "none",
-            }}
+            className={`inline-block size-[7px] flex-none rounded-full ${watching ? "bg-success shadow-[0_0_4px_var(--success)]" : "bg-border"}`}
           />
         )}
 
-        <div className="file-viewer-controls">
+        <div className="flex flex-shrink-0 items-center gap-1.5">
           {displayModes.length > 1 && (
-            <div className="file-viewer-mode-switch" aria-label={t("i18n.fileViewMode")}>
-              {displayModes.map((mode) => {
-                const active = effectiveDisplayMode === mode;
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => updateDisplayMode(mode)}
-                    title={mode === "diff" ? t("i18n.compareHead") : undefined}
-                    aria-pressed={active}
-                    className="file-viewer-mode-button"
-                    style={{
-                      background: active ? "var(--bg-selected)" : "transparent",
-                      color: active ? "var(--text)" : "var(--text-muted)",
-                    }}
-                  >
-                    {DISPLAY_MODE_LABELS[mode]}
-                  </button>
-                );
-              })}
-            </div>
+            <ToggleGroup
+              type="single"
+              value={effectiveDisplayMode}
+              onValueChange={(value) => { if (value) updateDisplayMode(value as DisplayMode); }}
+              variant="outline"
+              spacing={0}
+              size="sm"
+              aria-label={t("i18n.fileViewMode")}
+              className="h-6"
+            >
+              {displayModes.map((mode) => (
+                <ToggleGroupItem
+                  key={mode}
+                  value={mode}
+                  title={mode === "diff" ? t("i18n.compareHead") : undefined}
+                  className="h-6 px-2 text-[11px] font-medium"
+                >
+                  {DISPLAY_MODE_LABELS[mode]}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           )}
 
-          <div className="file-viewer-actions">
+          <div className="order-[-1] flex h-6 flex-shrink-0 items-center gap-1">
             {(onAtMention || onMentionLines) && (
-              <button
-                type="button"
+              <IconButton
                 onPointerDown={(event) => event.preventDefault()}
                 onClick={() => {
                   // Mention selected lines when a range is active (and line
@@ -1623,35 +1414,24 @@ function TextFileViewer({
                     ? `${t("i18n.mentionSelectedLines")} (L${selectedLineRange.startLine}${selectedLineRange.startLine !== selectedLineRange.endLine ? `-L${selectedLineRange.endLine}` : ""})`
                     : t("files.insertPath")
                 }
-                aria-label={t("files.mention")}
                 disabled={!onAtMention && !onMentionLines}
-                className="file-viewer-icon-button"
               >
                 <MentionIcon />
-              </button>
+              </IconButton>
             )}
             {effectiveDisplayMode === "source" && (
-              <>
-                <button
-                  type="button"
-                  onClick={toggleWrapLines}
-                  title={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
-                  aria-label={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
-                  aria-pressed={wrapLines}
-                  className="file-viewer-icon-button"
-                  style={{
-                    background: wrapLines ? "var(--bg-selected)" : "transparent",
-                    color: wrapLines ? "var(--text)" : "var(--text-muted)",
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M3 6h18" />
-                    <path d="M3 12h15a3 3 0 1 1 0 6h-4" />
-                    <path d="m16 16-2 2 2 2" />
-                    <path d="M3 18h7" />
-                  </svg>
-                </button>
-              </>
+              <IconButton
+                onClick={toggleWrapLines}
+                title={wrapLines ? t("i18n.disableWrap") : t("i18n.enableWrap")}
+                active={wrapLines}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 6h18" />
+                  <path d="M3 12h15a3 3 0 1 1 0 6h-4" />
+                  <path d="m16 16-2 2 2 2" />
+                  <path d="M3 18h7" />
+                </svg>
+              </IconButton>
             )}
           </div>
 
@@ -1660,24 +1440,11 @@ function TextFileViewer({
       </div>
 
       {data?.truncated && (
-        <div
-          className="file-viewer-load-more"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 10,
-            padding: "5px 8px",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            color: "var(--text-dim)",
-            fontSize: 11,
-          }}
-        >
+        <div className="absolute right-3 bottom-3 z-2 flex max-w-[calc(100%-24px)] items-center justify-center gap-2.5 rounded-md border border-border bg-sidebar px-2 py-[5px] text-[11px] text-muted-foreground shadow-[0_3px_12px_color-mix(in_srgb,var(--foreground)_18%,transparent)]">
           <span>{formatSize(data.nextOffset)} / {formatSize(data.size)}</span>
           <button
             type="button"
-            className="file-viewer-mode-button"
+            className="h-[22px] rounded-[5px] border-0 border-l border-l-border px-2 text-[11px] font-medium whitespace-nowrap hover:brightness-110"
             disabled={loadingMore}
             onClick={() => {
               setLoadingMore(true);
@@ -1692,12 +1459,11 @@ function TextFileViewer({
       {/* Content area */}
       <div
         ref={contentRef}
-        className="file-viewer-content"
         onScroll={(event) => {
           viewerStateRef.current.scrollTop = event.currentTarget.scrollTop;
           viewerStateRef.current.scrollLeft = event.currentTarget.scrollLeft;
         }}
-        style={{ flex: 1, overflow: "auto", background: "var(--bg)", paddingBottom: data?.truncated ? 48 : undefined }}
+        className={`flex-1 overflow-auto bg-background ${data?.truncated ? "pb-12" : ""}`}
       >
         {effectiveDisplayMode === "diff" && hasGitDiff ? (
           <DiffView patch={gitDiff.patch!} />
@@ -1705,13 +1471,12 @@ function TextFileViewer({
           <iframe
             srcDoc={content}
             sandbox="allow-scripts"
-            style={{ width: "100%", height: "100%", border: "none", background: "var(--bg)" }}
+            className="h-full w-full border-0 bg-background"
              title={t("i18n.htmlPreview")}
           />
         ) : isMarkdown && effectiveDisplayMode === "preview" ? (
           <div
-            className="markdown-body markdown-file-preview"
-            style={{ padding: "24px 32px" }}
+            className="markdown-body px-8 py-6 [&_code]:rounded-sm [&_code]:bg-sidebar [&_code]:px-[5px] [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.9em] [&_h1]:text-[1.8em] [&_h2]:text-[1.4em] [&_h3]:text-[1.15em] [&_p]:mb-3 [&_pre]:my-3 [&_pre]:rounded-md [&_pre]:border [&_pre]:border-border [&_pre]:bg-sidebar [&_pre]:px-4 [&_pre]:py-3 [&_pre]:font-mono [&_pre]:text-sm [&_pre_code]:bg-transparent [&_pre_code]:p-0"
           >
             {frontmatter?.data && <FrontmatterCard data={frontmatter.data} />}
             <ReactMarkdown
@@ -1776,14 +1541,7 @@ function TextFileViewer({
           </div>
         ) : useLightweightSource ? (
           <div
-            className="file-source-view is-lightweight"
-            style={{
-              width: wrapLines ? "100%" : "max-content",
-              minWidth: "100%",
-              minHeight: "100%",
-              background: "var(--bg)",
-              ...FILE_CODE_STYLE,
-            }}
+            className={`file-source-view is-lightweight min-h-full bg-background ${wrapLines ? "w-full" : "w-max"} min-w-full ${FILE_CODE_CLASS}`}
           >
             {lightweightSourceLines}
           </div>

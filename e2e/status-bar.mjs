@@ -22,8 +22,8 @@ import assert from "node:assert/strict";
 const snapshot = (page) => page.evaluate(() => {
   const surface = document.querySelector(".chat-bottom-bar");
   const inner = document.querySelector(".chat-bottom-bar-inner");
-  const bar = document.querySelector(".chat-status-bar");
-  const textarea = document.querySelector("textarea.chat-input-textarea");
+  const bar = document.querySelector('[data-slot="chat-status-bar"]');
+  const textarea = document.querySelector('textarea[data-slot="chat-input-textarea"]');
   const fieldset = textarea ? textarea.closest("fieldset") : null;
   const rectOf = (el) => {
     if (!el) return null;
@@ -38,21 +38,21 @@ const snapshot = (page) => page.evaluate(() => {
     const right = rect.right - Number.parseFloat(style.paddingRight);
     frame = { left, width: right - left };
   }
-  const lineEls = Array.from(document.querySelectorAll(".chat-status-line"));
+  const lineEls = Array.from(document.querySelectorAll('[data-slot="chat-status-line"]'));
   return {
     hasSurface: Boolean(surface),
     hasBar: Boolean(bar),
-    className: bar ? bar.className : null,
-    hasStats: Boolean(bar && bar.querySelector(".chat-status-stats")),
-    hasName: Boolean(bar && bar.querySelector(".chat-status-name")),
+    isFresh: bar ? bar.getAttribute("data-state") === "fresh" : false,
+    hasStats: Boolean(bar && bar.querySelector('[data-slot="chat-status-stats"]')),
+    hasName: Boolean(bar && bar.querySelector('[data-slot="chat-status-name"]')),
     hasFold: Boolean(surface && surface.querySelector('[data-chrome-toggle="status-fold"]')),
     borderTopWidth: bar ? getComputedStyle(bar).borderTopWidth : null,
     // Nothing inside the surface may scroll on its own, or the lines would move independently.
     // The extension strip only exists when an extension publishes a status; the unit suite pins it.
-    innerOverflowX: [bar, document.querySelector(".chat-status-ext")]
+    innerOverflowX: [bar, document.querySelector('[data-slot="chat-status-ext"]')]
       .filter(Boolean)
       .map((el) => getComputedStyle(el).overflowX),
-    lines: lineEls.map((line) => Array.from(line.children).map((child) => child.className)),
+    lines: lineEls.map((line) => Array.from(line.children).map((child) => child.getAttribute("data-slot") ?? child.className)),
     lineLefts: lineEls.map((line) => (line.firstElementChild ? line.firstElementChild.getBoundingClientRect().left : null)),
     surface: surface
       ? { ...rectOf(surface), clientWidth: surface.clientWidth, scrollWidth: surface.scrollWidth, scrollLeft: surface.scrollLeft }
@@ -74,17 +74,17 @@ const snapshot = (page) => page.evaluate(() => {
 });
 
 const near = (a, b, tolerance = 1) => Math.abs(a - b) <= tolerance;
-const has = (line, cls) => line.some((value) => value.split(/\s+/).includes(cls));
+const has = (line, slot) => line.some((value) => value === slot || value.split(/\s+/).includes(slot));
 
 export async function checkStatusBar(page, { base, cwd, sessionId }) {
   const restore = page.viewportSize();
   await page.goto(`${base}/?session=${sessionId}`, { waitUntil: "domcontentloaded" });
-  await page.locator(".chat-status-bar").waitFor();
-  await page.waitForFunction(() => (document.querySelector(".chat-status-bar")?.innerText ?? "").trim().length > 0);
+  await page.locator('[data-slot="chat-status-bar"]').waitFor();
+  await page.waitForFunction(() => (document.querySelector('[data-slot="chat-status-bar"]')?.innerText ?? "").trim().length > 0);
 
   const ongoing = await snapshot(page);
   assert.ok(ongoing.hasBar && ongoing.hasSurface, "the bar renders inside its scroll surface");
-  assert.doesNotMatch(ongoing.className, /is-fresh/, "a session in progress is not fresh");
+  assert.equal(ongoing.isFresh, false, "a session in progress is not fresh");
   assert.equal(ongoing.lines.length, 2, `an ongoing session shows two lines, got ${ongoing.lines.length}`);
   assert.ok(has(ongoing.lines[0], "chat-status-project"), `line 1 must lead with the workspace, got ${ongoing.lines[0]}`);
   assert.ok(has(ongoing.lines[1], "chat-status-stats"), `line 2 must lead with the token cluster, got ${ongoing.lines[1]}`);
@@ -124,7 +124,7 @@ export async function checkStatusBar(page, { base, cwd, sessionId }) {
       if (surface) surface.scrollLeft = 60;
       return {
         scrollLeft: surface ? surface.scrollLeft : null,
-        lefts: Array.from(document.querySelectorAll(".chat-status-line")).map((line) =>
+        lefts: Array.from(document.querySelectorAll('[data-slot="chat-status-line"]')).map((line) =>
           line.firstElementChild ? line.firstElementChild.getBoundingClientRect().left : null),
       };
     });
@@ -140,10 +140,10 @@ export async function checkStatusBar(page, { base, cwd, sessionId }) {
   }
 
   await page.goto(`${base}/?cwd=${encodeURIComponent(cwd)}`, { waitUntil: "domcontentloaded" });
-  await page.locator(".chat-status-bar.is-fresh").waitFor();
+  await page.locator('[data-slot="chat-status-bar"][data-state="fresh"]').waitFor();
   await page.waitForTimeout(1000);
   const fresh = await snapshot(page);
-  assert.match(fresh.className, /is-fresh/, "a new session shows the fresh state");
+  assert.equal(fresh.isFresh, true, "a new session shows the fresh state");
   assert.equal(fresh.hasStats, false, "the fresh bar shows no token cluster");
   assert.equal(fresh.hasName, false, "the fresh bar shows no session name");
   assert.equal(fresh.hasFold, false, "the bar never offers a fold control");

@@ -14,16 +14,14 @@ const {
 } = await jiti.import("./models-config-helpers.ts");
 
 const source = await readFile(new URL("./ModelsConfig.tsx", import.meta.url), "utf8");
-const cssSource = await readFile(new URL("../app/settings.css", import.meta.url), "utf8");
 
 test("uses shared sidebar sizing for providers and matching indented model rows", () => {
   const sidebar = source.slice(source.indexOf("<ConfigSidebar>"), source.indexOf("</ConfigSidebar>"));
 
   assert.match(sidebar, /<ConfigSidebarItem[\s\S]*?active=\{isSelected\}/);
   assert.match(sidebar, /<ConfigSidebarItem[\s\S]*?active=\{isProviderSelected\}/);
-  assert.match(sidebar, /className="models-sidebar-indented-item"/);
-  assert.match(sidebar, /className="models-sidebar-indented-item models-sidebar-add-item"/);
-  assert.match(cssSource, /\.models-sidebar-indented-item \{[\s\S]*?padding-left: 26px/);
+  assert.match(sidebar, /className="pl-\[26px\]"/);
+  assert.match(sidebar, /className="pl-\[26px\] text-muted-foreground hover:text-primary focus-visible:text-primary"/);
 });
 
 test("ignores malformed auth provider responses", () => {
@@ -166,10 +164,10 @@ test("per-model settings use one primary divider before advanced settings", () =
   );
 
   assert.equal(
-    (modelDetail.match(/borderTop: "1px solid var\(--border\)"/g) ?? []).length,
+    (modelDetail.match(/border-t border-border/g) ?? []).length,
     1,
   );
-  assert.doesNotMatch(modelDetail, /borderBottom: "1px solid var\(--border\)"/);
+  assert.doesNotMatch(modelDetail, /border-b border-border/);
 });
 
 test("thinking level overrides keep explicit default, disabled, and custom controls", () => {

@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useI18n } from "@/hooks/useI18n";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import type { SessionInfo, SubagentSessionStatus } from "@/lib/types";
 // Type-only: `lib/pi-subagents-bridge` reaches the pi SDK, and a value import from a client
 // component drags it into the browser bundle (see lib/pi-subagents-details.ts).
@@ -57,12 +60,12 @@ function formatRelativeTime(value: string, locale: string): string {
   return formatter.format(Math.round(elapsedHours / 24), "day");
 }
 
-function statusColor(status: SubagentSessionStatus): string {
-  if (status === "running" || status === "starting") return "var(--accent)";
-  if (status === "completed") return "#16a34a";
-  if (status === "failed") return "#dc2626";
-  if (status === "aborted") return "#d97706";
-  return "var(--text-dim)";
+function statusClass(status: SubagentSessionStatus): string {
+  if (status === "running" || status === "starting") return "text-primary";
+  if (status === "completed") return "text-success";
+  if (status === "failed") return "text-destructive";
+  if (status === "aborted") return "text-warning";
+  return "text-muted-foreground";
 }
 
 function StatusIcon({ status }: { status: SubagentSessionStatus }) {
@@ -128,30 +131,12 @@ function AgentRow({
       role="option"
       aria-selected={selected}
       onClick={onSelect}
-      style={{
-        width: "100%",
-        minHeight: 56,
-        display: "grid",
-        gridTemplateColumns: "28px minmax(0, 1fr) auto",
-        alignItems: "center",
-        gap: 9,
-        padding: "7px 12px",
-        border: "none",
-        borderBottom: "1px solid var(--border)",
-        borderLeft: selected ? "2px solid var(--accent)" : "2px solid transparent",
-        background: selected ? "var(--bg-selected)" : "transparent",
-        color: "var(--text)",
-        cursor: "pointer",
-        textAlign: "left",
-      }}
-      onMouseEnter={(event) => {
-        if (!selected) event.currentTarget.style.background = "var(--bg-hover)";
-      }}
-      onMouseLeave={(event) => {
-        if (!selected) event.currentTarget.style.background = "transparent";
-      }}
+      className={cn(
+        "grid min-h-14 w-full grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-[9px] border-0 border-b border-border px-3 py-[7px] text-left text-foreground",
+        selected ? "border-l-2 border-l-primary bg-accent" : "border-l-2 border-l-transparent bg-transparent hover:bg-accent",
+      )}
     >
-      <span style={{ width: 28, height: 28, display: "grid", placeItems: "center", color: main ? "var(--text-muted)" : "var(--accent)" }}>
+      <span className={cn("grid h-7 w-7 place-items-center", main ? "text-muted-foreground" : "text-primary")}>
         {main ? (
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" />
@@ -162,28 +147,25 @@ function AgentRow({
           </svg>
         )}
       </span>
-      <span style={{ minWidth: 0 }}>
-        <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: selected ? 600 : 500 }} title={primary}>
+      <span className="min-w-0">
+        <span className={cn("block overflow-hidden text-ellipsis whitespace-nowrap text-xs", selected ? "font-semibold" : "font-medium")} title={primary}>
           {primary}
         </span>
-        <span style={{ display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-dim)", fontSize: 11 }} title={secondary}>
+        <span className="mt-0.5 block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-muted-foreground" title={secondary}>
           {relation?.engine === "pi-subagents" && (
             // Origin tag: without it a package run reads exactly like one of Pi Web's own children.
-            <span
+            <Badge
               data-testid="agent-engine-tag"
-              style={{
-                display: "inline-block", marginRight: 5, padding: "0 4px",
-                border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg-subtle)",
-                color: "var(--accent)", fontSize: 10, lineHeight: "14px", verticalAlign: "1px",
-              }}
+              variant="outline"
+              className="mr-[5px] h-3.5 rounded px-1 align-[1px] text-[10px] leading-[14px] text-primary"
             >
               {t("agentSwitcher.enginePackage")}
-            </span>
+            </Badge>
           )}
           {secondary}
         </span>
       </span>
-      <span style={{ display: "flex", alignItems: "center", gap: 6, color: main && !running ? "var(--text-dim)" : statusColor(status), fontSize: 11, whiteSpace: "nowrap" }}>
+      <span className={cn("flex items-center gap-1.5 text-[11px] whitespace-nowrap", main && !running ? "text-muted-foreground" : statusClass(status))}>
         {main && !running ? (
           selected ? t("agentSwitcher.current") : null
         ) : (
@@ -227,45 +209,33 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
     <div
       role="listbox"
       aria-label={t("agentSwitcher.title")}
-      style={{
-        background: "var(--bg-panel)",
-        borderLeft: "1px solid var(--border)",
-        borderRight: "1px solid var(--border)",
-        borderBottom: "1px solid var(--border)",
-        borderRadius: "0 0 6px 6px",
-        boxShadow: "0 10px 28px rgba(0,0,0,0.10)",
-        overflow: "hidden",
-      }}
+      className="overflow-hidden rounded-b-md border-x border-b border-border bg-sidebar shadow-[0_10px_28px_rgba(0,0,0,0.10)]"
     >
       <div>
-        <div style={{ minHeight: 44, display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", borderBottom: "1px solid var(--border)" }}>
-          <strong style={{ fontSize: 12, fontWeight: 600 }}>{t("agentSwitcher.title")}</strong>
-          <span style={{ color: "var(--text-dim)", fontSize: 11 }}>
+        <div className="flex min-h-11 items-center gap-2 border-b border-border px-3 py-[7px]">
+          <strong className="text-xs font-semibold">{t("agentSwitcher.title")}</strong>
+          <span className="text-[11px] text-muted-foreground">
             {t("agentSwitcher.count", { count: subagents.length })}
           </span>
           {runningCount > 0 && (
-            <span style={{ marginLeft: "auto", color: "var(--accent)", fontSize: 11 }}>
+            <span className="ml-auto text-[11px] text-primary">
               {t("agentSwitcher.runningCount", { count: runningCount })}
             </span>
           )}
         </div>
         {subagents.length > 8 && (
-          <div style={{ padding: 8, borderBottom: "1px solid var(--border)" }}>
-            <input
+          <div className="border-b border-border p-2">
+            <Input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("agentSwitcher.search")}
               aria-label={t("agentSwitcher.search")}
-              style={{
-                width: "100%", height: 32, padding: "0 10px",
-                border: "1px solid var(--border)", borderRadius: 6,
-                background: "var(--bg)", color: "var(--text)", fontSize: 12, outline: "none",
-              }}
+              className="text-xs"
             />
           </div>
         )}
-        <div style={{ maxHeight: "min(58dvh, 480px)", overflowY: "auto" }}>
+        <div className="max-h-[min(58dvh,480px)] overflow-y-auto">
           <AgentRow
             session={rootSession}
             main
@@ -290,28 +260,21 @@ export function AgentSessionPanel({ rootSession, subagents, selectedSessionId, r
               disabled
               data-testid="agent-pending-run"
               title={t("piSubagents.sessionPending")}
-              style={{
-                width: "100%", minHeight: 44, display: "grid",
-                gridTemplateColumns: "28px minmax(0, 1fr) auto",
-                alignItems: "center", gap: 9, padding: "7px 12px",
-                border: "none", borderBottom: "1px solid var(--border)",
-                borderLeft: "2px solid transparent", background: "transparent",
-                color: "var(--text-muted)", textAlign: "left", cursor: "default",
-              }}
+              className="grid min-h-11 w-full cursor-default grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-[9px] border-0 border-b border-border border-l-2 border-l-transparent bg-transparent px-3 py-[7px] text-left text-muted-foreground"
             >
-              <span style={{ width: 28, display: "grid", placeItems: "center", color: "var(--accent)" }}>
+              <span className="grid w-7 place-items-center text-primary">
                 <StatusIcon status="starting" />
               </span>
-              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs">
                 {run.description || run.profile}
               </span>
-              <span style={{ color: "var(--text-dim)", fontSize: 11, whiteSpace: "nowrap" }}>
+              <span className="text-[11px] whitespace-nowrap text-muted-foreground">
                 {t("piSubagents.sessionPending")}
               </span>
             </button>
           ))}
           {visibleSubagents.length === 0 && pendingRuns.length === 0 && (
-            <div style={{ padding: "22px 12px", color: "var(--text-dim)", fontSize: 12, textAlign: "center" }}>
+            <div className="px-3 py-[22px] text-center text-xs text-muted-foreground">
               {t("agentSwitcher.noMatches")}
             </div>
           )}

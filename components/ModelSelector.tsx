@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { cn } from "cn";
 
 export interface ModelSelectorOption {
   provider: string;
@@ -108,61 +109,6 @@ export function ModelSelector({
     setFilter("");
   }, [locked]);
 
-  const buttonStyle: CSSProperties = variant === "status"
-    ? {
-        // Pi paints its footer as plain text, so the trigger must not read as a button.
-        display: "flex",
-        alignItems: "center",
-        gap: 4,
-        maxWidth: "100%",
-        padding: 0,
-        overflow: "hidden",
-        border: "none",
-        background: "none",
-        color: "inherit",
-        font: "inherit",
-        cursor: locked ? "default" : "pointer",
-        textDecoration: open && !locked ? "underline" : "none",
-        textUnderlineOffset: 2,
-      }
-    : variant === "field"
-    ? {
-        display: "flex",
-        alignItems: "center",
-        gap: 7,
-        width: "100%",
-        minWidth: 0,
-        height: 34,
-        padding: "0 9px",
-        overflow: "hidden",
-        border: "1px solid var(--border)",
-        borderRadius: 5,
-        background: locked ? "var(--bg-panel)" : "var(--bg)",
-        color: locked ? "var(--text-dim)" : "var(--text)",
-        cursor: locked ? "default" : "pointer",
-        fontSize: 12,
-        textAlign: "left",
-      }
-    : {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: isMobile ? "flex-start" : undefined,
-        gap: 6,
-        width: isMobile ? "100%" : undefined,
-        maxWidth: isMobile ? "100%" : 220,
-        height: 32,
-        padding: isMobile ? "8px 10px" : "8px 12px",
-        overflow: "hidden",
-        border: "none",
-        borderRadius: 9,
-        background: open ? "var(--bg-hover)" : "none",
-        color: "var(--text-muted)",
-        cursor: locked ? "not-allowed" : "pointer",
-        fontSize: 12,
-        opacity: locked ? 0.5 : 1,
-        transition: "background 0.12s, color 0.12s",
-      };
-
   const choose = (option: ModelSelectorOption) => {
     const active = option.modelId === value?.modelId && option.provider === value?.provider;
     setOpen(false);
@@ -173,8 +119,11 @@ export function ModelSelector({
   return (
     <div
       ref={rootRef}
-      className={`model-selector is-${variant}${locked ? " is-disabled" : ""}`}
-      style={{ position: "relative", width: variant === "field" || (isMobile && variant === "toolbar") ? "100%" : undefined, minWidth: 0, flex: variant === "toolbar" && isMobile ? "1 1 auto" : undefined }}
+      className={cn(
+        "relative min-w-0",
+        (variant === "field" || (isMobile && variant === "toolbar")) && "w-full",
+        variant === "toolbar" && isMobile && "flex-1",
+      )}
       onKeyDown={(event) => {
         if (event.key !== "Escape" || !open) return;
         event.preventDefault();
@@ -191,7 +140,19 @@ export function ModelSelector({
         aria-busy={busy || undefined}
         disabled={locked}
         title={busy ? "Switching model" : locked ? currentName : sortedOptions.length > 0 || onClear ? "Change model" : "No available models"}
-        style={buttonStyle}
+        className={cn(
+          "flex items-center overflow-hidden text-xs transition-colors",
+          variant === "status" && "max-w-full gap-1 border-none bg-transparent p-0 text-inherit",
+          variant === "status" && !locked && open && "underline underline-offset-2",
+          variant === "status" && locked && "cursor-default",
+          variant === "status" && !locked && "cursor-pointer",
+          variant === "field" && "h-[34px] w-full min-w-0 gap-1.5 rounded-md border border-border px-2.5 text-left",
+          variant === "field" && (locked ? "cursor-default bg-muted text-muted-foreground" : "cursor-pointer bg-background text-foreground hover:bg-accent"),
+          variant === "toolbar" && "max-w-[220px] gap-1.5 rounded-lg border-none text-muted-foreground",
+          variant === "toolbar" && (isMobile ? "w-full justify-start px-2.5 py-2" : "px-3 py-2"),
+          variant === "toolbar" && (open ? "bg-accent" : "bg-transparent"),
+          variant === "toolbar" && (locked ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:bg-accent hover:text-foreground"),
+        )}
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
           setAnchorRect({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width });
@@ -200,29 +161,13 @@ export function ModelSelector({
             return !current;
           });
         }}
-        onMouseEnter={(event) => {
-          if (locked) return;
-          if (variant === "status") return;
-          event.currentTarget.style.background = "var(--bg-hover)";
-          event.currentTarget.style.color = "var(--text)";
-        }}
-        onMouseLeave={(event) => {
-          if (variant === "status") return;
-          if (locked) {
-            event.currentTarget.style.background = variant === "field" ? "var(--bg-panel)" : "none";
-            event.currentTarget.style.color = variant === "field" ? "var(--text-dim)" : "var(--text-muted)";
-            return;
-          }
-          event.currentTarget.style.background = open ? "var(--bg-hover)" : variant === "field" ? "var(--bg)" : "none";
-          event.currentTarget.style.color = variant === "field" ? "var(--text)" : "var(--text-muted)";
-        }}
       >
         {busy ? (
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" style={{ animation: "spin 0.8s linear infinite", flexShrink: 0 }} aria-hidden="true">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="shrink-0 animate-spin" aria-hidden="true">
             <path d="M21 12a9 9 0 1 1-2.64-6.36" />
           </svg>
         ) : variant === "status" ? null : (
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
             <rect x="4" y="4" width="16" height="16" rx="2" />
             <rect x="9" y="9" width="6" height="6" />
             <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
@@ -231,9 +176,9 @@ export function ModelSelector({
             <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
           </svg>
         )}
-        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentName}</span>
+        <span className="min-w-0 flex-1 truncate">{currentName}</span>
         {variant === "field" && (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, color: "var(--text-dim)" }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-muted-foreground">
             <polyline points="6 9 12 15 18 9" />
           </svg>
         )}
@@ -258,23 +203,14 @@ export function ModelSelector({
             ref={panelRef}
             role="listbox"
             aria-label={ariaLabel}
-            style={{
-              position: "fixed",
-              ...verticalPosition,
-              ...horizontalPosition,
-              zIndex: 500,
-              display: "flex",
-              flexDirection: "column",
-              maxHeight,
-              overflow: "hidden",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              background: "var(--bg)",
-              boxShadow: openAbove ? "0 -4px 16px rgba(0,0,0,0.10)" : "0 4px 16px rgba(0,0,0,0.10)",
-            }}
+            className={cn(
+              "fixed z-[500] flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-md",
+              openAbove ? "shadow-[0_-4px_16px_rgba(0,0,0,0.10)]" : "shadow-[0_4px_16px_rgba(0,0,0,0.10)]",
+            )}
+            style={{ ...verticalPosition, ...horizontalPosition, maxHeight }}
           >
             {showFilter && (
-              <div style={{ flexShrink: 0, padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>
+              <div className="shrink-0 border-b border-border p-1.5">
                 <input
                   value={filter}
                   onChange={(event) => setFilter(event.target.value)}
@@ -283,23 +219,14 @@ export function ModelSelector({
                   autoFocus
                   autoComplete="off"
                   spellCheck={false}
-                  style={{
-                    boxSizing: "border-box",
-                    width: "100%",
-                    minWidth: isMobile ? 0 : 220,
-                    padding: "5px 8px",
-                    border: "1px solid var(--border)",
-                    borderRadius: 5,
-                    outline: "none",
-                    background: "var(--bg)",
-                    color: "var(--text)",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11,
-                  }}
+                  className={cn(
+                    "box-border w-full rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[11px] text-foreground outline-none",
+                    isMobile ? "min-w-0" : "min-w-[220px]",
+                  )}
                 />
               </div>
             )}
-            <div style={{ minHeight: 0, overflowY: "auto" }}>
+            <div className="min-h-0 overflow-y-auto">
               {onClear && !filter.trim() && (
                 <ModelOptionButton active={!value} label={emptyLabel ?? "Default"} onClick={() => {
                   setOpen(false);
@@ -308,13 +235,18 @@ export function ModelSelector({
                 }} />
               )}
               {modelsByProvider.length === 0 ? (
-                <div style={{ padding: "8px 12px", color: "var(--text-dim)", fontSize: 12, whiteSpace: "nowrap" }}>
+                <div className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
                   {filter.trim() ? t("chat.noMatchingModels") : "No available models"}
                 </div>
               ) : modelsByProvider.map((group, index) => (
                 <div key={group.provider}>
                   {modelsByProvider.length > 1 && (
-                    <div style={{ padding: "6px 12px 4px", borderTop: index > 0 || onClear ? "1px solid var(--border)" : "none", color: "var(--text-dim)", fontSize: 10, fontWeight: 600, letterSpacing: 0, textTransform: "uppercase" }}>
+                    <div
+                      className={cn(
+                        "px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase text-muted-foreground",
+                        (index > 0 || onClear) && "border-t border-border",
+                      )}
+                    >
                       {group.provider}
                     </div>
                   )}
@@ -343,14 +275,15 @@ function ModelOptionButton({ active, label, onClick }: { active: boolean; label:
       role="option"
       aria-selected={active}
       onClick={onClick}
-      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 12px", border: "none", background: active ? "var(--bg-selected)" : "none", color: active ? "var(--text)" : "var(--text-muted)", cursor: "pointer", fontSize: 12, fontWeight: active ? 600 : 400, textAlign: "left", whiteSpace: "nowrap" }}
-      onMouseEnter={(event) => { if (!active) event.currentTarget.style.background = "var(--bg-hover)"; }}
-      onMouseLeave={(event) => { if (!active) event.currentTarget.style.background = "none"; }}
+      className={cn(
+        "flex w-full items-center gap-2 whitespace-nowrap border-none px-3 py-1.5 text-left text-xs",
+        active ? "bg-accent font-semibold text-foreground" : "font-normal text-muted-foreground hover:bg-accent",
+      )}
     >
       {active
-        ? <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true"><polyline points="1.5 5 4 7.5 8.5 2.5" /></svg>
-        : <span style={{ width: 10, flexShrink: 0 }} />}
-      <span title={label} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+        ? <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-primary" aria-hidden="true"><polyline points="1.5 5 4 7.5 8.5 2.5" /></svg>
+        : <span className="w-2.5 shrink-0" />}
+      <span title={label} className="min-w-0 overflow-hidden text-ellipsis">{label}</span>
     </button>
   );
 }

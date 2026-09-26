@@ -26,9 +26,13 @@ test("the UI stack is a variable, not a hard-coded element rule", () => {
   assert.doesNotMatch(globals, /font-family: BlinkMacSystemFont/);
 });
 
-test("Tailwind exposes both roles as font utilities", () => {
-  assert.match(globals, /--font-mono-font: var\(--font-mono\);/);
-  assert.match(globals, /--font-ui-font: var\(--font-ui\);/);
+// The legacy `--font-mono-font`/`--font-ui-font` @theme aliases were dead (no component ever used
+// the `font-mono-font`/`font-ui-font` utility classes they generated) and were removed with the rest
+// of the legacy @theme colour block in Step 6. `--font-sans` is what Tailwind's own `font-sans`
+// utility now reads, and it must point at the app's `--font-ui`, not shadcn init's self-reference.
+test("Tailwind's font-sans utility resolves to the app's --font-ui, not shadcn init's self-reference", () => {
+  assert.match(globals, /--font-sans: var\(--font-ui\);/);
+  assert.doesNotMatch(globals, /--font-sans: var\(--font-sans\);/);
 });
 
 test("both font variables are declared on :root so they resolve before hydration", () => {

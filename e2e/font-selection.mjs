@@ -38,8 +38,8 @@ const readFonts = (page) => page.evaluate(() => {
     },
     body: family("body"),
     statusBar: family(".chat-status-bar"),
-    codeBlock: family(".markdown-code-block pre"),
-    codeBlockCode: family(".markdown-code-block pre code"),
+    codeBlock: family("[data-slot=\"markdown-code-block\"] pre"),
+    codeBlockCode: family("[data-slot=\"markdown-code-block\"] pre code"),
     stored: {
       ui: localStorage.getItem("pi-font-ui"),
       mono: localStorage.getItem("pi-font-mono"),
@@ -53,7 +53,7 @@ export async function checkFontSelection(page) {
   // desktop page before touching Settings.
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.locator(".markdown-code-block pre").waitFor();
+  await page.locator("[data-slot=\"markdown-code-block\"] pre").waitFor();
   await openGeneralSettings(page);
 
   // Real keystrokes, not fill(): the field is a controlled input, and a trimming round-trip once
@@ -110,7 +110,7 @@ export async function checkFontSelection(page) {
   assert.deepEqual(state.stored, { ui: UI_FONT, mono: MONO_FONT }, "Both choices must be persisted");
 
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.locator(".markdown-code-block pre").waitFor();
+  await page.locator("[data-slot=\"markdown-code-block\"] pre").waitFor();
   state = await readFonts(page);
   assert.equal(head(state.body), UI_FONT, "The UI font must survive a reload");
   assert.equal(head(state.codeBlock), MONO_FONT, "The mono font must survive a reload");

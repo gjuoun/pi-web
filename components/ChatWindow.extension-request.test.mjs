@@ -12,13 +12,13 @@ test("confines extension overlays to the content region above the composer", () 
     source,
     /className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden"[\s\S]*?<ExtensionDialog[\s\S]*?<ExtensionCustomPanel[\s\S]*?className="relative shrink-0"[\s\S]*?\{!composerHidden && chatInputElement\}/,
   );
-  assert.match(dialogSource, /position: "absolute"[\s\S]*?inset: 0/);
-  assert.match(dialogSource, /pointerEvents: "none"/);
-  assert.match(dialogSource, /pointerEvents: "auto"/);
-  assert.match(customSource, /position: "absolute"[\s\S]*?inset: 0/);
-  assert.match(customSource, /pointerEvents: "none"/);
+  assert.match(dialogSource, /absolute inset-0/);
+  assert.match(dialogSource, /pointer-events-none/);
+  assert.match(dialogSource, /pointer-events-auto/);
+  assert.match(customSource, /absolute inset-0/);
+  assert.match(customSource, /pointer-events-none/);
   assert.doesNotMatch(source, /z-\[100\]|zIndex: 100/);
-  assert.match(customSource, /maxHeight: "min\(760px, 100%\)"/);
+  assert.match(customSource, /max-h-\[min\(760px,100%\)\]/);
 });
 
 test("adds collapse without replacing cancel", () => {

@@ -11,7 +11,7 @@ const chatAppearanceHook = await readFile(new URL("../hooks/useChatAppearance.ts
 const jiti = createJiti(import.meta.url);
 const { clampChatContentWidth, clampChatContentFontSize } = await jiti.import("../hooks/useChatAppearance.ts");
 
-const widthVariable = /var\(--chat-content-max-width, 820px\)/g;
+const widthVariable = /var\(--chat-content-max-width,\s?820px\)/g;
 
 test("chat content keeps the existing 820px default behind one shared variable", () => {
   // The message column and the empty-state banner still read it; the composer no longer does — it

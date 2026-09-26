@@ -15,10 +15,10 @@ import assert from "node:assert/strict";
 
 const snapshot = (page) => page.evaluate(() => {
   const px = (v) => Number.parseFloat(v ?? "0") || 0;
-  const textarea = document.querySelector("textarea.chat-input-textarea");
+  const textarea = document.querySelector('textarea[data-slot="chat-input-textarea"]');
   const rail = document.querySelector('[data-chat-rail]');
   const railStyle = rail ? getComputedStyle(rail) : null;
-  const statusBar = document.querySelector('.chat-status-bar');
+  const statusBar = document.querySelector('[data-slot="chat-status-bar"]');
   return {
     hasComposer: Boolean(textarea),
     rail: rail
@@ -32,7 +32,7 @@ const snapshot = (page) => page.evaluate(() => {
       : null,
     actions: Array.from(document.querySelectorAll('[data-chat-action]')).map((el) => el.getAttribute('data-chat-action')).sort(),
     hasFoldToggle: Boolean(document.querySelector('[data-chrome-toggle="status-fold"]')),
-    hasStats: Boolean(document.querySelector('.chat-status-stats')),
+    hasStats: Boolean(document.querySelector('[data-slot="chat-status-stats"]')),
     hasRestore: Boolean(document.querySelector('[data-chrome-restore="composer"]')),
     hasHideToggle: Boolean(document.querySelector('[data-chrome-toggle="composer-hide"]')),
     hasActionsToggle: Boolean(document.querySelector('[data-chat-actions-toggle]')),
@@ -42,8 +42,8 @@ const snapshot = (page) => page.evaluate(() => {
 
 export async function checkMinimalChrome(page, { base, cwd, sessionId }) {
   await page.goto(`${base}/?session=${sessionId}`, { waitUntil: "domcontentloaded" });
-  await page.locator(".chat-rail").waitFor();
-  await page.waitForFunction(() => (document.querySelector(".chat-status-bar")?.innerText ?? "").trim().length > 0);
+  await page.locator("[data-chat-rail]").waitFor();
+  await page.waitForFunction(() => (document.querySelector('[data-slot="chat-status-bar"]')?.innerText ?? "").trim().length > 0);
 
   const base_ = await snapshot(page);
 
@@ -68,12 +68,12 @@ export async function checkMinimalChrome(page, { base, cwd, sessionId }) {
   assert.deepEqual((await snapshot(page)).actions, [], "Escape must collapse the bar again");
 
   // Focus rides the rules — and must not be a closed outline, which would put the side edges back.
-  await page.locator("textarea.chat-input-textarea").focus();
+  await page.locator('textarea[data-slot="chat-input-textarea"]').focus();
   await page.waitForTimeout(250);
   const focused = await snapshot(page);
   assert.equal(focused.rail.outlineStyle, "none", "focus must not draw a closed outline");
   assert.match(focused.rail.shadow, /inset/, `focus must add inset bands, got ${focused.rail.shadow}`);
-  await page.locator("textarea.chat-input-textarea").blur();
+  await page.locator('textarea[data-slot="chat-input-textarea"]').blur();
   console.log("PASS: minimal chrome — two rules, no side edges, focus drawn on the rules");
 
   // Nothing folds and nothing is hidden by a control: the row and the input are always displayed.
@@ -96,7 +96,7 @@ export async function checkMinimalChrome(page, { base, cwd, sessionId }) {
   // first bare key this app binds, so its guards matter as much as its happy path.
   const composer = () => page.evaluate(() => ({
     active: String((document.activeElement && document.activeElement.className) || ""),
-    value: document.querySelector("textarea.chat-input-textarea")?.value ?? null,
+    value: document.querySelector('textarea[data-slot="chat-input-textarea"]')?.value ?? null,
   }));
   const blur = () => page.evaluate(() => {
     const el = document.activeElement;
@@ -108,7 +108,7 @@ export async function checkMinimalChrome(page, { base, cwd, sessionId }) {
   await page.keyboard.press("/");
   await page.waitForTimeout(300);
   const fromPage = await composer();
-  assert.ok(fromPage.active.includes("chat-input-textarea"), "`/` must move the caret into the composer, got " + fromPage.active);
+  assert.ok(fromPage.active.includes("min-w-0"), "`/` must move the caret into the composer, got " + fromPage.active);
   assert.equal(fromPage.value, "/", "an empty composer takes the `/` with it, so the slash palette opens");
 
   // Already typing: `/` is just a character. The guard must not eat it or reach for focus.
@@ -120,14 +120,14 @@ export async function checkMinimalChrome(page, { base, cwd, sessionId }) {
   await page.keyboard.press("/");
   await page.waitForTimeout(300);
   const withDraft = await composer();
-  assert.ok(withDraft.active.includes("chat-input-textarea"), "`/` must still focus when a draft is present");
+  assert.ok(withDraft.active.includes("min-w-0"), "`/` must still focus when a draft is present");
   assert.equal(withDraft.value, "//", "the shortcut must not touch a draft");
   // The composer is reloaded by the navigation below, so `//` cannot leak into the next check.
   console.log("PASS: minimal chrome — / focuses the composer and never eats a keystroke");
 
   // The fresh row is already only [model] [project], so it must offer no fold control.
   await page.goto(`${base}/?cwd=${encodeURIComponent(cwd)}`, { waitUntil: "domcontentloaded" });
-  await page.locator(".chat-rail").waitFor();
+  await page.locator("[data-chat-rail]").waitFor();
   await page.waitForTimeout(1200);
   const fresh = await snapshot(page);
   assert.equal(fresh.hasFoldToggle, false, "the row never offers a fold control");

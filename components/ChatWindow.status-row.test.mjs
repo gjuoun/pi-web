@@ -34,8 +34,8 @@ test("renders the extension status line as its own bar below the status row", ()
 });
 
 test("puts every line of the bar inside one shared scroll surface", () => {
-  const surfaceAt = source.indexOf('className="chat-bottom-bar"');
-  const innerAt = source.indexOf('className="chat-bottom-bar-inner"');
+  const surfaceAt = source.indexOf('data-slot="chat-bottom-bar"');
+  const innerAt = source.indexOf('data-slot="chat-bottom-bar-inner"');
   const rowAt = source.indexOf("<ChatStatusBar");
   const extAt = source.indexOf("<ExtensionStatusLine");
 
@@ -54,8 +54,7 @@ test("puts every line of the bar inside one shared scroll surface", () => {
   // padding is not honoured past the overflow edge, so 52px there would leave the tail of an
   // overflowing line sitting cut off at the viewport edge.
   const inner = source.slice(innerAt, source.indexOf("</div>", innerAt));
-  assert.match(inner, /paddingLeft: 16/);
-  assert.match(inner, /paddingRight: isMobile \? 16 : 52/);
+  assert.match(inner, /pr-\[52px\]/);
 });
 
 test("feeds the status row the fresh predicate and the project root", () => {

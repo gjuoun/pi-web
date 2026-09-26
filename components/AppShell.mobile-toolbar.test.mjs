@@ -13,10 +13,10 @@ test("keeps action icons inline in medium mobile sidebars", () => {
 });
 
 test("uses a compact narrow-mobile toolbar with a floating action layer", () => {
-  assert.match(source, /data-mobile-toolbar="true"[\s\S]*?flex: 1,[\s\S]*?minWidth: 0/);
+  assert.match(source, /data-mobile-toolbar="true"[\s\S]*?flex-1[\s\S]*?min-w-0/);
   assert.match(
     source,
-    /data-mobile-toolbar-actions="true"[\s\S]*?position: "absolute"[\s\S]*?right: 0,[\s\S]*?left: TOP_BAR_ICON_BUTTON_SIZE/,
+    /data-mobile-toolbar-actions="true"[\s\S]*?left: TOP_BAR_ICON_BUTTON_SIZE[\s\S]*?absolute[\s\S]*?right-0/,
   );
 
   for (const action of ["history", "name", "agents", "branches", "system", "tools"]) {
@@ -53,7 +53,7 @@ test("only renders branch toolbar controls for sessions with branches", () => {
 test("keeps covered statistics and file controls out of interaction and focus", () => {
   assert.match(source, /const covered = mobile && isNarrowMobile && mobileToolbarMoreOpen;/);
   assert.match(source, /disabled=\{!showChat \|\| covered\}[\s\S]*?tabIndex=\{covered \? -1 : undefined\}/);
-  assert.match(source, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}[\s\S]*?visibility: covered \? "hidden" : "visible"/);
+  assert.match(source, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}[\s\S]*?covered \? \{ visibility: "hidden", pointerEvents: "none" \} : undefined/);
   assert.match(source, /aria-hidden=\{covered \? true : undefined\}/);
 });
 

@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { useI18n } from "@/hooks/useI18n";
+import { useTheme } from "@/hooks/useTheme";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
+import { getXtermTheme } from "@/lib/code-themes";
 import { createTerminalWriter, terminalRequest } from "@/lib/terminal-client";
 import type { TerminalEvent } from "@/lib/terminal-manager";
 import type { TerminalTab } from "./terminal-tab-state";
@@ -19,6 +21,7 @@ interface Props {
 
 export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }: Props) {
   const { t } = useI18n();
+  const { theme } = useTheme();
   const { id, cwd, restored } = tab;
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -54,15 +57,7 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
       scrollback: 8000,
       screenReaderMode: true,
       disableStdin: true,
-      theme: {
-        background: "#111318", foreground: "#d7dce5", cursor: "#60a5fa",
-        selectionBackground: "#365b8a",
-        black: "#1d222b", red: "#f87171", green: "#4ade80", yellow: "#facc15",
-        blue: "#60a5fa", magenta: "#c084fc", cyan: "#22d3ee", white: "#e5e7eb",
-        brightBlack: "#6b7280", brightRed: "#fca5a5", brightGreen: "#86efac",
-        brightYellow: "#fde047", brightBlue: "#93c5fd", brightMagenta: "#d8b4fe",
-        brightCyan: "#67e8f9", brightWhite: "#ffffff",
-      },
+      theme: getXtermTheme(theme),
     });
     terminalRef.current = terminal;
     const fit = new FitAddon();
@@ -190,6 +185,14 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
     fitRef.current?.();
   }, [monoStack, reconnectKey]);
 
+  // xterm also reads its theme once at construction; push palette changes live so switching
+  // theme (e.g. into Dracula) recolors already-open terminals.
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (!terminal) return;
+    terminal.options.theme = getXtermTheme(theme);
+  }, [theme, reconnectKey]);
+
   useEffect(() => {
     if (active) terminalRef.current?.focus();
   }, [active]);
@@ -213,30 +216,34 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
   }, [id, tab.closing]);
 
   return (
-    <section className="terminal-panel" aria-label={t("terminal.title")}>
-      <header className="terminal-panel-header">
-        <div className="terminal-panel-path">
-          <span className={`terminal-status-dot is-${status}`} title={t(`terminal.${status}`)} />
-          <span title={cwd}>{cwd}</span>
+    <section data-slot="terminal-panel" data-state={status} className="grid grid-rows-[38px_auto_minmax(0,1fr)] w-full h-full min-w-0 min-h-0 bg-[#111318]" aria-label={t("terminal.title")}>
+      <header className="flex items-center justify-between min-w-0 pl-[13px] pr-2.5 border-b border-[#2f3540] bg-[#181b21] text-[#9ca3af] font-mono text-[11px]">
+        <div className="flex items-center min-w-0 gap-2">
+          <span
+            data-state={status}
+            title={t(`terminal.${status}`)}
+            className="w-[7px] h-[7px] flex-none rounded-full bg-[#facc15] data-[state=ready]:bg-[#4ade80] data-[state=exited]:bg-[#f87171] data-[state=error]:bg-[#f87171]"
+          />
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap" title={cwd}>{cwd}</span>
         </div>
         {status === "error" && (
-          <button type="button" onClick={() => setReconnectKey((key) => key + 1)} disabled={Boolean(tab.closing)} title={t("terminal.reconnect")} aria-label={t("terminal.reconnect")}>
+          <button type="button" className="inline-flex items-center gap-1.5 h-[27px] flex-shrink-0 px-2 border border-[#343a46] rounded-[5px] bg-transparent text-[#9ca3af] cursor-pointer font-[inherit] hover:bg-[#242932] hover:text-[#e5e7eb]" onClick={() => setReconnectKey((key) => key + 1)} disabled={Boolean(tab.closing)} title={t("terminal.reconnect")} aria-label={t("terminal.reconnect")}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2" />
             </svg>
           </button>
         )}
-        <button type="button" onClick={onRestart} disabled={Boolean(tab.closing)} title={t("terminal.restart")} aria-label={t("terminal.restart")}>
+        <button type="button" className="inline-flex items-center gap-1.5 h-[27px] flex-shrink-0 px-2 border border-[#343a46] rounded-[5px] bg-transparent text-[#9ca3af] cursor-pointer font-[inherit] hover:bg-[#242932] hover:text-[#e5e7eb]" onClick={onRestart} disabled={Boolean(tab.closing)} title={t("terminal.restart")} aria-label={t("terminal.restart")}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M20 11a8 8 0 1 0-2.34 5.66" /><polyline points="20 4 20 11 13 11" />
           </svg>
         </button>
       </header>
       <div>
-        {error && <div className="terminal-panel-error" role="alert">{error}</div>}
-        {status === "exited" && <div className="terminal-panel-exit" role="status">{exitCode === null ? t("terminal.exited") : t("terminal.exitCode", { code: exitCode })}</div>}
+        {error && <div className="px-3 py-[7px] border-b border-[#5f2424] bg-[#321b1b] text-[#fca5a5] font-mono text-[11px]" role="alert">{error}</div>}
+        {status === "exited" && <div className="px-3 py-[7px] text-[#9ca3af] font-mono text-[11px]" role="status">{exitCode === null ? t("terminal.exited") : t("terminal.exitCode", { code: exitCode })}</div>}
       </div>
-      <div className="terminal-xterm"><div ref={containerRef} className="terminal-xterm-host" /></div>
+      <div data-slot="terminal-xterm" className="[grid-row:-2/-1] min-w-0 min-h-0 pt-2.5 pr-2 pb-[22px] pl-3 overflow-hidden"><div ref={containerRef} className="w-full h-full" /></div>
     </section>
   );
 }

@@ -278,7 +278,7 @@ test("renders the shared field model selector as a disabled gray control", () =>
 
   assert.match(html, /aria-label="Model override"/);
   assert.match(html, /disabled=""/);
-  assert.match(html, /background:var\(--bg-panel\)/);
+  assert.match(html, /class="[^"]*bg-muted\b[^"]*text-muted-foreground\b[^"]*"/);
   assert.match(html, />Parent default</);
 });
 
@@ -298,8 +298,8 @@ test("file mention menu applies the measured upward height cap", () => {
   const block = source.slice(start, start + 4000);
   assert.match(block, /ref=\{atMenuRef\}/);
   assert.match(block, /min\(48vh, 400px, \$\{atMenuMaxHeight\}px\)/);
-  assert.match(block, /flexDirection: "column"/);
-  assert.match(block, /minHeight: 0/);
+  assert.match(block, /flex flex-col/);
+  assert.match(block, /min-h-0/);
   assert.equal(block.includes("maxHeight: \"min(48vh, 400px)\""), false);
 });
 
@@ -563,7 +563,7 @@ test("renders compact errors above the input as a wrapping alert", () => {
   assert.match(html, /role="alert"/);
   assert.match(html, /Compaction failed: OpenAI API error/);
   assert.match(html, /&lt;html&gt;request forbidden&lt;\/html&gt;/);
-  assert.match(html, /white-space:pre-wrap/);
+  assert.match(html, /whitespace-pre-wrap/);
   assert.ok(html.indexOf('role="alert"') < html.indexOf("<textarea"));
 });
 

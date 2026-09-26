@@ -5,42 +5,28 @@ import test from "node:test";
 const source = await readFile(new URL("./ImagePreview.tsx", import.meta.url), "utf8");
 const cssSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
-test("uses a native modal dialog and restores focus to its trigger", () => {
-  assert.match(source, /useRef<HTMLDialogElement>\(null\)/);
-  assert.match(source, /dialog\.showModal\(\)/);
-  assert.match(source, /closeButtonRef\.current\?\.focus\(\{ preventScroll: true \}\)/);
-  assert.match(source, /const trigger = triggerRef\.current[\s\S]*?trigger\?\.isConnected[\s\S]*?trigger\.focus\(\{ preventScroll: true \}\)/);
+test("renders on shadcn Dialog, controlled by local open state", () => {
+  assert.match(source, /import \{ Dialog, DialogContent, DialogTrigger \} from "@\/components\/ui\/dialog"/);
+  assert.match(source, /<Dialog open=\{open\} onOpenChange=\{setOpen\}>/);
+  assert.match(source, /<DialogTrigger asChild>/);
   assert.doesNotMatch(source, /createPortal/);
+  assert.doesNotMatch(source, /HTMLDialogElement/);
 });
 
-test("Escape closes image preview without reaching global shortcuts", () => {
-  assert.match(
-    source,
-    /const closePreview = \(\) => \{[\s\S]*?dialogRef\.current\?\.open[\s\S]*?dialogRef\.current\.close\(\)[\s\S]*?setOpen\(false\)/,
-  );
-  assert.match(
-    source,
-    /event\.key !== "Escape"[\s\S]*?event\.preventDefault\(\)[\s\S]*?event\.stopPropagation\(\)[\s\S]*?closePreview\(\)/,
-  );
-  assert.match(
-    source,
-    /onCancel=\{\(event\) => \{[\s\S]*?event\.preventDefault\(\)[\s\S]*?event\.stopPropagation\(\)[\s\S]*?closePreview\(\)/,
-  );
-});
-
-test("closes only when the backdrop itself is clicked", () => {
-  assert.match(source, /event\.target === event\.currentTarget[\s\S]*?closePreview\(\)/);
-});
-
-test("keeps the preview and Pi-style close button inside mobile safe areas", () => {
-  assert.match(
-    cssSource,
-    /\.image-preview-dialog \{[\s\S]*?env\(safe-area-inset-top\)[\s\S]*?env\(safe-area-inset-right\)[\s\S]*?env\(safe-area-inset-bottom\)[\s\S]*?env\(safe-area-inset-left\)/,
-  );
-  assert.match(
-    cssSource,
-    /\.image-preview-close \{[\s\S]*?top: max\(12px, env\(safe-area-inset-top\)\)[\s\S]*?right: max\(12px, env\(safe-area-inset-right\)\)[\s\S]*?border-radius: 6px[\s\S]*?background: var\(--bg-panel\)/,
-  );
-  assert.match(cssSource, /@media \(pointer: coarse\) \{[\s\S]*?\.image-preview-close \{[\s\S]*?width: 44px;[\s\S]*?height: 44px;/);
+test("keeps a Pi-style close button that closes on click", () => {
+  assert.match(source, /onClick=\{\(\) => setOpen\(false\)\}/);
   assert.match(source, /<path d="M6 6l12 12M18 6 6 18" \/>/);
+});
+
+test("full-screen overlay honours mobile safe areas", () => {
+  assert.match(source, /pt-\[max\(16px,env\(safe-area-inset-top\)\)\]/);
+  assert.match(source, /pr-\[max\(16px,env\(safe-area-inset-right\)\)\]/);
+  assert.match(source, /pb-\[max\(16px,env\(safe-area-inset-bottom\)\)\]/);
+  assert.match(source, /pl-\[max\(16px,env\(safe-area-inset-left\)\)\]/);
+  assert.match(source, /top-\[max\(12px,env\(safe-area-inset-top\)\)\]/);
+  assert.match(source, /right-\[max\(12px,env\(safe-area-inset-right\)\)\]/);
+});
+
+test("no longer relies on the deleted .image-preview-* CSS rules", () => {
+  assert.doesNotMatch(cssSource, /\.image-preview-(dialog|image|close)\b/);
 });

@@ -21,14 +21,14 @@ test("large source previews bypass the per-line syntax highlighter", () => {
 
   const lightweightSource = source.slice(lightweightStart, lightweightEnd);
   assert.match(lightweightSource, /useLightweightSource \? sourceLines\.map\(\(line, lineIndex\) =>/);
-  assert.match(lightweightSource, /className="file-source-line"/);
-  assert.match(lightweightSource, /className="file-source-line-content"/);
-  assert.match(lightweightSource, /style=\{FILE_LINE_NUMBER_STYLE\}/);
+  assert.match(lightweightSource, /className="file-source-line flex min-w-full"/);
+  assert.match(lightweightSource, /className={`file-source-line-content/);
+  assert.match(lightweightSource, /className={FILE_LINE_NUMBER_CLASS}/);
 
   // The lightweight branch still wins over the syntax highlighter in the JSX.
   const branchStart = source.indexOf(") : useLightweightSource ? (");
   assert.notEqual(branchStart, -1);
-  assert.match(source.slice(branchStart), /className="file-source-view is-lightweight"/);
+  assert.match(source.slice(branchStart), /className={`file-source-view is-lightweight/);
   assert.notEqual(source.indexOf("highlightedSource", branchStart), -1);
 });
 
@@ -44,7 +44,7 @@ test("lightweight source rows are skipped for highlighted, diff, and preview vie
   const { outputText } = ts.transpileModule(`
     return (data, displayMode, hasGitDiff = false, isDeletedDiff = false, wrapLines = false) => {
       const SOURCE_HIGHLIGHT_MAX_LINES = 1_000;
-      const FILE_LINE_NUMBER_STYLE = {};
+      const FILE_LINE_NUMBER_CLASS = "";
       ${calculations}
       return lightweightSourceLines;
     };
@@ -64,5 +64,5 @@ test("lightweight source rows are skipped for highlighted, diff, and preview vie
     assert.equal(rows[0].props["data-line-number"], 1);
     assert.equal(rows[0].props.children[1].props.children, "line");
   }
-  assert.equal(render(large, "source", false, false, true)[0].props.children[1].props.style.whiteSpace, "pre-wrap");
+  assert.match(render(large, "source", false, false, true)[0].props.children[1].props.className, /whitespace-pre-wrap/);
 });

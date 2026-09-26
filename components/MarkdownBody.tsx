@@ -37,7 +37,7 @@ export function MarkdownBody({ children, className, isStreaming, cwd, onOpenFile
       }
       return (
         <code
-          className="markdown-inline-code"
+          className="rounded-[5px] bg-muted px-[5px] py-px font-mono text-[0.92em] text-foreground ring-1 ring-inset ring-border"
           {...props}
         >
           {children}
@@ -86,8 +86,13 @@ export function MarkdownBody({ children, className, isStreaming, cwd, onOpenFile
     },
     table({ children }) {
       return (
-        <div className="markdown-table-wrap">
-          <table>{children}</table>
+        <div
+          data-slot="markdown-table-wrap"
+          className="my-2 w-full overflow-x-auto overflow-y-hidden rounded-[7px] border border-border"
+        >
+          <table className="w-max min-w-full border-separate border-spacing-0 text-[calc(13px+var(--chat-font-size-offset,0px))]">
+            {children}
+          </table>
         </div>
       );
     },
