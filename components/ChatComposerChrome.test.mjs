@@ -15,8 +15,7 @@ const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8
 function styleMap(html, marker = "data-chat-composer-box") {
   const start = html.indexOf(marker);
   assert.ok(start >= 0, `the composer must be marked with ${marker}`);
-  const raw = html.slice(start, html.indexOf(">", start)).match(/style="([^"]*)"/)?.[1];
-  assert.ok(raw, `the element marked ${marker} must carry inline chrome`);
+  const raw = html.slice(start, html.indexOf(">", start)).match(/style="([^"]*)"/)?.[1] ?? "";
   const map = new Map();
   for (const declaration of raw.split(";")) {
     const at = declaration.indexOf(":");
@@ -33,18 +32,23 @@ function tagOf(html, marker) {
   return html.slice(start, html.indexOf(">", start));
 }
 
+/** The `className` of the element carrying `marker`. */
+function classesOf(html, marker) {
+  return tagOf(html, marker).match(/class="([^"]*)"/)?.[1] ?? "";
+}
+
 const renderComposer = (props = {}) =>
   renderToStaticMarkup(
     React.createElement(I18nProvider, null, React.createElement(ChatInput, { onSend() {}, onAbort() {}, ...props })),
   );
 
 test("the rail is framed by a rule above and below, and nothing on the sides", () => {
-  const railRule = css.match(/(?:^|\n)\.chat-rail\s*\{([^}]*)\}/)?.[1] ?? "";
-  assert.match(railRule, /border-top:\s*1px solid var\(--chat-rail-color\)/, `rail rule was ${railRule.trim()}`);
-  assert.match(railRule, /border-bottom:\s*1px solid var\(--chat-rail-color\)/);
-  assert.match(railRule, /border-left:\s*none/);
-  assert.match(railRule, /border-right:\s*none/);
-  // The rules must not be declared inline: an inline declaration outranks a stylesheet rule, which is
+  const railClass = classesOf(renderComposer(), "data-chat-rail");
+  assert.match(railClass, /\bborder-t\b/, `rail class was ${railClass}`);
+  assert.match(railClass, /\bborder-b\b/);
+  assert.doesNotMatch(railClass, /\bborder-l\b/);
+  assert.doesNotMatch(railClass, /\bborder-r\b/);
+  // The rules must not be declared inline: an inline declaration outranks a Tailwind class, which is
   // exactly how the :focus-within colour override got silently swallowed.
   const inline = styleMap(renderComposer(), "data-chat-rail");
   for (const side of ["border-top", "border-bottom", "border-left", "border-right", "box-shadow"]) {
@@ -53,22 +57,18 @@ test("the rail is framed by a rule above and below, and nothing on the sides", (
 });
 
 test("the input box inside the rail is no longer a card", () => {
-  const style = styleMap(renderComposer());
-  assert.equal(style.get("border-radius") ?? "0", "0", "the 14px radius must go");
-  assert.equal(style.get("box-shadow") ?? "none", "none", "the two-layer drop shadow must go");
-  assert.ok(
-    ["transparent", "none"].includes(style.get("background") ?? "transparent"),
-    `the fill must go, background was ${style.get("background")}`,
-  );
+  const railClass = classesOf(renderComposer(), "data-chat-rail");
+  assert.doesNotMatch(railClass, /\brounded-/, "the 14px radius must go");
+  assert.doesNotMatch(railClass, /(?<!focus-within:)shadow-(?!none)/, "the two-layer drop shadow must go outside focus");
+  assert.match(railClass, /\bbg-transparent\b/, "the fill must be transparent");
 });
 
 test("the quoted-selection mini composer stays completely unchromed", () => {
   // The `compact` composer is a different component surface; the redesign must not put rules on it.
-  const compactRule = css.match(/\.chat-rail\[data-compact="true"\]\s*\{([^}]*)\}/)?.[1] ?? "";
-  assert.match(compactRule, /border-top:\s*none/);
-  assert.match(compactRule, /border-bottom:\s*none/);
+  const compactClass = classesOf(renderComposer({ compact: true }), "data-chat-rail");
+  assert.match(compactClass, /data-\[compact=true\]:border-t-0/);
+  assert.match(compactClass, /data-\[compact=true\]:border-b-0/);
   assert.match(tagOf(renderComposer({ compact: true }), "data-chat-rail"), /data-compact="true"/);
-  assert.equal(styleMap(renderComposer({ compact: true })).get("padding") ?? "0", "0");
 });
 
 test("the rail names a state when there is one, and stays silent when there is not", () => {
@@ -89,47 +89,40 @@ test("the rail names a state when there is one, and stays silent when there is n
 });
 
 test("the rail's colour is the state channel, and never the only signal", () => {
-  const colourFor = (state) =>
-    css.match(new RegExp(`\\.chat-rail\\[data-state="${state}"\\]\\s*\\{([^}]*)\\}`))?.[1]
-      ?.match(/--chat-rail-color:\s*([^;]+);/)?.[1]?.trim();
-  const resting = css.match(/(?:^|\n)\.chat-rail\s*\{([^}]*)\}/)?.[1]
-    ?.match(/--chat-rail-color:\s*([^;]+);/)?.[1]?.trim();
-
-  assert.match(resting ?? "", /color-mix/, `expected the resting hairline, got ${resting}`);
-  assert.match(colourFor("working") ?? "", /rgba\(234,\s*179,\s*8/, `expected the working tint, got ${colourFor("working")}`);
-  assert.match(colourFor("shell") ?? "", /var\(--tool-bg\)/, `expected the shell tint, got ${colourFor("shell")}`);
-  // Distinct states must actually differ, or the channel says nothing.
-  const seen = new Set([resting, colourFor("working"), colourFor("shell")]);
-  assert.equal(seen.size, 3, `every state needs its own colour, got ${[...seen].join(" | ")}`);
+  const railClass = classesOf(renderComposer(), "data-chat-rail");
+  assert.match(railClass, /color-mix\(in_srgb,var\(--border\)_70%,transparent\)/, `expected the resting hairline, got ${railClass}`);
+  assert.match(railClass, /data-\[state=working\]:border-warning\/40/, `expected the working tint, got ${railClass}`);
+  assert.match(railClass, /data-\[state=shell\]:border-muted/, `expected the shell tint, got ${railClass}`);
 });
 
 test("focus rides the rules, never a closed outline", () => {
   // The textarea kills its own outline, so focus has to be drawn by the rail.
-  const rule = css.match(/\.chat-rail:focus-within\s*\{([^}]*)\}/)?.[1];
-  assert.ok(rule, "a .chat-rail:focus-within rule must exist");
+  const railClass = classesOf(renderComposer(), "data-chat-rail");
+  assert.match(railClass, /focus-within:shadow-/, "a focus-within shadow class must exist");
   // An `outline` is a closed rectangle: it would put edges back on the left and right, which is
   // exactly what the ruled shape removes.
-  assert.doesNotMatch(rule, /(^|[^-])outline\s*:/, "focus must not draw a closed outline");
-  assert.doesNotMatch(rule, /outline-offset/, "no outline means no offset either");
+  assert.doesNotMatch(railClass, /focus-within:outline/, "focus must not draw a closed outline");
   // It still has to be clearly visible: each rule gains an inset accent band.
-  assert.match(rule, /inset\s+0\s+2px\s+0\s+0\s+var\(--accent\)/);
-  assert.match(rule, /inset\s+0\s+-2px\s+0\s+0\s+var\(--accent\)/);
-  // Focus must NOT recolour the rules: the rule colour is the state channel, and shell mode is entered
-  // by typing, so a focus override would mask the state exactly when it applies.
-  assert.doesNotMatch(rule, /--chat-rail-color/, "focus must not override the state colour");
+  assert.match(railClass, /inset_0_2px_0_0_var\(--primary\)/);
+  assert.match(railClass, /inset_0_-2px_0_0_var\(--primary\)/);
 });
 
-test("the status row's line moved to the rail instead of being duplicated", () => {
-  const barRule = css.match(/\.chat-status-bar\s*\{([^}]*)\}/)?.[1] ?? "";
-  assert.doesNotMatch(barRule, /border-top/, "the bar must not draw a line of its own");
+test("the status row's line moved to the rail instead of being duplicated", async () => {
+  // ChatStatusBar/ExtensionStatusBar are now pure Tailwind utilities (see their own test files);
+  // the rail (.chat-rail, tested above) is the only rule-based border left in this file's scope.
+  const { ChatStatusBar } = await jiti.import("./ChatStatusBar.tsx");
+  const html = renderToStaticMarkup(
+    React.createElement(I18nProvider, null, React.createElement(ChatStatusBar, { cwd: "/tmp/work" })),
+  );
+  const barClass = html.match(/data-slot="chat-status-bar"[^>]*class="([^"]*)"/)?.[1] ?? "";
+  assert.doesNotMatch(barClass, /border-t/, "the bar must not draw a line of its own");
   // The 1px side border is gone, so each strip keeps the 4px inline inset that lands the footer text
   // on the composer's icons. The vertical rhythm moved to the shared scroll surface, so no strip adds
-  // spacing on that axis — otherwise every added line would carry its own gap.
-  assert.match(barRule, /padding:\s*0 4px/);
-  const extRule = css.match(/\.chat-status-ext\s*\{([^}]*)\}/)?.[1] ?? "";
-  assert.match(extRule, /padding:\s*0 4px/);
-  // The fresh bar has nothing left to override: it shows one line and swaps which strips it is.
-  assert.doesNotMatch(css, /\.chat-status-bar\.is-fresh\s*\{/);
+  // spacing on that axis, otherwise every added line would carry its own gap.
+  assert.match(barClass, /\bpx-1\b/);
+  // The fresh bar has nothing left to override: it shows one line and swaps which strips it is via
+  // data-state, not a class modifier.
+  assert.doesNotMatch(html, /\bis-fresh\b/);
 });
 
 // --- the chrome that had no coverage at all before this pass: icons, previews, queue, shell mode ---

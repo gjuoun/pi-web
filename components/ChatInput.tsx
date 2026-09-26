@@ -26,6 +26,8 @@ import { FolderIcon, getFileIcon } from "./FileIcons";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useI18n } from "@/hooks/useI18n";
 import { useChatAppearance } from "@/hooks/useChatAppearance";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export { filterModelOptions } from "./ModelSelector";
 
@@ -415,56 +417,26 @@ function revokeImagePreview(image: AttachedImage): void {
 
 function QueuedMessageRow({ kind, text }: { kind: "steer" | "follow-up"; text: string }) {
   return (
-    <div
-      title={text}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "3px 10px",
-        fontSize: 12,
-        color: "var(--text-muted)",
-        minWidth: 0,
-      }}
-    >
+    <div title={text} className="flex min-w-0 items-center gap-2 px-2.5 py-[3px] text-xs text-muted-foreground">
       <span
-        style={{
-          flexShrink: 0,
-          fontSize: 10,
-          fontFamily: "var(--font-mono)",
-          padding: "1px 7px",
-          borderRadius: 999,
-          border: `1px solid ${kind === "steer" ? "color-mix(in srgb, var(--accent) 45%, transparent)" : "var(--border)"}`,
-          color: kind === "steer" ? "var(--accent)" : "var(--text-dim)",
-        }}
+        className={cn(
+          "shrink-0 rounded-full border px-[7px] py-px font-mono text-[10px]",
+          kind === "steer" ? "border-primary/45 text-primary" : "border-border text-muted-foreground",
+        )}
       >
         {kind}
       </span>
-      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</span>
+      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{text}</span>
     </div>
   );
 }
 
 function ModelNoticeBanner({ tone, title, body, onClose }: { tone: "error" | "warning"; title: string; body: string; onClose?: () => void }) {
-  const color = tone === "error" ? "239,68,68" : "234,179,8";
+  const toneClass = tone === "error" ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-warning/30 bg-warning/10 text-warning";
   return (
     <div
       role="alert"
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 8,
-        maxHeight: 120,
-        marginBottom: 8,
-        padding: "7px 10px",
-        overflowY: "auto",
-        border: `1px solid rgba(${color},0.3)`,
-        borderRadius: 6,
-        background: `rgba(${color},0.07)`,
-        color: `rgb(${color})`,
-        fontSize: 11,
-        lineHeight: 1.45,
-      }}
+      className={cn("mb-2 flex max-h-[120px] items-start gap-2 overflow-y-auto rounded-md border px-2.5 py-[7px] text-[11px] leading-[1.45]", toneClass)}
     >
       <svg
         width="13"
@@ -475,33 +447,23 @@ function ModelNoticeBanner({ tone, title, body, onClose }: { tone: "error" | "wa
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{ flexShrink: 0, marginTop: 1 }}
+        className="mt-px shrink-0"
         aria-hidden="true"
       >
         <path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0Z" />
         <line x1="12" y1="9" x2="12" y2="13" />
         <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontWeight: 600 }}>{title}</div>
-        <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{body}</div>
+      <div className="min-w-0 flex-1">
+        <div className="font-semibold">{title}</div>
+        <div className="break-words whitespace-pre-wrap">{body}</div>
       </div>
       {onClose && (
         <button
           type="button"
           onClick={onClose}
           aria-label="Dismiss"
-          style={{
-            flexShrink: 0,
-            background: "none",
-            border: "none",
-            padding: "0 2px",
-            cursor: "pointer",
-            color: "inherit",
-            opacity: 0.7,
-            fontSize: 13,
-            lineHeight: 1,
-          }}
+          className="shrink-0 border-none bg-none px-0.5 py-0 text-[13px] leading-none text-inherit opacity-70"
         >
           ×
         </button>
@@ -1574,17 +1536,11 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     <fieldset
       disabled={builtinCommandPending}
       aria-busy={builtinCommandPending}
-      style={{
-        flexShrink: 0,
-        minWidth: 0,
-        margin: 0,
-        border: 0,
-        background: "transparent",
-        padding: compact ? 0 : "0 16px",
-        paddingRight: compact ? 0 : isMobile ? 16 : 52, // desktop: 16px base + 36px for ChatMinimap alignment
-        opacity: builtinCommandPending ? 0.5 : 1,
-        transition: "opacity 0.15s",
-      }}
+      className={cn(
+        "m-0 min-w-0 shrink-0 border-0 bg-transparent transition-opacity duration-150",
+        compact ? "p-0" : isMobile ? "px-4 py-0" : "py-0 pr-13 pl-4", // desktop: 16px base + 36px for ChatMinimap alignment
+        builtinCommandPending ? "opacity-50" : "opacity-100",
+      )}
     >
       {/* Hidden file input */}
       {!compact && <input
@@ -1592,7 +1548,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         type="file"
         accept="image/*"
         multiple
-        style={{ display: "none" }}
+        className="hidden"
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
           processImageFiles(files);
@@ -1617,7 +1573,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             the shape pi itself uses (`Steering:` / `Follow-up:`) — not a bordered panel: the panel's
             header and its `Queued · N` count were chrome around information the row already carries. */}
         {((queuedMessages?.steering.length ?? 0) + (queuedMessages?.followUp.length ?? 0)) > 0 && (
-          <div style={{ marginBottom: 6 }}>
+          <div className="mb-1.5">
             {queuedMessages?.steering.map((text, i) => (
               <div key={`steer-${i}`} data-chat-queued="steer">
                 <QueuedMessageRow kind="steer" text={text} />
@@ -1629,18 +1585,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               </div>
             ))}
             {onRecallQueue && (
-              <div style={{ display: "flex", justifyContent: "flex-end", padding: "2px 4px 0" }}>
+              <div className="flex justify-end pt-0 pr-1 pb-0 pl-1">
                 <button
                   type="button"
                   data-chat-recall=""
                   onClick={onRecallQueue}
                   title={t("chat.recallTitle")}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    padding: "1px 2px", border: "none", background: "transparent",
-                    color: "var(--text-muted)", cursor: "pointer",
-                    fontFamily: "var(--font-mono)", fontSize: 10,
-                  }}
+                  className="flex cursor-pointer items-center gap-[5px] border-none bg-transparent px-0.5 py-px font-mono text-[10px] text-muted-foreground"
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <polyline points="9 14 4 9 9 4" />
@@ -1654,27 +1605,17 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         )}
         {/* Retry banner */}
         {retryInfo && (
-          <div style={{
-            marginBottom: 8, padding: "5px 10px",
-            background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.25)",
-            borderRadius: 6, fontSize: 12, color: "rgba(180,130,0,0.9)",
-            display: "flex", alignItems: "center", gap: 6,
-          }}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <div className="mb-2 flex items-center gap-1.5 rounded-md border border-warning/25 bg-warning/8 px-2.5 py-[5px] text-xs text-warning">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
               <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
               <path d="M3 3v5h5" />
             </svg>
-             {t("chat.retrying", { attempt: retryInfo.attempt, max: retryInfo.maxAttempts })}{retryInfo.errorMessage && <span style={{ opacity: 0.7, marginLeft: 4 }}>— {retryInfo.errorMessage}</span>}
+             {t("chat.retrying", { attempt: retryInfo.attempt, max: retryInfo.maxAttempts })}{retryInfo.errorMessage && <span className="ml-1 opacity-70">— {retryInfo.errorMessage}</span>}
           </div>
         )}
         {compactResultText && (
-          <div style={{
-            marginBottom: 8, padding: "5px 10px",
-            background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.24)",
-            borderRadius: 6, fontSize: 12, color: "rgba(5,150,105,0.95)",
-            display: "flex", alignItems: "center", gap: 6,
-          }}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <div className="mb-2 flex items-center gap-1.5 rounded-md border border-success/24 bg-success/8 px-2.5 py-[5px] text-xs text-success">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
               <polyline points="20 6 9 17 4 12" />
             </svg>
             {compactResultText}
@@ -1683,43 +1624,25 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         {compactError && (
           <div
             role="alert"
-            style={{
-              marginBottom: 8,
-              padding: "7px 10px",
-              background: "rgba(239,68,68,0.07)",
-              border: "1px solid rgba(239,68,68,0.3)",
-              borderRadius: 6,
-              color: "#ef4444",
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-              lineHeight: 1.5,
-              whiteSpace: "pre-wrap",
-              overflowWrap: "anywhere",
-            }}
+            className="mb-2 rounded-md border border-destructive/30 bg-destructive/7 px-2.5 py-[7px] font-mono text-xs leading-normal break-words whitespace-pre-wrap text-destructive"
           >
             {compactError}
           </div>
         )}
         {/* Image previews, above the input frame and visible at rest — never collapsed behind a count. */}
         {attachedImages.length > 0 && (
-          <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+          <div className="mb-1.5 flex flex-wrap gap-1.5">
             {attachedImages.map((img, i) => (
-              <div key={i} data-chat-chip="" style={{ position: "relative", flexShrink: 0 }}>
+              <div key={i} data-chat-chip="" className="relative shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={img.previewUrl}
                   alt=""
-                  style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: "1px solid var(--border)", display: "block" }}
+                  className="block h-14 w-14 rounded-md border border-border object-cover"
                 />
                 <button
                   onClick={() => removeImage(i)}
-                  style={{
-                    position: "absolute", top: -4, right: -4,
-                    width: 16, height: 16, borderRadius: "50%",
-                    background: "var(--bg-panel)", border: "1px solid var(--border)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: "pointer", padding: 0, color: "var(--text-muted)",
-                  }}
+                  className="absolute -top-1 -right-1 flex size-4 cursor-pointer items-center justify-center rounded-full border border-border bg-sidebar p-0 text-muted-foreground"
                 >
                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                     <line x1="1" y1="1" x2="7" y2="7" /><line x1="7" y1="1" x2="1" y2="7" />
@@ -1731,34 +1654,15 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         )}
 
         {/* Main input */}
-        <div style={{ position: "relative", minWidth: 0 }}>
+        <div className="relative min-w-0">
           {historyMenuOpen && inputHistory.length > 0 && (
             <div
               ref={historyMenuRef}
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: "calc(100% + 8px)",
-                zIndex: 120,
-                background: "var(--bg)",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                boxShadow: "0 -6px 20px rgba(0,0,0,0.12)",
-                overflow: "hidden",
-                maxHeight: "min(44vh, 360px)",
-              }}
+              className="absolute right-0 bottom-[calc(100%+8px)] left-0 z-[120] max-h-[min(44vh,360px)] overflow-hidden rounded-lg border border-border bg-background shadow-[0_-6px_20px_rgba(0,0,0,0.12)]"
             >
               <div
                 title={t("chat.inputHistory")}
-                style={{
-                  height: 30,
-                  padding: "0 10px",
-                  borderBottom: "1px solid var(--border)",
-                  display: "flex",
-                  alignItems: "center",
-                  color: "var(--text-dim)",
-                }}
+                className="flex h-[30px] items-center border-b border-border px-2.5 text-muted-foreground"
               >
                 <svg
                   width="14"
@@ -1776,7 +1680,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                   <path d="M12 7v5l3 2" />
                 </svg>
               </div>
-              <div style={{ maxHeight: "calc(min(44vh, 360px) - 31px)", overflowY: "auto", padding: 4 }}>
+              <div className="max-h-[calc(min(44vh,360px)-31px)] overflow-y-auto p-1">
                 {inputHistory.map((item, index) => {
                   const active = index === historyActiveIndex;
                   return (
@@ -1791,26 +1695,15 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                         applyHistoryInput(item);
                       }}
                       onMouseEnter={() => setHistoryActiveIndex(index)}
-                      style={{
-                        width: "100%",
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 8,
-                        padding: "7px 8px",
-                        border: "none",
-                        borderRadius: 6,
-                        background: active ? "var(--bg-selected)" : "none",
-                        color: "var(--text)",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        fontSize: 12.5,
-                        lineHeight: 1.45,
-                      }}
+                      className={cn(
+                        "flex w-full cursor-pointer items-start gap-2 rounded-md border-none px-2 py-[7px] text-left text-[12.5px] leading-[1.45] text-foreground",
+                        active ? "bg-accent" : "bg-none",
+                      )}
                     >
-                      <span style={{ flexShrink: 0, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)", paddingTop: 1 }}>
+                      <span className="shrink-0 pt-px font-mono text-[11px] text-muted-foreground">
                         {index + 1}
                       </span>
-                      <span style={{ minWidth: 0, display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", overflowWrap: "anywhere" }}>
+                      <span className="line-clamp-2 min-w-0 overflow-hidden break-words">
                         {item}
                       </span>
                     </button>
@@ -1822,76 +1715,30 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           {slashMenuOpen && slashQuery !== null && (
             <div
               ref={slashMenuRef}
+              className="absolute right-0 bottom-[calc(100%+8px)] left-0 z-[120] box-border flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-[0_-6px_20px_rgba(0,0,0,0.12)]"
               style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: "calc(100% + 8px)",
-                zIndex: 120,
-                background: "var(--bg)",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                boxShadow: "0 -6px 20px rgba(0,0,0,0.12)",
-                overflow: "hidden",
-                boxSizing: "border-box",
-                display: "flex",
-                flexDirection: "column",
                 maxHeight: slashMenuMaxHeight === null
                   ? "min(72.8vh, 598px)"
                   : `min(72.8vh, 598px, ${slashMenuMaxHeight}px)`,
               }}
             >
-              <div
-                style={{
-                  padding: "8px 10px",
-                  borderBottom: "1px solid var(--border)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  fontSize: 11,
-                  color: "var(--text-dim)",
-                  flexShrink: 0,
-                }}
-              >
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-2.5 py-2 text-[11px] text-muted-foreground">
                  <span>{slashCommandsLoading ? t("chat.loadingCommands") : t("chat.slashCommands", { label: slashCommandCountLabel })}</span>
-                 <span style={{ fontFamily: "var(--font-mono)" }}>{t("chat.tabEnter")}</span>
+                 <span className="font-mono">{t("chat.tabEnter")}</span>
               </div>
-              <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", padding: 10 }}>
+              <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
                 {!slashCommandsLoading && filteredSlashCommands.length === 0 ? (
-                  <div style={{ padding: "2px 2px 4px", fontSize: 12, color: "var(--text-dim)" }}>
+                  <div className="px-0.5 pt-0.5 pb-1 text-xs text-muted-foreground">
                      {t("chat.noCommands")}
                   </div>
                 ) : (
                   groupedSlashCommands.map((group) => (
-                    <section key={group.source} style={{ marginBottom: 12 }}>
-                      <div
-                        style={{
-                          position: "sticky",
-                          top: -10,
-                          zIndex: 1,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 8,
-                          padding: "4px 0 6px",
-                          background: "var(--bg)",
-                          color: "var(--text-dim)",
-                          fontSize: 10,
-                          fontWeight: 600,
-                          textTransform: "uppercase",
-                        }}
-                      >
+                    <section key={group.source} className="mb-3">
+                      <div className="sticky top-[-10px] z-[1] flex items-center justify-between gap-2 bg-background pt-1 pb-1.5 text-[10px] font-semibold text-muted-foreground uppercase">
                            <span>{t(SLASH_SOURCE_GROUP_LABEL_KEYS[group.source])}</span>
-                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500 }}>{group.items.length}</span>
+                        <span className="font-mono font-medium">{group.items.length}</span>
                       </div>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                          gap: 8,
-                        }}
-                      >
+                      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-2">
                         {group.items.map(({ command, index }) => {
                           const active = index === slashActiveIndex;
                           const dormant = isDormantSkillCommand(command, skillDormancy);
@@ -1907,56 +1754,23 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                                 applySlashCommand(command);
                               }}
                               onMouseEnter={() => setSlashActiveIndex(index)}
-                              style={{
-                                width: "100%",
-                                minWidth: 0,
-                                minHeight: 58,
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 4,
-                                justifyContent: "center",
-                                padding: "9px 10px",
-                                border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-                                borderRadius: 7,
-                                background: active ? "var(--bg-selected)" : "var(--bg-panel)",
-                                color: "var(--text)",
-                                cursor: "pointer",
-                                textAlign: "left",
-                                boxShadow: active ? "0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent)" : "none",
-                              }}
+                              className={cn(
+                                "flex min-h-[58px] w-full min-w-0 cursor-pointer flex-col justify-center gap-1 rounded-[7px] border px-2.5 py-2 text-left text-foreground",
+                                active
+                                  ? "border-primary bg-accent shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_28%,transparent)]"
+                                  : "border-border bg-sidebar shadow-none",
+                              )}
                             >
-                              <span style={{
-                                fontSize: 13,
-                                fontFamily: "var(--font-mono)",
-                                overflowWrap: "anywhere",
-                                wordBreak: "break-word",
-                                color: dormant ? "var(--text-dim)" : undefined,
-                              }}>
+                              <span className={cn("overflow-wrap-anywhere font-mono text-[13px] break-words", dormant ? "text-muted-foreground" : undefined)}>
                                 /{command.name}
                                 {dormant && (
-                                  <span style={{
-                                    marginLeft: 6,
-                                    padding: "0 4px",
-                                    border: "1px solid var(--border)",
-                                    borderRadius: 3,
-                                    fontSize: 9,
-                                    color: "var(--text-dim)",
-                                    whiteSpace: "nowrap",
-                                  }}>
+                                  <span className="ml-1.5 rounded-[3px] border border-border px-1 text-[9px] whitespace-nowrap text-muted-foreground">
                                     {t("chat.dormant")}
                                   </span>
                                 )}
                               </span>
                                {command.description && (
-                                <span style={{
-                                  display: "-webkit-box",
-                                  WebkitBoxOrient: "vertical",
-                                  WebkitLineClamp: 2,
-                                  overflow: "hidden",
-                                  fontSize: 11,
-                                  lineHeight: 1.35,
-                                  color: "var(--text-dim)",
-                                }}>
+                                <span className="line-clamp-2 overflow-hidden text-[11px] leading-[1.35] text-muted-foreground">
                                    {getSlashDescription(command, t)}
                                 </span>
                               )}
@@ -1981,48 +1795,24 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             return (
               <div
                 ref={atMenuRef}
+                className="absolute right-0 bottom-[calc(100%+8px)] left-0 z-[120] box-border flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-[0_-6px_20px_rgba(0,0,0,0.12)]"
                 style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  bottom: "calc(100% + 8px)",
-                  zIndex: 120,
-                  background: "var(--bg)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  boxShadow: "0 -6px 20px rgba(0,0,0,0.12)",
-                  overflow: "hidden",
-                  boxSizing: "border-box",
-                  display: "flex",
-                  flexDirection: "column",
                   maxHeight: atMenuMaxHeight === null
                     ? "min(48vh, 400px)"
                     : `min(48vh, 400px, ${atMenuMaxHeight}px)`,
                 }}
               >
-                <div
-                  style={{
-                    padding: "8px 10px",
-                    borderBottom: "1px solid var(--border)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 8,
-                    fontSize: 11,
-                    color: "var(--text-dim)",
-                    flexShrink: 0,
-                  }}
-                >
+                <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-2.5 py-2 text-[11px] text-muted-foreground">
                   <span>
                     {indexLoading
                        ? t("chat.loadingFiles")
                        : t("chat.files", { label: matchCountLabel, hint: truncatedHint })}
                   </span>
-                   <span style={{ fontFamily: "var(--font-mono)" }}>{t("chat.tabEnter")}</span>
+                   <span className="font-mono">{t("chat.tabEnter")}</span>
                 </div>
-                <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", padding: 4 }}>
+                <div className="min-h-0 flex-1 overflow-y-auto p-1">
                   {!indexLoading && atMatches.length === 0 ? (
-                    <div style={{ padding: "6px 8px", fontSize: 12, color: "var(--text-dim)" }}>
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
                        {needsServerSearch && !serverResultInUse ? t("chat.searching") : t("chat.noMatchingFiles")}
                     </div>
                   ) : (
@@ -2042,29 +1832,18 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                             applyAtCompletion(entry);
                           }}
                           onMouseEnter={() => setAtActiveIndex(index)}
-                          style={{
-                            width: "100%",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "6px 8px",
-                            border: "none",
-                            borderRadius: 6,
-                            background: active ? "var(--bg-selected)" : "none",
-                            color: "var(--text)",
-                            cursor: "pointer",
-                            textAlign: "left",
-                            fontSize: 12.5,
-                            fontFamily: "var(--font-mono)",
-                          }}
+                          className={cn(
+                            "flex w-full cursor-pointer items-center gap-2 rounded-md border-none px-2 py-1.5 text-left font-mono text-[12.5px] text-foreground",
+                            active ? "bg-accent" : "bg-none",
+                          )}
                         >
-                          <span style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
+                          <span className="flex shrink-0 items-center">
                             {entry.isDir ? <FolderIcon size={14} /> : getFileIcon(name, 14)}
                           </span>
-                          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {dirPrefix && <span style={{ color: "var(--text-dim)" }}>{dirPrefix}</span>}
+                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                            {dirPrefix && <span className="text-muted-foreground">{dirPrefix}</span>}
                             {name}
-                            {entry.isDir && <span style={{ color: "var(--text-dim)" }}>/</span>}
+                            {entry.isDir && <span className="text-muted-foreground">/</span>}
                           </span>
                         </button>
                       );
@@ -2080,19 +1859,14 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             data-chat-composer-box=""
             data-state={railState}
             data-compact={compact ? "true" : undefined}
-            className="chat-rail"
-            style={{
-              position: "relative",
-              minWidth: 0,
-              display: "flex",
-              flexDirection: compact ? "column" : "row",
-              gap: 6,
-              alignItems: compact ? "stretch" : textareaMultiline ? "flex-end" : "center",
-              // The rules and their colour are declared in `app/globals.css` against .chat-rail.
-              background: "transparent",
-              borderRadius: 0,
-              padding: compact ? 0 : "6px 4px",
-            } as React.CSSProperties}
+            className={cn(
+              "relative flex min-w-0 gap-1.5 border-t border-b border-[color-mix(in_srgb,var(--border)_70%,transparent)] bg-transparent",
+              "data-[state=working]:border-warning/40 data-[state=shell]:border-muted",
+              "data-[compact=true]:border-t-0 data-[compact=true]:border-b-0",
+              "focus-within:shadow-[inset_0_2px_0_0_var(--primary),inset_0_-2px_0_0_var(--primary)]",
+              compact ? "flex-col items-stretch p-0" : "flex-row px-1 py-1.5",
+              !compact && (textareaMultiline ? "items-end" : "items-center"),
+            )}
           >
           {/* The rail is a wordless tinted line; the state reaches assistive tech from here. Absent
               while idle, so the app never opens a live region that has nothing to say. */}
@@ -2103,12 +1877,14 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             className="sr-only"
           />
           {!compact && actionsOpen && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-sm"
               onClick={() => { setActionsOpen(false); fileInputRef.current?.click(); }}
               title={t("chat.attachImage")}
               aria-label={t("chat.attachImage")}
-              className={`chat-composer-action is-attach${attachedImages.length ? " is-active" : ""}`}
+              className={cn("size-[26px] rounded-[9px]", attachedImages.length && "text-primary")}
               data-chat-action="attach"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -2116,11 +1892,12 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 <circle cx="8.5" cy="8.5" r="1.5" />
                 <polyline points="21 15 16 10 5 21" />
               </svg>
-            </button>
+            </Button>
           )}
           <textarea
             ref={textareaRef}
-            className="chat-input-textarea"
+            data-slot="chat-input-textarea"
+            className="min-w-0 w-full max-h-[200px] resize-none border-none bg-none text-[length:var(--chat-content-font-size,14px)] leading-[1.6] text-foreground outline-none"
             aria-label={compact ? t("chat.quoteQuestion") : undefined}
             value={value}
             onChange={(e) => {
@@ -2154,138 +1931,129 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             rows={1}
             style={{
               flex: compact ? "none" : 1,
-              minWidth: 0,
-              width: "100%",
-              background: "none",
-              border: "none",
-              outline: "none",
-              resize: "none",
-              color: "var(--text)",
-              fontSize: "var(--chat-content-font-size, 14px)",
-              lineHeight: 1.6,
-              fontFamily: "inherit",
               minHeight: compact ? 96 : 24,
-              maxHeight: 200,
-              overflow: "auto",
             }}
           />
 
           {showPrimary && (compact ? (
-            <button
+            <Button
               onClick={handleSend}
               disabled={!value.trim() && !attachedImages.length}
-              style={{
-                flexShrink: 0,
-                alignSelf: "flex-end",
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "7px 14px",
-                background: (value.trim() || attachedImages.length) ? "var(--accent)" : "var(--bg-panel)",
-                border: "none",
-                borderRadius: 8,
-                color: (value.trim() || attachedImages.length) ? "var(--accent-contrast)" : "var(--text-dim)",
-                cursor: (value.trim() || attachedImages.length) ? "pointer" : "not-allowed",
-                fontSize: 13,
-                fontWeight: 600,
-                letterSpacing: "-0.01em",
-                boxShadow: (value.trim() || attachedImages.length) ? "0 1px 3px color-mix(in srgb, var(--accent) 25%, transparent)" : "none",
-                transition: "background 0.15s, box-shadow 0.15s",
-              }}
+              size="sm"
+              className={cn(
+                "shrink-0 self-end gap-1.5 rounded-lg px-3.5 text-[13px] font-semibold tracking-[-0.01em] transition-[background,box-shadow] duration-150",
+                (value.trim() || attachedImages.length)
+                  ? "bg-primary text-primary-foreground shadow-[0_1px_3px_color-mix(in_srgb,var(--primary)_25%,transparent)] hover:bg-primary"
+                  : "bg-sidebar text-muted-foreground shadow-none hover:bg-sidebar",
+              )}
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <line x1="2" y1="7" x2="11" y2="7" />
                 <polyline points="7.5 3 12 7 7.5 11" />
               </svg>
               {t("chat.send")}
-            </button>
+            </Button>
           ) : isCompacting && !isStreaming && onAbortCompaction ? (
-            <button
+            <Button
               type="button"
+              variant="destructive"
+              size="icon-sm"
               onClick={onAbortCompaction}
               title={t("chat.stopCompaction")}
               aria-label={t("chat.stopCompaction")}
-              className="chat-composer-action is-danger"
+              className="size-[26px] rounded-[9px]"
               data-chat-action="stop-compaction"
             >
               <svg width="11" height="11" viewBox="0 0 10 10" fill="none" aria-hidden="true">
                 <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
               </svg>
-            </button>
+            </Button>
           ) : isStreaming ? (
             <>
               {/* Contextual primary: stop while the draft is empty, steer once it has text. Esc also
                   interrupts, but a phone has no Esc, so stopping must never be keyboard-only. */}
               {showPrimary && (value.trim() || attachedImages.length ? (
-                <button
+                <Button
                   type="button"
+                  variant="default"
+                  size="icon-sm"
                   data-chat-action="steer"
                   onClick={() => sendQueued("steer")}
                   title={t("chat.steer")}
                   aria-label={t("chat.steer")}
-                  className="chat-composer-action is-send is-active"
+                  className="size-[26px] rounded-[9px]"
                 >
                   <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <line x1="2" y1="7" x2="11" y2="7" />
                     <polyline points="7.5 3 12 7 7.5 11" />
                   </svg>
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
                   type="button"
+                  variant="destructive"
+                  size="icon-sm"
                   data-chat-action="stop"
                   onClick={onAbort}
                   title={t("chat.stopAgent")}
                   aria-label={t("chat.stop")}
-                  className="chat-composer-action is-danger"
+                  className="size-[26px] rounded-[9px]"
                 >
                   <svg width="11" height="11" viewBox="0 0 10 10" fill="none" aria-hidden="true">
                     <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
                   </svg>
-                </button>
+                </Button>
               )
               )}
               {/* The action the deleted hint row used to document: Alt+Enter, made visible. */}
               {actionsOpen && onFollowUp && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
                   data-chat-action="queue"
                   onClick={() => sendQueued("followup")}
                   title={t("chat.queueFollowUp")}
                   aria-label={t("chat.queueFollowUp")}
-                  className="chat-composer-action is-queue"
+                  className="size-[26px] rounded-[9px]"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M4 6v6a3 3 0 0 0 3 3h10" />
                     <polyline points="14 12 17 15 14 18" />
                   </svg>
-                </button>
+                </Button>
               )}
             </>
           ) : (
-            <button
+            <Button
               type="button"
+              variant={(value.trim() || attachedImages.length) ? "default" : "ghost"}
+              size="icon-sm"
               onClick={handleSend}
               disabled={!value.trim() && !attachedImages.length}
               title={t("chat.send")}
               aria-label={t("chat.send")}
-              className={`chat-composer-action is-send${(value.trim() || attachedImages.length) ? " is-active" : ""}`}
+              className="size-[26px] rounded-[9px]"
               data-chat-action="send"
             >
               <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <line x1="2" y1="7" x2="11" y2="7" />
                 <polyline points="7.5 3 12 7 7.5 11" />
               </svg>
-            </button>
+            </Button>
           )
           )}
           {/* The disclosure control. Collapsed, the input is text and one dot-dot-dot. */}
           {!compact && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-sm"
               data-chat-actions-toggle=""
               aria-expanded={actionsOpen}
               aria-label={t("chat.moreActions")}
               title={t("chat.moreActions")}
-              className={`chat-composer-action is-more${actionsOpen ? " is-active" : ""}`}
+              className="size-[26px] rounded-[9px] text-muted-foreground"
               onClick={() => setActionsOpen((open) => !open)}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -2293,7 +2061,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 <circle cx="12" cy="12" r="1.7" />
                 <circle cx="19" cy="12" r="1.7" />
               </svg>
-            </button>
+            </Button>
           )}
           </div>
         </div>
