@@ -236,11 +236,90 @@ Location: `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`
 
 ---
 
-## CSS Variables (`app/globals.css`)
+## UI system: shadcn/ui on Tailwind v4
+
+The UI is `components.json` `style: radix-nova`, neutral base, CSS variables, `lucide-react` icons.
+`lib/utils.ts` exports `cn()`. Every `.tsx` under `components/` and `app/` composes
+`components/ui/*` and Tailwind utilities — no static inline styles, no legacy tokens, no JS
+hover-style mutations, no ad hoc custom CSS classes, no CSS modules.
+
+### Token contract (`app/globals.css`)
+
+Colour comes only from shadcn's own contract, plus one extension pair each for success/warning:
 
 ```
---bg --bg-panel --bg-hover --bg-selected --border
---text --text-muted --text-dim
---accent --user-bg --tool-bg
---font-mono
+--background --foreground
+--card --card-foreground
+--popover --popover-foreground
+--primary --primary-foreground
+--secondary --secondary-foreground
+--muted --muted-foreground
+--accent --accent-foreground
+--destructive
+--success --success-foreground   (extension)
+--warning --warning-foreground   (extension)
+--border --input --ring
+--radius
+--sidebar --sidebar-foreground --sidebar-primary --sidebar-primary-foreground
+--sidebar-accent --sidebar-accent-foreground --sidebar-border --sidebar-ring
+--chart-1 … --chart-5
 ```
+
+`--font-ui` / `--font-mono` (mapped onto `--font-sans` in `@theme inline`) and
+`FONT_INIT_SCRIPT` stay the app's own font system; shadcn's Geist import was removed at init time
+and never comes back.
+
+### Themes
+
+Four themes plus `auto` (follows the OS): `light` and `dark` are shadcn's own neutral palette
+(`.dark` is the dark variant of `light`); `github` (`:root[data-theme="github"]`) is Primer light;
+`dracula` (`:root[data-theme="dracula"]`) is the Dracula spec, dark only. `hooks/useTheme.ts` still
+owns theme state (`useSyncExternalStore`, the View Transitions wipe, the `auto` listener) and the
+`data-theme` attribute plus `.dark` class — not `next-themes`. `lib/code-themes.ts` maps each
+resolved theme to its own Prism style, Mermaid `themeVariables` and xterm `ITheme`.
+
+### `components/ui/*` is pristine
+
+Never hand-edit a file under `components/ui/`. The only sanctioned change is adding a cva variant,
+and every one added must be recorded (search git history / the plan's Risks section for the running
+list — none exist as of this writing) and passed to `scripts/ui-pristine.sh --allow <component>`.
+Anything else `ui-pristine.sh` flags on a `components/ui/*` file is an illegal edit — revert it and
+compose instead.
+
+### Test policy: SSR can't see an open overlay
+
+`renderToStaticMarkup` (this repo's jiti-based unit tests) renders shadcn `Button`/`Switch` with
+`data-slot`, and an overlay's *trigger* with `aria-expanded` — but Radix portal content (`Dialog`,
+`DropdownMenu`, `Popover`, `Tooltip`) is **never present** under SSR; an open dialog probed in a unit
+test comes back empty. So:
+
+- Pure logic (helpers, reducers, derived state) stays unit-tested as always.
+- Open-overlay behaviour (content, focus return, Escape, keyboard nav) is proven in `e2e/*.mjs` or
+  the plan's `drive-themes.mjs`, never in a unit test that renders a closed overlay and calls it proof.
+- Assertions pin roles, labels, `data-slot`, `data-state` and `aria-*` — never a Tailwind class string.
+
+### `data-slot` is the hook-class convention
+
+When a test or an `e2e/*.mjs` script needs a stable selector, the target element carries
+`data-slot="<name>"` (shadcn's own convention — every shadcn primitive already does this). Do not
+reintroduce a bare hook class (`.chat-status-bar`, `.chat-input-textarea`, …) for this purpose; those
+were all migrated to `data-slot` and the corresponding selectors updated in the same commit that
+moved them. A handful of structural layout-shell classes (`sidebar-container`, `right-panel-container`,
+`panel-resize-handle`, …) are a deliberate, recorded exception — see `docs/adr/0007-shadcn-ui-system.md`.
+
+**Trap:** don't reintroduce inline `style={{...}}` for anything that isn't runtime geometry, and don't
+add a new legacy token or ad hoc CSS class "just this once" — every one of those was removed for a
+reason (`docs/adr/0007-shadcn-ui-system.md` and the plan at
+`~/.notebook/project/gjuoun/pi-web/plan/2026-09-24/shadcn-ready/plan.md` record why). If a component
+needs something `components/ui/*` doesn't offer yet, `npx shadcn@4.21.0 add <name>` it — restyling the
+registry output is not part of the workflow.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
