@@ -8,12 +8,12 @@ interface Props {
 
 export function SystemPromptPanel({ loading, prompt, translate }: Props) {
   return (
-    <section className="system-prompt-panel" aria-label={translate("system.prompt")}>
-      <div className="system-prompt-scroll">
+    <section className="flex h-[min(600px,75dvh)] min-h-[220px] flex-col border-b border-border bg-card" aria-label={translate("system.prompt")}>
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
         {prompt ? (
-          <div className="system-prompt-text">{prompt}</div>
+          <div className="overflow-wrap-anywhere font-mono text-xs leading-[1.6] whitespace-pre-wrap text-muted-foreground">{prompt}</div>
         ) : (
-          <div className="system-prompt-empty">
+          <div className="py-2.5 text-xs text-muted-foreground italic">
             {prompt === ""
               ? translate("system.empty")
               : loading
@@ -22,37 +22,6 @@ export function SystemPromptPanel({ loading, prompt, translate }: Props) {
           </div>
         )}
       </div>
-
-      <style>{`
-        .system-prompt-panel {
-          display: flex;
-          height: min(600px, 75dvh);
-          min-height: 220px;
-          flex-direction: column;
-          background: var(--bg-panel);
-          border-bottom: 1px solid var(--border);
-        }
-        .system-prompt-scroll {
-          min-height: 0;
-          flex: 1;
-          overflow: auto;
-          padding: 12px 16px;
-        }
-        .system-prompt-text {
-          color: var(--text-muted);
-          font-family: var(--font-mono);
-          font-size: 12px;
-          line-height: 1.6;
-          overflow-wrap: anywhere;
-          white-space: pre-wrap;
-        }
-        .system-prompt-empty {
-          padding: 10px 0;
-          color: var(--text-muted);
-          font-size: 12px;
-          font-style: italic;
-        }
-      `}</style>
     </section>
   );
 }

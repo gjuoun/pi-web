@@ -32,6 +32,14 @@ import { setupPushSubscription } from "@/lib/push-client";
 import { SkillsConfig } from "./SkillsConfig";
 import { PluginsConfig } from "./PluginsConfig";
 import { ConfigButton, ConfigSwitch } from "./SettingsUi";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import { cn } from "@/lib/utils";
 
 interface Props {
   cwd: string | null;
@@ -162,35 +170,31 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
   };
 
   return (
-    <div className="settings-general">
-      <h2 className="settings-general-title">{t("settings.general")}</h2>
+    <div data-slot="settings-general" className="mx-auto h-full max-h-full w-full max-w-[680px] overflow-y-auto px-[clamp(18px,4vw,40px)] pt-[26px] pb-10">
+      <h2 className="m-0 text-lg font-bold text-foreground">{t("settings.general")}</h2>
 
-      <section className="settings-general-section">
-        <h3 className="settings-general-heading">{t("settings.appearance")}</h3>
-        <div role="radiogroup" aria-label={t("settings.appearance")} className="settings-theme-options">
-          {THEME_OPTIONS.map((option) => {
-            const selected = preference === option.id;
-            return (
-              <label
-                key={option.id}
-                className="settings-theme-option"
-              >
-                <input
-                  type="radio"
-                  name="theme"
-                  value={option.id}
-                  checked={selected}
-                  onChange={() => setThemePreference(option.id)}
-                  className="sr-only"
-                />
-                <ThemeIcon preference={option.id} />
-                <span className="settings-theme-option-label">{t(option.label)}</span>
-              </label>
-            );
-          })}
-        </div>
-        <p className="settings-general-description">{t("settings.fontHint")}</p>
-        <div className="settings-chat-options settings-font-options">
+      <section className="mt-6 first-of-type:mt-6">
+        <h3 className="m-0 mb-1.5 text-[13px] font-semibold text-foreground">{t("settings.appearance")}</h3>
+        <RadioGroup
+          value={preference}
+          onValueChange={(value) => setThemePreference(value as typeof preference)}
+          aria-label={t("settings.appearance")}
+          className="grid w-full max-w-[420px] grid-cols-3 gap-[3px] p-[3px]"
+        >
+          {THEME_OPTIONS.map((option) => (
+            <label
+              key={option.id}
+              data-slot="settings-theme-option"
+              className="relative flex min-h-11 min-w-0 cursor-pointer items-center justify-center gap-[7px] rounded-[5px] px-1.5 text-xs font-normal text-muted-foreground has-[[data-state=checked]]:bg-accent has-[[data-state=checked]]:font-semibold has-[[data-state=checked]]:text-primary has-[[data-state=unchecked]]:hover:bg-accent/60 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-primary has-[:focus-visible]:outline-offset-1"
+            >
+              <RadioGroupItem value={option.id} className="absolute inset-0 z-10 cursor-pointer rounded-[5px] border-0 bg-transparent opacity-0" />
+              <ThemeIcon preference={option.id} />
+              <span data-slot="settings-theme-option-label" className="min-w-0 overflow-wrap-anywhere">{t(option.label)}</span>
+            </label>
+          ))}
+        </RadioGroup>
+        <p className="m-0 mb-3 text-[11px] leading-normal text-muted-foreground">{t("settings.fontHint")}</p>
+        <div className="flex flex-col gap-3 w-full max-w-[420px] mt-3">
           <FontFamilyPicker
             role="ui"
             label={t("settings.uiFont")}
@@ -214,10 +218,10 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
         </div>
       </section>
 
-      <section className="settings-general-section">
-        <h3 className="settings-general-heading">{t("settings.chat")}</h3>
-        <div className="settings-chat-options">
-          <div className="settings-chat-option settings-chat-switch-option">
+      <section className="mt-[30px]">
+        <h3 className="m-0 mb-1.5 text-[13px] font-semibold text-foreground">{t("settings.chat")}</h3>
+        <div className="flex w-full max-w-[420px] flex-col gap-3">
+          <div className="flex min-h-7 w-full items-center justify-between gap-4 text-xs text-foreground">
             <span>{t("settings.thinkingExpandedDefault")}</span>
             <ConfigSwitch
               checked={thinkingExpanded}
@@ -228,14 +232,13 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
               }}
             />
           </div>
-          <div className="settings-chat-option settings-chat-range-option">
-            <div className="settings-chat-range-header">
+          <div className="w-full text-xs text-foreground">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_28px] items-center gap-2">
               <label htmlFor="settings-chat-content-width">{t("settings.messageWidth")}</label>
-              <output htmlFor="settings-chat-content-width">{chatContentWidth}px</output>
-              <ConfigButton
+              <output htmlFor="settings-chat-content-width" className="font-mono text-[11px] text-muted-foreground">{chatContentWidth}px</output>
+              <Button
                 variant="ghost"
-                size="small"
-                className="settings-chat-reset"
+                size="icon-sm"
                 title={t("settings.resetMessageWidth")}
                 aria-label={t("settings.resetMessageWidth")}
                 disabled={chatContentWidth === CHAT_CONTENT_WIDTH_DEFAULT}
@@ -244,7 +247,7 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" />
                 </svg>
-              </ConfigButton>
+              </Button>
             </div>
             <input
               id="settings-chat-content-width"
@@ -254,16 +257,16 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
               step={10}
               value={chatContentWidth}
               onChange={(event) => setChatContentWidth(Number(event.target.value))}
+              className="mt-0.5 block w-full accent-primary"
             />
           </div>
-          <div className="settings-chat-option settings-chat-range-option">
-            <div className="settings-chat-range-header">
+          <div className="w-full text-xs text-foreground">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_28px] items-center gap-2">
               <label htmlFor="settings-chat-content-font-size">{t("settings.chatContentFontSize")}</label>
-              <output htmlFor="settings-chat-content-font-size">{fontSize}px</output>
-              <ConfigButton
+              <output htmlFor="settings-chat-content-font-size" className="font-mono text-[11px] text-muted-foreground">{fontSize}px</output>
+              <Button
                 variant="ghost"
-                size="small"
-                className="settings-chat-reset"
+                size="icon-sm"
                 title={t("settings.resetChatContentFontSize")}
                 aria-label={t("settings.resetChatContentFontSize")}
                 disabled={fontSize === CHAT_CONTENT_FONT_SIZE_DEFAULT}
@@ -272,7 +275,7 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" />
                 </svg>
-              </ConfigButton>
+              </Button>
             </div>
             <input
               id="settings-chat-content-font-size"
@@ -282,9 +285,10 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
               step={1}
               value={fontSize}
               onChange={(event) => setFontSize(Number(event.target.value))}
+              className="mt-0.5 block w-full accent-primary"
             />
           </div>
-          <div className="settings-chat-option settings-chat-switch-option">
+          <div className="flex min-h-7 w-full items-center justify-between gap-4 text-xs text-foreground">
             <span>{t("settings.quoteSelection")}</span>
             <ConfigSwitch
               checked={quoteSelectionEnabled}
@@ -292,7 +296,7 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
               onChange={onQuoteSelectionChange}
             />
           </div>
-          <div className="settings-chat-option settings-chat-switch-option">
+          <div className="flex min-h-7 w-full items-center justify-between gap-4 text-xs text-foreground">
             <span>{t("settings.completionSound")}</span>
             <ConfigSwitch
               checked={soundEnabled}
@@ -304,10 +308,10 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
       </section>
 
       {shellSettings?.isWindows && (
-        <section className="settings-general-section">
-          <h3 className="settings-general-heading">{t("settings.shellTool")}</h3>
-          <p className="settings-general-description">{t("settings.shellToolDescription")}</p>
-          <div className="settings-shell-option">
+        <section className="mt-[30px]">
+          <h3 className="m-0 mb-1.5 text-[13px] font-semibold text-foreground">{t("settings.shellTool")}</h3>
+          <p className="m-0 mb-3 text-[11px] leading-normal text-muted-foreground">{t("settings.shellToolDescription")}</p>
+          <div className="flex min-h-11 w-full max-w-[420px] items-center justify-between gap-4 rounded-[5px] bg-sidebar px-2.5 text-xs text-foreground">
             <span>{t("settings.usePowerShell")}</span>
             <ConfigSwitch
               checked={shellSettings.powerShellEnabled}
@@ -316,38 +320,38 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
               onChange={(enabled) => void togglePowerShell(enabled)}
             />
           </div>
-          {shellError && <p role="alert" className="settings-general-error">{shellError}</p>}
+          {shellError && <p role="alert" className="mt-2 text-[11px] text-destructive">{shellError}</p>}
         </section>
       )}
 
-      <section className="settings-general-section">
-        <h3 className="settings-general-heading">{t("settings.pushPermission")}</h3>
-        <p className="settings-general-description">{t("settings.pushPermissionDescription")}</p>
-        <div className="settings-shell-option">
+      <section className="mt-[30px]">
+        <h3 className="m-0 mb-1.5 text-[13px] font-semibold text-foreground">{t("settings.pushPermission")}</h3>
+        <p className="m-0 mb-3 text-[11px] leading-normal text-muted-foreground">{t("settings.pushPermissionDescription")}</p>
+        <div className="flex min-h-11 w-full max-w-[420px] items-center justify-between gap-4 rounded-[5px] bg-sidebar px-2.5 text-xs text-foreground">
           <span>{t("settings.pushPermission")}</span>
-          <button
+          <Button
             type="button"
-            className="config-button config-button-small config-button-secondary"
+            variant="outline"
+            size="sm"
             disabled={pushRegistering}
             onClick={() => void registerPush()}
           >
             {pushRegistering ? t("settings.pushRegisterLoading") : t("settings.pushRegister")}
-          </button>
+          </Button>
         </div>
         {pushStatus && (
           <p
             role="status"
-            className="settings-general-error"
-            style={pushStatus.kind === "ok" ? { color: "var(--accent)" } : undefined}
+            className={cn("mt-2 text-[11px]", pushStatus.kind === "ok" ? "text-primary" : "text-destructive")}
           >
             {pushStatus.message}
           </p>
         )}
       </section>
 
-      <section className="settings-general-section">
-        <h3 className="settings-general-heading">{t("common.language")}</h3>
-        <div role="radiogroup" aria-label={t("common.language")} className="settings-language-options">
+      <section className="mt-[30px]">
+        <h3 className="m-0 mb-1.5 text-[13px] font-semibold text-foreground">{t("common.language")}</h3>
+        <div role="radiogroup" aria-label={t("common.language")} data-slot="settings-language-options" className="flex w-full max-w-[420px] flex-col gap-[3px]">
           {supportedLocales.map((plugin) => {
             const selected = locale === plugin.id;
             return (
@@ -357,13 +361,16 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
                 role="radio"
                 aria-checked={selected}
                 onClick={() => setLocale(plugin.id as typeof locale)}
-                className="settings-language-option"
+                className={cn(
+                  "flex h-11 items-center gap-2.5 rounded-[5px] px-2.5 text-left text-xs text-foreground",
+                  selected ? "bg-accent" : "hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-none",
+                )}
               >
-                <span className="settings-language-radio">
-                  {selected && <span className="settings-language-radio-dot" />}
+                <span className={cn("grid size-4 shrink-0 place-items-center rounded-full border", selected ? "border-primary" : "border-input")}>
+                  {selected && <span className="size-2 rounded-full bg-primary" />}
                 </span>
-                <span className="settings-language-label">{plugin.label}</span>
-                <span className="settings-language-code">{plugin.id}</span>
+                <span className="flex-1">{plugin.label}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">{plugin.id}</span>
               </button>
             );
           })}
@@ -371,14 +378,14 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
       </section>
 
       {webAuthEnabled && (
-        <section className="settings-general-section">
+        <section className="mt-[30px]">
           <ConfigButton variant="secondary" disabled={loggingOut} onClick={() => void logOut()}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M10 17l5-5-5-5M15 12H3M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
             </svg>
             {loggingOut ? t("auth.loggingOut") : t("auth.logOut")}
           </ConfigButton>
-          {logoutError && <p role="alert" className="settings-general-error">{logoutError}</p>}
+          {logoutError && <p role="alert" className="mt-2 text-[11px] text-destructive">{logoutError}</p>}
         </section>
       )}
     </div>
@@ -427,36 +434,41 @@ export function SettingsPanel({ cwd, sessionId, initialSection, onClose, onSessi
     <div
       key={id}
       hidden={section !== id}
-      className="settings-section-host"
+      className="h-full w-full min-w-0 min-h-0 flex-1"
     >
       {content}
     </div>
   ) : null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("settings.title")}
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
-      className="settings-dialog-backdrop"
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
     >
-      <div className="settings-dialog-surface">
-        <div className="settings-dialog-header">
-          <strong className="settings-dialog-title">{t("settings.title")}</strong>
-          <select
+      <DialogContent
+        aria-label={t("settings.title")}
+        showCloseButton={false}
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        className="z-[600] flex h-[84vh] max-h-[calc(100dvh-16px)] w-[1080px] max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-lg p-0 sm:max-w-[calc(100vw-16px)] max-[640px]:h-[calc(100dvh-12px)] max-[640px]:w-[calc(100vw-12px)]"
+      >
+        <DialogTitle className="sr-only">{t("settings.title")}</DialogTitle>
+        <div className="relative flex min-h-[50px] shrink-0 items-center border-b border-border pr-[52px] pl-[18px]">
+          <strong className="shrink-0 whitespace-nowrap text-[15px] font-normal text-foreground">{t("settings.title")}</strong>
+          <NativeSelect
             aria-label={t("settings.title")}
             value={section}
             onChange={(event) => activateSection(event.target.value as SettingsSection)}
-            className="settings-mobile-section-picker"
+            className="ml-3.5 hidden w-full max-w-[210px] max-[640px]:block"
           >
             {sections.map((item) => (
-              <option key={item.id} value={item.id} disabled={item.requiresProject && !cwd}>
+              <NativeSelectOption key={item.id} value={item.id} disabled={item.requiresProject && !cwd}>
                 {item.label}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
-          <nav aria-label={t("settings.title")} className="settings-section-tabs">
+          </NativeSelect>
+          <nav aria-label={t("settings.title")} className="ml-[22px] flex h-[50px] min-w-0 items-stretch gap-0.5 overflow-x-auto overflow-y-hidden max-[640px]:hidden">
             {sections.map((item) => {
               const selected = section === item.id;
               const disabled = item.requiresProject && !cwd;
@@ -464,11 +476,19 @@ export function SettingsPanel({ cwd, sessionId, initialSection, onClose, onSessi
                 <button
                   key={item.id}
                   type="button"
-                  className="settings-section-tab"
+                  data-slot="settings-section-tab"
+                  aria-current={selected ? "page" : undefined}
                   disabled={disabled}
                   title={disabled ? t("settings.projectRequired") : item.label}
-                  aria-current={selected ? "page" : undefined}
                   onClick={() => activateSection(item.id)}
+                  className={cn(
+                    "relative flex h-full w-24 flex-none items-center justify-center gap-[5px] whitespace-nowrap border-0 bg-transparent px-0.5 text-xs font-normal outline-none transition-colors",
+                    "after:absolute after:bottom-0 after:left-1/2 after:h-0.5 after:w-6 after:-translate-x-1/2 after:scale-x-50 after:rounded-t-sm after:bg-primary after:opacity-0 after:transition-[opacity,transform]",
+                    selected
+                      ? "font-semibold text-foreground after:scale-x-100 after:opacity-100 focus-visible:outline-none"
+                      : "text-muted-foreground not-disabled:hover:text-foreground focus-visible:rounded-sm focus-visible:bg-accent focus-visible:text-foreground",
+                    disabled && "cursor-default opacity-38",
+                  )}
                 >
                   <SettingsSectionIcon section={item.id} />
                   <span>{item.label}</span>
@@ -476,16 +496,26 @@ export function SettingsPanel({ cwd, sessionId, initialSection, onClose, onSessi
               );
             })}
           </nav>
-          <button type="button" onClick={onClose} title={t("i18n.close")} aria-label={t("i18n.close")} className="config-close-button settings-dialog-close">×</button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onClose}
+            title={t("i18n.close")}
+            aria-label={t("i18n.close")}
+            className="absolute top-2.5 right-3.5 text-lg leading-none"
+          >
+            ×
+          </Button>
         </div>
 
-        <main className="settings-dialog-main">
+        <main className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           {sectionHost("general", <GeneralSettings sessionId={sessionId} onSessionReloaded={onSessionReloaded} quoteSelectionEnabled={quoteSelectionEnabled} onQuoteSelectionChange={onQuoteSelectionChange} soundEnabled={soundEnabled} onSoundToggle={onSoundToggle} />)}
           {sectionHost("models", <ModelsConfig embedded onClose={onClose} />)}
           {cwd && sectionHost("skills", <SkillsConfig embedded key={cwd} cwd={cwd} onClose={onClose} />)}
           {cwd && sectionHost("plugins", <PluginsConfig embedded key={cwd} cwd={cwd} sessionId={sessionId} onClose={onClose} onReloaded={onSessionReloaded} />)}
         </main>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

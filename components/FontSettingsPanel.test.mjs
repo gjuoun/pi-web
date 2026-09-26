@@ -5,7 +5,6 @@ import { createJiti } from "jiti";
 
 const settingsPanel = await readFile(new URL("./SettingsPanel.tsx", import.meta.url), "utf8");
 const picker = await readFile(new URL("./FontFamilyPicker.tsx", import.meta.url), "utf8");
-const settingsCss = await readFile(new URL("../app/settings.css", import.meta.url), "utf8");
 const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const jiti = createJiti(import.meta.url);
 const { UI_FONT_PRESETS, MONO_FONT_PRESETS } = await jiti.import("../lib/fonts.ts");
@@ -53,7 +52,7 @@ test("each field is a combobox backed by a visible listbox, not a native datalis
   assert.match(picker, /role="listbox"/);
   assert.match(picker, /role="option"/);
   assert.match(picker, /options\.filter/);
-  assert.match(settingsCss, /\.settings-font-picker-popover \{[^}]*position: fixed/, "the settings pane clips, so the list must escape it");
+  assert.match(picker, /className="fixed z-\[400\][^"]*"/, "the settings pane clips, so the list must escape it");
   assert.match(picker, /t\("settings\.fontSuggestions"\)/);
   assert.match(picker, /t\("settings\.fontNoMatches"\)/);
   assert.match(picker, /t\("settings\.fontDefaultBadge"\)/);
@@ -96,11 +95,11 @@ test("the hint explains fallback and the monospace blast radius", () => {
 });
 
 test("the field styles exist and reuse the settings row layout", () => {
-  assert.match(settingsCss, /\.settings-font-option-header \{/);
-  assert.match(settingsCss, /\.settings-font-input \{/);
-  assert.match(settingsCss, /\.settings-font-picker-popover \{/);
-  assert.match(settingsCss, /\.settings-font-picker-option \{/);
-  assert.match(settingsCss, /font-family: var\(--font-mono\)/);
+  assert.match(picker, /flex items-center justify-between gap-2/);
+  assert.match(picker, /rounded-md border border-border bg-background/);
+  assert.match(picker, /fixed z-\[400\]/);
+  assert.match(picker, /cursor-pointer items-baseline justify-between/);
+  assert.match(picker, /font-mono text-\[11px\]/);
 });
 
 test("every locale carries all six font keys", () => {
