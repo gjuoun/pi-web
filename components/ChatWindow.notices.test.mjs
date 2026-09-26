@@ -11,7 +11,7 @@ test("renders temporary notices once at the top right of the chat column", () =>
   assert.equal(noticeShelfUsages.length, 1);
   assert.match(
     source,
-    /position: "absolute",\s*top: 12,\s*left: 0,\s*right: isMobile \? 0 : CHAT_MINIMAP_WIDTH,[\s\S]*?justifyContent: "flex-end",[\s\S]*?<NoticeShelf notices=\{notices\} floating onPauseChange=\{setNoticePaused\} \/>/,
+    /absolute top-3 left-0 z-40 flex justify-end px-4[\s\S]*?isMobile \? "right-0" : "right-9"[\s\S]*?<NoticeShelf notices=\{notices\} floating onPauseChange=\{setNoticePaused\} \/>/,
   );
 });
 
@@ -26,5 +26,5 @@ test("lets keyboard users pause and scroll long notices", () => {
   assert.match(source, /onFocus=\{\(\) => onPauseChange\?\.\(notice\.id\)\}/);
   assert.match(source, /onBlur=\{\(event\) => \{\s*if \(!event\.currentTarget\.matches\(":hover"\)\) onPauseChange\?\.\(null\)/);
   assert.match(source, /onMouseLeave=\{\(event\) => \{\s*if \(!event\.currentTarget\.contains\(document\.activeElement\)\) onPauseChange\?\.\(null\)/);
-  assert.match(source, /<span\s+tabIndex=\{0\}\s+style=\{\{[^}]*overflowY: "auto"/);
+  assert.match(source, /<span\s+tabIndex=\{0\}\s+className="[^"]*overflow-y-auto/);
 });

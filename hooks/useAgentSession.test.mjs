@@ -494,7 +494,7 @@ test("restores an in-page session viewport without the default tail jump", () =>
   assert.match(chatWindowSource, /context\.oldestEntryId === position\.oldestEntryId/);
   assert.match(chatWindowSource, /if \(!context\) \{\s*scrollToBottom\("instant"\);\s*setPendingScrollRestore\(null\);/);
   assert.match(chatWindowSource, /scrollToMessage\(element, position\.anchorOffset\)/);
-  assert.match(chatWindowSource, /visibility: pendingScrollRestore \? "hidden" : undefined/);
+  assert.match(chatWindowSource, /pendingScrollRestore && "invisible"/);
 });
 
 test("keeps a newly sent user message at the top while its response starts", () => {
@@ -558,7 +558,7 @@ test("keeps prompt anchor measurement outside the React update cycle", () => {
   assert.match(anchorLifecycleEffectSource, /promptAnchorMeasureFrameRef\.current = requestAnimationFrame\(\(\) => \{\s*promptAnchorMeasureFrameRef\.current = null;\s*updatePromptAnchorSpacer\(\)/);
   assert.match(anchorLifecycleEffectSource, /disposed = true;[\s\S]*?promptAnchorUpdateRef\.current === updatePromptAnchorSpacer[\s\S]*?cancelAnimationFrame\(promptAnchorMeasureFrameRef\.current\)/);
   assert.match(anchorSyncEffectSource, /promptAnchorUpdateRef\.current\?\.\(\);\s*\}, \[streamState\.streamingMessage\]\)/);
-  assert.match(chatWindowSource, /<div ref=\{messageContentRef\}[^>]*style=\{\{/);
+  assert.match(chatWindowSource, /<div ref=\{messageContentRef\}[^>]*className=/);
 });
 
 test("uses the prompt anchor as the only trailing message spacer", () => {

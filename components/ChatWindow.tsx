@@ -2,6 +2,11 @@
 import { isComposerFocusKey, registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { cn } from "cn";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { IconButton } from "@/components/IconButton";
 import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolEntry, ToolResultMessage, UserMessage } from "@/lib/types";
 import { normalizeCustomPanelLines } from "@/lib/ansi";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
@@ -85,9 +90,6 @@ function phaseLabel(phase: AgentPhase, t: (key: string, params?: Record<string, 
   return null;
 }
 
-const CHAT_MINIMAP_WIDTH = 36;
-const CHAT_COLUMN_PADDING = 16;
-
 function NewSessionUpdateLink({
   label,
 }: {
@@ -123,29 +125,10 @@ function NewSessionUpdateLink({
       rel="noopener noreferrer"
       title={accessibleLabel}
       aria-label={accessibleLabel}
-      onMouseEnter={(event) => { event.currentTarget.style.background = "var(--bg-hover)"; }}
-      onMouseLeave={(event) => { event.currentTarget.style.background = "transparent"; }}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        alignSelf: "center",
-        gap: 3,
-        minHeight: 32,
-        minWidth: 0,
-        padding: "0 4px",
-        background: "transparent",
-        borderRadius: 5,
-        color: "var(--accent)",
-        fontSize: 12,
-        fontWeight: 600,
-        lineHeight: 1.2,
-        textDecoration: "none",
-        transition: "background 0.12s",
-        whiteSpace: "nowrap",
-      }}
+      className="inline-flex min-h-8 min-w-0 shrink-0 items-center gap-[3px] self-center rounded-[5px] bg-transparent px-1 text-xs leading-tight font-semibold whitespace-nowrap text-primary no-underline transition-colors hover:bg-muted"
     >
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>v{update.latestVersion}</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <span className="overflow-hidden text-ellipsis">v{update.latestVersion}</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
         <path d="M7 17 17 7" />
         <path d="M7 7h10v10" />
       </svg>
@@ -203,36 +186,24 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, defaultExpanded = fa
   if (toolCallCount > 0) parts.push(`${toolCallCount} ${t(toolCallCount === 1 ? "chat.toolCall" : "chat.toolCalls")}`);
 
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div className="mb-3.5">
       <button
         type="button"
+        data-slot="process-details-toggle"
         aria-expanded={expanded || reveal}
         onClick={() => setExpanded((v) => !v)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          width: "auto",
-          minHeight: 24,
-          padding: "2px 0",
-          border: "none",
-          background: "transparent",
-          color: "var(--text-muted)",
-          cursor: "pointer",
-          fontSize: 12,
-          textAlign: "left",
-        }}
         title={expanded ? t("chat.collapseProcess") : t("chat.expandProcess")}
+        className="flex min-h-6 w-auto items-center gap-2 border-none bg-transparent py-0.5 text-left text-xs text-muted-foreground"
       >
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: expanded ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={cn("shrink-0 transition-transform duration-150", expanded && "rotate-90")}>
           <polyline points="4 2.5 7.5 6 4 9.5" />
         </svg>
-        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
           {parts.join(" · ")}
         </span>
       </button>
       {(expanded || reveal) && (
-        <div style={{ marginTop: 8 }}>
+        <div className="mt-2">
           {children}
         </div>
       )}
@@ -671,7 +642,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     if (element) {
       scrollToMessage(element);
       element.animate([
-        { backgroundColor: "var(--bg-selected)" },
+        { backgroundColor: "var(--accent)" },
         { backgroundColor: "transparent" },
       ], { duration: 2500 });
     }
@@ -926,7 +897,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   // The bottom bar's two segments take the same path, anchored to whichever trigger was clicked.
   const openPickerFromSegment = useCallback((mode: "model" | "thinking") => {
     if (sessionBusy) return;
-    const selector = mode === "model" ? ".chat-status-model button" : ".chat-status-thinking button";
+    const selector = mode === "model" ? "[data-slot='chat-status-model'] button" : "[data-slot='chat-status-thinking'] button";
     const trigger = typeof document === "undefined" ? null : document.querySelector(selector);
     const box = trigger?.getBoundingClientRect();
     const viewportHeight = typeof window === "undefined" ? 720 : window.innerHeight;
@@ -1043,7 +1014,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-text-muted">
+      <div className="flex h-full items-center justify-center text-muted-foreground">
          {t("chat.loadingSession")}
       </div>
     );
@@ -1059,32 +1030,32 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
 
   return (
     <div
-      className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      data-slot="chat-content"
+      className="relative flex h-full min-w-0 flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {isDragOver && (
-        <div className="pointer-events-none absolute inset-0 z-50 flex animate-[drop-zone-in_0.15s_ease_both] items-center justify-center bg-[rgba(37,99,235,0.06)] backdrop-blur-[1px]">
+        <div className="pointer-events-none absolute inset-0 z-50 flex animate-[drop-zone-in_0.15s_ease_both] items-center justify-center bg-primary/6 backdrop-blur-[1px]">
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             {[0, 0.8, 1.6].map((delay) => (
               <div
                 key={delay}
-                className="absolute h-[720px] w-[720px] rounded-full border-[1.5px] border-solid border-[rgba(37,99,235,0.5)] animate-[drop-ripple_2.4s_ease-out_infinite_backwards]"
-                style={{ transformOrigin: "center", animationDelay: `${delay}s` }}
+                className="absolute h-[720px] w-[720px] origin-center rounded-full border-[1.5px] border-solid border-primary/50 animate-[drop-ripple_2.4s_ease-out_infinite_backwards]"
+                style={{ animationDelay: `${delay}s` }}
               />
             ))}
           </div>
           <svg
             width="280" height="280" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg"
-            className="drop-shadow-[0_6px_18px_rgba(37,99,235,0.18)]"
+            className="text-primary drop-shadow-[0_6px_18px_color-mix(in_srgb,var(--primary)_18%,transparent)]"
           >
-            <rect x="28" y="44" width="84" height="60" rx="8" fill="rgba(37,99,235,0.08)" stroke="rgba(37,99,235,0.50)" strokeWidth="1.8"/>
-            <path d="M36 100 L54 72 L68 88 L80 74 L104 100Z" fill="rgba(37,99,235,0.16)" stroke="rgba(37,99,235,0.40)" strokeWidth="1.4" strokeLinejoin="round"/>
-            <circle cx="96" cy="58" r="8" fill="rgba(37,99,235,0.22)" stroke="rgba(37,99,235,0.55)" strokeWidth="1.6"/>
-            <g stroke="rgba(37,99,235,0.45)" strokeWidth="1.4" strokeLinecap="round">
+            <rect x="28" y="44" width="84" height="60" rx="8" fill="currentColor" fillOpacity="0.08" stroke="currentColor" strokeOpacity="0.50" strokeWidth="1.8"/>
+            <path d="M36 100 L54 72 L68 88 L80 74 L104 100Z" fill="currentColor" fillOpacity="0.16" stroke="currentColor" strokeOpacity="0.40" strokeWidth="1.4" strokeLinejoin="round"/>
+            <circle cx="96" cy="58" r="8" fill="currentColor" fillOpacity="0.22" stroke="currentColor" strokeOpacity="0.55" strokeWidth="1.6"/>
+            <g stroke="currentColor" strokeOpacity="0.45" strokeWidth="1.4" strokeLinecap="round">
               <line x1="96" y1="46" x2="96" y2="43"/>
               <line x1="96" y1="70" x2="96" y2="73"/>
               <line x1="84" y1="58" x2="81" y2="58"/>
@@ -1099,18 +1070,10 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       )}
 
       <div
-        style={{
-          position: "absolute",
-          top: 12,
-          left: 0,
-          right: isMobile ? 0 : CHAT_MINIMAP_WIDTH,
-          zIndex: 40,
-          display: "flex",
-          // Toasts live in the top-right corner
-          justifyContent: "flex-end",
-          padding: `0 ${CHAT_COLUMN_PADDING}px`,
-          pointerEvents: "none",
-        }}
+        className={cn(
+          "pointer-events-none absolute top-3 left-0 z-40 flex justify-end px-4",
+          isMobile ? "right-0" : "right-9",
+        )}
       >
         <NoticeShelf notices={notices} floating onPauseChange={setNoticePaused} />
       </div>
@@ -1125,11 +1088,10 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
         {!isEmptyNew && <>
         <div
           ref={scrollContainerRef}
-          className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 [scrollbar-width:none]"
-          style={{ visibility: pendingScrollRestore ? "hidden" : undefined }}
+          className={cn("min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 [scrollbar-width:none]", pendingScrollRestore && "invisible")}
         >
-          <div style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING}px` }}>
-            <div ref={messageContentRef} onPointerUp={captureQuotedSelection} style={{ width: "100%", minWidth: 0, maxWidth: "var(--chat-content-max-width, 820px)", margin: "0 auto" }}>
+          <div className="min-w-0 px-4">
+            <div ref={messageContentRef} onPointerUp={captureQuotedSelection} className="mx-auto w-full min-w-0 max-w-[var(--chat-content-max-width,820px)]">
             {(() => {
               let lastUserIdx = -1;
               for (let i = messages.length - 1; i >= 0; i--) {
@@ -1321,7 +1283,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
               return (
                 <>
                   {hasMore && (
-                     <div ref={sentinelRef} className="py-3 text-center text-xs text-text-muted">
+                     <div ref={sentinelRef} className="py-3 text-center text-xs text-muted-foreground">
                        {t("chat.loadEarlier")}
                     </div>
                   )}
@@ -1334,13 +1296,13 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
             )}
 
             {agentRunning && !hasStreamingContent && agentPhase && (
-              <div className="break-words py-2 text-[13px] text-text-muted">
+              <div className="break-words py-2 text-[13px] text-muted-foreground">
                 <span className="animate-[pulse_1.5s_infinite]">{phaseLabel(agentPhase, t)}</span>
               </div>
             )}
 
             {bashRunning && !pendingBash && (
-              <div className="py-2 text-[13px] text-text-muted">
+              <div className="py-2 text-[13px] text-muted-foreground">
                  <span className="animate-[pulse_1.5s_infinite]">{t("chat.runningCommand")}</span>
               </div>
             )}
@@ -1379,36 +1341,26 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
           ref={quotePopoverRef}
           role={quoteInputOpen ? "dialog" : "toolbar"}
           aria-label={t(quoteInputOpen ? "chat.newQuoteChat" : "chat.askSelection")}
+          className={cn(
+            "fixed z-[130] flex max-w-[calc(100vw-16px)] max-h-[calc(var(--app-viewport-height,100dvh)-16px)] flex-wrap gap-[3px] overflow-y-auto rounded-md border border-border bg-background shadow-[0_2px_10px_rgba(0,0,0,0.12)]",
+            quoteInputOpen ? "w-[min(420px,calc(100vw-16px))] p-3" : "p-[3px]",
+          )}
           style={{
-            position: "fixed",
             top: quotedSelection.top,
             left: quotedSelection.left,
-            zIndex: 130,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 3,
-            width: quoteInputOpen ? "min(420px, calc(100vw - 16px))" : undefined,
-            maxWidth: "calc(100vw - 16px)",
-            maxHeight: "calc(var(--app-viewport-height, 100dvh) - 16px)",
-            overflowY: "auto",
-            padding: quoteInputOpen ? 12 : 3,
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            background: "var(--bg)",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
           }}
         >
           {quoteInputOpen ? (
             <fieldset
               disabled={quoteSubmitting}
               aria-busy={quoteSubmitting}
-              style={{ width: "100%", minWidth: 0, margin: 0, padding: 0, border: "none", display: "flex", flexDirection: "column", gap: 10 }}
+              className="m-0 flex w-full min-w-0 flex-col gap-2.5 border-none p-0"
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600 }}>{t("chat.askInNewChat")}</span>
-                <button type="button" className="file-viewer-icon-button" title={t("i18n.close")} aria-label={t("i18n.close")} disabled={quoteSubmitting} onClick={closeQuotedSelection} style={{ border: "none" }}>
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 text-xs font-semibold">{t("chat.askInNewChat")}</span>
+                <IconButton title={t("i18n.close")} disabled={quoteSubmitting} onClick={closeQuotedSelection} className="border-none">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
-                </button>
+                </IconButton>
               </div>
               <ChatInput
                 ref={quoteChatInputRef}
@@ -1417,36 +1369,36 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                 onAbort={closeQuotedSelection}
                 isStreaming={false}
               />
-              {quoteError && <div role="alert" style={{ color: "#dc2626", fontSize: 12, overflowWrap: "anywhere" }}>{quoteError}</div>}
+              {quoteError && <div role="alert" className="text-xs text-destructive break-words">{quoteError}</div>}
             </fieldset>
           ) : <>
-          <button
+          <Button
             type="button"
-            className="file-viewer-icon-button"
+            variant="ghost"
             title={t("chat.askInCurrent")}
             aria-label={t("chat.askInCurrent")}
             onPointerDown={(event) => event.preventDefault()}
             onClick={askSelectionHere}
-            style={{ width: "auto", height: 35, flex: "0 0 auto", gap: 5, padding: "0 10px", border: "none", fontSize: 12, fontWeight: 500 }}
+            className="h-[35px] w-auto flex-none gap-[5px] border-none px-2.5 text-xs font-medium"
           >
-            <span aria-hidden="true" style={{ fontSize: 15 }}>@</span>
+            <span aria-hidden="true" className="text-[15px]">@</span>
             <span>{t("chat.askInCurrent")}</span>
-          </button>
+          </Button>
           {onAskInNewChat && quotedSelection.sourceEntryId && !sessionBusy && (
-            <button
+            <Button
               type="button"
-              className="file-viewer-icon-button"
+              variant="ghost"
               title={t("chat.askInNewChat")}
               aria-label={t("chat.askInNewChat")}
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => { setQuoteInputOpen(true); window.getSelection()?.removeAllRanges(); }}
-              style={{ width: "auto", height: 35, flex: "0 0 auto", gap: 5, padding: "0 10px", border: "none", fontSize: 12, fontWeight: 500 }}
+              className="h-[35px] w-auto flex-none gap-[5px] border-none px-2.5 text-xs font-medium"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M6 3v12M18 9a9 9 0 0 1-9 9" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" />
               </svg>
               <span>{t("chat.askInNewChat")}</span>
-            </button>
+            </Button>
           )}
           </>}
         </div>,
@@ -1455,18 +1407,20 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
 
       <div className="relative shrink-0">
         {isEmptyNew && (
-          <div className="mx-auto mb-3 w-full" style={{ maxWidth: "var(--chat-content-max-width, 820px)", paddingLeft: 32, paddingRight: isMobile ? 32 : 68 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontFamily: "var(--font-mono)" }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: isMobile ? 7 : 10, minWidth: 0, flex: 1, lineHeight: 1.4, overflow: "hidden" }}>
-                <span style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", flexShrink: 0, whiteSpace: "nowrap" }}>π</span>
+          <div
+            className={cn("mx-auto mb-3 w-full max-w-[var(--chat-content-max-width,820px)] pl-8", isMobile ? "pr-8" : "pr-[68px]")}
+          >
+            <div className="flex items-center justify-between gap-3 font-mono">
+              <div className={cn("flex min-w-0 flex-1 items-baseline overflow-hidden leading-[1.4]", isMobile ? "gap-[7px]" : "gap-2.5")}>
+                <span className="shrink-0 text-[28px] font-bold whitespace-nowrap text-foreground">π</span>
                 <NewSessionUpdateLink label={(version) => t("appUpdate.releaseNotes", { version })} />
               </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  web <span style={{ color: "var(--text)" }}>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
+              <div className="flex shrink-0 flex-col items-end gap-0.5">
+                <span className="text-[11px] text-muted-foreground">
+                  web <span className="text-foreground">v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
                 </span>
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  pi <span style={{ color: "var(--text)" }}>v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
+                <span className="text-[11px] text-muted-foreground">
+                  pi <span className="text-foreground">v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
                 </span>
               </div>
             </div>
@@ -1476,13 +1430,13 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
         <ExtensionStatusBar widgets={extensionWidgets} />
         {/* The whole bar is one scroll surface: the status lines and the extension line share it, so a
             bar that outgrows the window scrolls together instead of per line. */}
-        <div className="chat-bottom-bar">
+        <div data-slot="chat-bottom-bar" className="overflow-x-auto overflow-y-auto overscroll-contain [max-height:min(144px,18dvh)]">
           {/* Same horizontal frame as the composer box: the fieldset in ChatInput reserves 16px plus the
               36px minimap rail on the right (:1499-1510), so a centred 820px box lands 18px left of this
               column's centre. The footer follows that frame instead of the raw column — and the inset
               lives on this inner block rather than on the scroll container, because a scroll container's
               right padding is not honoured past the overflow edge. */}
-          <div className="chat-bottom-bar-inner" style={{ paddingLeft: 16, paddingRight: isMobile ? 16 : 52 }}>
+          <div data-slot="chat-bottom-bar-inner" className={cn("flex w-max min-w-full flex-col py-1 pl-4", isMobile ? "pr-4" : "pr-[52px]")}>
             <ChatStatusBar
               cwd={session?.cwd ?? newSessionCwd}
               projectRoot={session?.projectRoot ?? null}
@@ -1524,34 +1478,23 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
   );
 }
 
-// Toast 整体高度上限；文本区高度上限 = 整体上限 - 上下 padding(14*2) - 上下边框(1*2)
-const NOTICE_MAX_HEIGHT_PX = 500;
-const NOTICE_TEXT_MAX_HEIGHT_PX = NOTICE_MAX_HEIGHT_PX - 30;
 
 function NoticeShelf({ notices, floating = false, onPauseChange }: { notices: NoticeItem[]; floating?: boolean; onPauseChange?: (id: string | null) => void }) {
   if (notices.length === 0) return null;
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        // Right-anchored: every toast's right edge aligns here, widths extend leftward
-        alignItems: "flex-end",
-        marginBottom: floating ? 0 : 10,
-      }}
-    >
+    <div className={cn("flex flex-col items-end", !floating && "mb-2.5")}>
       {notices.map((notice, index) => {
-        const color = notice.type === "error"
-          ? "#ef4444"
+        const dotClassName = notice.type === "error"
+          ? "bg-destructive"
           : notice.type === "warning"
-            ? "#d97706"
+            ? "bg-warning"
             : notice.type === "success"
-              ? "#10b981"
-              : "var(--accent)";
+              ? "bg-success"
+              : "bg-primary";
         return (
           <div
             key={notice.id}
-            className="notice-shelf-item"
+            data-slot="notice-shelf-item"
             onMouseEnter={() => onPauseChange?.(notice.id)}
             onMouseLeave={(event) => {
               if (!event.currentTarget.contains(document.activeElement)) onPauseChange?.(null);
@@ -1560,60 +1503,28 @@ function NoticeShelf({ notices, floating = false, onPauseChange }: { notices: No
             onBlur={(event) => {
               if (!event.currentTarget.matches(":hover")) onPauseChange?.(null);
             }}
-            style={{
-              display: "flex",
-              // Top-align children so the type dot sits by the first line on multi-line toasts
-              alignItems: "flex-start",
-              gap: 10,
-              minHeight: 60,
-              height: "auto",
-              // 整体高度上限：超出后由文本区内部滚动承担（见下方 span 的 overflowY），
-              // 容器自身保持 hidden，小圆点固定在顶部不随文本滚动
-              maxHeight: NOTICE_MAX_HEIGHT_PX,
-              // The floating wrapper is pointerEvents:"none" (click-through by design),
-              // so the toast itself must opt back into interactivity or hover events never reach it
-              pointerEvents: "auto",
-              marginBottom: index === notices.length - 1 ? 0 : 6,
-              overflow: "hidden",
-              borderRadius: 14,
-              border: "1px solid color-mix(in srgb, var(--border) 70%, transparent)",
-              background: "var(--bg)",
-              color: "var(--text-muted)",
-              width: "fit-content",
-              maxWidth: "min(100%, 620px)",
-              boxShadow: floating
-                ? "0 1px 2px rgba(15,23,42,0.05), 0 10px 28px -14px rgba(15,23,42,0.24)"
-                : "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)",
-              fontSize: 14,
-              lineHeight: 1.5,
-              transformOrigin: "top right",
+            className={cn(
+              // Top-align children so the type dot sits by the first line on multi-line toasts;
+              // pointer-events:auto opts back into interactivity since the floating wrapper is
+              // click-through by design (pointer-events:none).
+              "pointer-events-auto flex h-auto max-h-[500px] min-h-[60px] w-fit max-w-[min(100%,620px)] origin-top-right items-start gap-2.5 overflow-hidden rounded-[14px] border border-border/70 bg-background px-3 text-sm leading-normal text-muted-foreground",
+              index === notices.length - 1 ? "mb-0" : "mb-1.5",
+              floating ? "shadow-[0_1px_2px_rgba(15,23,42,0.05),0_10px_28px_-14px_rgba(15,23,42,0.24)]" : "shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.10)]",
               // Use backwards fill for the entrance animation so height styles return to
               // inline styles once it finishes; otherwise the keyframe's fixed 60px would
               // stick around in fill mode and permanently clamp the expanded toast
-              animation: notice.exiting
-                ? "notice-shelf-out 0.18s ease-in forwards"
-                : "notice-shelf-in 0.18s ease-out backwards",
-              padding: "0 12px",
-            }}
+              notice.exiting ? "animate-[notice-shelf-out_0.18s_ease-in_forwards]" : "animate-[notice-shelf-in_0.18s_ease-out_backwards]",
+            )}
           >
             <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: color,
-                flexShrink: 0,
-                // Align with the optical center of the first text line: 14px vertical
-                // padding + (21px line box - 7px dot) / 2
-                marginTop: 21,
-              }}
+              className={cn("mt-[21px] size-[7px] shrink-0 rounded-full", dotClassName)}
             />
             {/* Full text by default: pre-line preserves \n (nowrap/normal collapse
                 newlines into spaces) and long lines wrap instead of truncating;
                 content taller than the cap scrolls inside the text area */}
             <span
               tabIndex={0}
-              style={{ padding: "14px 0", minWidth: 0, maxWidth: "100%", maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX, overflowY: "auto", scrollbarWidth: "thin", whiteSpace: "pre-line", wordBreak: "break-word" }}
+              className="min-w-0 max-w-full overflow-y-auto py-3.5 break-words whitespace-pre-line [max-height:470px] [scrollbar-width:thin]"
             >
               {notice.message}
             </span>
@@ -1660,7 +1571,7 @@ function ExtensionDialog({
   }, [request.expiresAt]);
 
   const countdown = remainingSeconds !== null && (
-    <span style={{ fontSize: 11, color: "var(--text-dim)", whiteSpace: "nowrap", flexShrink: 0 }}>
+    <span className="shrink-0 text-[11px] whitespace-nowrap text-muted-foreground">
       {t("chat.extensionExpiresIn", { seconds: remainingSeconds })}
     </span>
   );
@@ -1681,111 +1592,63 @@ function ExtensionDialog({
         event.stopPropagation();
         onRespond(request, { cancelled: true });
       }}
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 90,
-        display: "flex",
-        alignItems: collapsed ? "flex-start" : "center",
-        justifyContent: "center",
-        padding: 20,
-        pointerEvents: "none",
-      }}
+      className={cn(
+        "pointer-events-none absolute inset-0 z-[90] flex justify-center p-5",
+        collapsed ? "items-start" : "items-center",
+      )}
     >
       {collapsed ? (
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
-          style={{
-            pointerEvents: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            maxWidth: "min(560px, 100%)",
-            width: "100%",
-            padding: "10px 12px",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            background: "var(--bg)",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
-            color: "var(--text)",
-            cursor: "pointer",
-            textAlign: "left",
-          }}
+          className="pointer-events-auto h-auto w-full max-w-[min(560px,100%)] justify-start gap-2.5 rounded-lg border border-border bg-background px-3 py-2.5 text-left text-foreground shadow-[0_12px_32px_rgba(0,0,0,0.18)]"
         >
-          <span style={{ fontSize: 11, fontWeight: 650, color: "var(--accent)", flexShrink: 0 }}>
+          <span className="shrink-0 text-[11px] font-semibold text-primary">
             {t("chat.extensionPending")}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+          <span className="min-w-0 flex-1 overflow-hidden text-[13px] font-semibold text-ellipsis whitespace-nowrap">
             {request.title}
           </span>
           {summary && (
-            <span style={{ fontSize: 12, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "34%", flexShrink: 1 }}>
+            <span className="max-w-[34%] shrink overflow-hidden text-xs text-ellipsis whitespace-nowrap text-muted-foreground">
               {summary}
             </span>
           )}
           {countdown}
-          <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
+          <span className="shrink-0 text-xs text-muted-foreground">
             {t("chat.extensionExpand")}
           </span>
-        </button>
+        </Button>
       ) : (
       <div
         role="dialog"
         aria-label={request.title}
-        style={{
-          pointerEvents: "auto",
-          width: "min(560px, 100%)",
-          maxHeight: "min(760px, 100%)",
-          display: "flex",
-          flexDirection: "column",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          background: "var(--bg)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.28)",
-          overflow: "hidden",
-        }}
+        className="pointer-events-auto flex w-[min(560px,100%)] max-h-[min(760px,100%)] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-[0_20px_60px_rgba(0,0,0,0.28)]"
       >
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", borderBottom: "1px solid var(--border)" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: "var(--text)", fontSize: 14, fontWeight: 650 }}>{request.title}</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
+        <div className="flex shrink-0 items-start gap-2 border-b border-border px-3.5 py-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold text-foreground">{request.title}</div>
+            <div className="mt-[3px] flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
               <span>{t("chat.extensionRequest")}</span>
               {countdown}
             </div>
           </div>
-          <button
-            type="button"
+          <IconButton
+            title={t("chat.extensionCollapse")}
             onClick={() => setCollapsed(true)}
             aria-expanded={true}
-            title={t("chat.extensionCollapse")}
-            aria-label={t("chat.extensionCollapse")}
-            style={{
-              display: "grid",
-              placeItems: "center",
-              width: 28,
-              height: 28,
-              borderRadius: 6,
-              border: "1px solid var(--border)",
-              background: "var(--bg-panel)",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
+            variant="outline"
+            className="shrink-0 rounded-md bg-muted"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points="2 3.5 5 6.5 8 3.5" />
             </svg>
-          </button>
+          </IconButton>
         </div>
 
-        <div
-          style={{
-            padding: 14,
-            flex: "1 1 auto", minHeight: 0, overflowY: "auto",
-          }}
-        >
+        <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
           {request.method === "confirm" && (
             <MarkdownBody>{request.message}</MarkdownBody>
           )}
@@ -1803,7 +1666,7 @@ function ExtensionDialog({
                 buttons[next].focus({ preventScroll: true });
                 buttons[next].scrollIntoView({ block: "nearest" });
               }}
-              style={{ display: "grid", gap: 8 }}
+              className="grid gap-2"
             >
               {request.options.map((option, index) => (
                 <div
@@ -1819,23 +1682,11 @@ function ExtensionDialog({
                     event.preventDefault();
                     onRespond(request, { value: option });
                   }}
-                  style={{
-                    width: "100%",
-                    padding: "9px 10px",
-                    borderRadius: 7,
-                    border: "1px solid var(--border)",
-                    background: "var(--bg-panel)",
-                    color: "var(--text)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontSize: 13,
-                    overflowWrap: "anywhere",
-                    // `focus({preventScroll})` + `scrollIntoView({block: "nearest"})` aligns the option
-                    // edge to the scrollport edge, which with the dialog's fractional offsets leaves a
-                    // sub-pixel of the option clipped (measured 0.4px). A 2px scroll margin keeps the
-                    // focused option strictly inside the scrollport.
-                    scrollMarginBlock: 2,
-                  }}
+                  // `focus({preventScroll})` + `scrollIntoView({block: "nearest"})` aligns the option
+                  // edge to the scrollport edge, which with the dialog's fractional offsets leaves a
+                  // sub-pixel of the option clipped (measured 0.4px). A 2px scroll margin keeps the
+                  // focused option strictly inside the scrollport.
+                  className="w-full cursor-pointer scroll-my-0.5 rounded-[7px] border border-border bg-muted px-2.5 py-[9px] text-left text-[13px] break-words text-foreground"
                 >
                   <div inert>
                     <MarkdownBody>{option}</MarkdownBody>
@@ -1845,7 +1696,7 @@ function ExtensionDialog({
             </div>
           )}
           {request.method === "input" && (
-            <input
+            <Input
               autoFocus
               value={value}
               placeholder={request.placeholder}
@@ -1853,87 +1704,38 @@ function ExtensionDialog({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
               }}
-              style={{
-                width: "100%",
-                padding: "9px 10px",
-                borderRadius: 7,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text)",
-                outline: "none",
-                fontSize: 13,
-              }}
+              className="h-auto rounded-[7px] bg-muted px-2.5 py-[9px] text-[13px]"
             />
           )}
           {request.method === "editor" && (
-            <textarea
+            <Textarea
               autoFocus
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
               }}
-              style={{
-                width: "100%",
-                minHeight: 220,
-                padding: 10,
-                borderRadius: 7,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text)",
-                outline: "none",
-                resize: "vertical",
-                fontSize: 13,
-                lineHeight: 1.55,
-                fontFamily: "var(--font-mono)",
-              }}
+              className="min-h-[220px] rounded-[7px] bg-muted p-2.5 font-mono text-[13px] leading-[1.55]"
             />
           )}
         </div>
 
-        <div style={{ flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 14px", borderTop: "1px solid var(--border)", background: "var(--bg-panel)" }}>
-          <button
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-muted px-3.5 py-2.5">
+          <Button
+            variant="outline"
             autoFocus={request.method === "confirm" || (request.method === "select" && request.options.length === 0)}
             onClick={() => onRespond(request, { cancelled: true })}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 6,
-              border: "1px solid var(--border)",
-              background: "var(--bg)",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-            }}
           >
              {t("chat.cancel")}
-          </button>
+          </Button>
           {request.method === "confirm" ? (
-            <button
-              onClick={submitValue}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 6,
-                border: "1px solid var(--accent)",
-                background: "var(--accent)",
-                color: "var(--accent-contrast)",
-                cursor: "pointer",
-              }}
-            >
+            <Button onClick={submitValue}>
                {t("chat.confirm")}
-            </button>
+            </Button>
           ) : request.method !== "select" ? (
-            <button
-              onClick={submitValue}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 6,
-                border: "1px solid var(--accent)",
-                background: "var(--accent)",
-                color: "var(--accent-contrast)",
-                cursor: "pointer",
-              }}
-            >
+            <Button onClick={submitValue}>
                {t("chat.submit")}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -1964,74 +1766,41 @@ function ExtensionCustomPanel({
 
   return (
     <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 95,
-        display: "flex",
-        alignItems: collapsed ? "flex-start" : "center",
-        justifyContent: "center",
-        padding: 20,
-        pointerEvents: "none",
-      }}
+      className={cn(
+        "pointer-events-none absolute inset-0 z-[95] flex justify-center p-5",
+        collapsed ? "items-start" : "items-center",
+      )}
     >
       {collapsed ? (
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
-          style={{
-            pointerEvents: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            maxWidth: "min(920px, 100%)",
-            width: "100%",
-            padding: "10px 12px",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            background: "var(--bg)",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
-            color: "var(--text)",
-            cursor: "pointer",
-            textAlign: "left",
-          }}
+          className="pointer-events-auto h-auto w-full max-w-[min(920px,100%)] justify-start gap-2.5 rounded-lg border border-border bg-background px-3 py-2.5 text-left text-foreground shadow-[0_12px_32px_rgba(0,0,0,0.18)]"
         >
-          <span style={{ fontSize: 11, fontWeight: 650, color: "var(--accent)", flexShrink: 0 }}>
+          <span className="shrink-0 text-[11px] font-semibold text-primary">
             {t("chat.extensionPending")}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+          <span className="min-w-0 flex-1 overflow-hidden text-[13px] font-semibold text-ellipsis whitespace-nowrap">
             {t("chat.extensionPanel")}
           </span>
           {summary && (
-            <span style={{ fontSize: 12, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "34%", flexShrink: 1 }}>
+            <span className="max-w-[34%] shrink overflow-hidden text-xs text-ellipsis whitespace-nowrap text-muted-foreground">
               {summary}
             </span>
           )}
-          <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
+          <span className="shrink-0 text-xs text-muted-foreground">
             {t("chat.extensionExpand")}
           </span>
-        </button>
+        </Button>
       ) : (
       <div
         role="dialog"
         onClick={(event) => {
           if (!(event.target as HTMLElement).closest("button")) inputRef.current?.focus();
         }}
-        style={{
-          pointerEvents: "auto",
-          position: "relative",
-          width: "min(920px, 100%)",
-          maxHeight: "min(760px, 100%)",
-          display: "flex",
-          flexDirection: "column",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          background: "var(--bg)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.28)",
-          overflow: "hidden",
-          outline: "none",
-        }}
+        className="pointer-events-auto relative flex w-[min(920px,100%)] max-h-[min(760px,100%)] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-[0_20px_60px_rgba(0,0,0,0.28)] outline-none"
       >
         <textarea
           ref={inputRef}
@@ -2071,72 +1840,32 @@ function ExtensionCustomPanel({
             const text = event.clipboardData.getData("text");
             if (text) onInput(request, asBracketedPaste(text));
           }}
-          style={{
-            position: "absolute",
-            width: 1,
-            height: 1,
-            padding: 0,
-            border: 0,
-            opacity: 0,
-            pointerEvents: "none",
-          }}
+          className="pointer-events-none absolute size-px border-0 p-0 opacity-0"
         />
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
-           <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 650 }}>{t("chat.extensionPanel")}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              type="button"
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2.5">
+           <div className="text-[13px] font-semibold text-foreground">{t("chat.extensionPanel")}</div>
+          <div className="flex items-center gap-2">
+            <IconButton
+              title={t("chat.extensionCollapse")}
               onClick={() => setCollapsed(true)}
               aria-expanded={true}
-              title={t("chat.extensionCollapse")}
-              aria-label={t("chat.extensionCollapse")}
-              style={{
-                display: "grid",
-                placeItems: "center",
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                flexShrink: 0,
-              }}
+              variant="outline"
+              className="shrink-0 rounded-md bg-muted"
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="2 3.5 5 6.5 8 3.5" />
               </svg>
-            </button>
-            <button
+            </IconButton>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => onInput(request, "\x03")}
-              style={{
-                padding: "5px 9px",
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                fontSize: 12,
-              }}
             >
                {t("chat.close")}
-            </button>
+            </Button>
           </div>
         </div>
-        <pre
-          style={{
-            margin: 0,
-            padding: 14,
-            minHeight: 0,
-            overflow: "auto",
-            background: "var(--bg-panel)",
-            color: "var(--text)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 13,
-            lineHeight: 1.45,
-            whiteSpace: "pre",
-          }}
-        >
+        <pre className="m-0 min-h-0 overflow-auto bg-muted p-3.5 font-mono text-[13px] leading-[1.45] whitespace-pre text-foreground">
           <AnsiText text={displayLines.join("\n")} />
         </pre>
       </div>
