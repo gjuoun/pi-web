@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { useI18n } from "@/hooks/useI18n";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface DirectoryEntry {
   name: string;
@@ -55,9 +57,140 @@ interface Props {
   error?: string | null;
 }
 
+interface BodyProps {
+  currentPath: string;
+  parentDirectory: string | null;
+  pathInput: string;
+  directories: DirectoryEntry[];
+  drives: DirectoryEntry[] | null;
+  loadError: string | null;
+  loading: boolean;
+  busy: boolean;
+  error?: string | null;
+  onPathInputChange: (value: string) => void;
+  onPathSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onNavigateUp: () => void;
+  onNavigate: (path: string) => void;
+  onCancel: () => void;
+  onSelect: () => void;
+}
+
+/** Pure, portal-free body — this is what unit tests render, since Dialog content is SSR-invisible. */
+export function DirectoryPickerBody({
+  currentPath,
+  parentDirectory,
+  pathInput,
+  directories,
+  drives,
+  loadError,
+  loading,
+  busy,
+  error,
+  onPathInputChange,
+  onPathSubmit,
+  onNavigateUp,
+  onNavigate,
+  onCancel,
+  onSelect,
+}: BodyProps) {
+  const { t } = useI18n();
+  const hasUncommittedPath = pathInput.trim() !== currentPath;
+  const canSelect = Boolean(currentPath) && !hasUncommittedPath && !busy;
+  const canNavigateUp = Boolean(parentDirectory) || isWindowsDriveRoot(currentPath);
+
+  return (
+    <div className="flex h-[min(620px,calc(100dvh-16px))] max-h-[calc(100dvh-16px)] flex-col overflow-hidden">
+      <form onSubmit={onPathSubmit} className="flex shrink-0 items-center gap-2 border-b py-2.5">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={onNavigateUp}
+          disabled={loading || !canNavigateUp}
+          title={t("directoryPicker.goToParent")}
+          aria-label={t("directoryPicker.goToParent")}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m18 15-6-6-6 6" />
+          </svg>
+        </Button>
+        <label htmlFor="directory-path" className="sr-only">
+          {t("directoryPicker.directoryPath")}
+        </label>
+        <Input
+          id="directory-path"
+          type="text"
+          value={pathInput}
+          placeholder="/path/to/project or ~/project"
+          autoFocus
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(event) => onPathInputChange(event.target.value)}
+          className="min-w-0 flex-1 font-mono text-xs"
+        />
+        <Button type="submit" variant="outline" disabled={loading || !pathInput.trim()}>
+          {t("directoryPicker.go")}
+        </Button>
+      </form>
+
+      <div data-slot="directory-picker-list" className="min-h-0 flex-1 overflow-auto px-2.5 py-2">
+        {loading ? (
+          <div className="p-2 text-xs text-muted-foreground">{t("directoryPicker.loadingDirectories")}</div>
+        ) : drives !== null ? (
+          drives.length > 0 ? (
+            drives.map((drive) => (
+              <button
+                key={drive.path}
+                type="button"
+                onClick={() => onNavigate(drive.path)}
+                title={drive.path}
+                className="flex min-h-8.5 w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-left font-mono text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              >
+                <DriveIcon />
+                <span>{drive.name}</span>
+              </button>
+            ))
+          ) : (
+            <div className="p-2 text-xs text-muted-foreground">{t("directoryPicker.noDrives")}</div>
+          )
+        ) : directories.length > 0 ? (
+          directories.map((entry) => (
+            <button
+              key={entry.path}
+              type="button"
+              onClick={() => onNavigate(entry.path)}
+              title={entry.path}
+              className="flex min-h-7.5 w-full items-center gap-1.5 rounded-sm px-2 py-1 text-left font-mono text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              <FolderIcon />
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap">{entry.name}</span>
+            </button>
+          ))
+        ) : (
+          <div className="p-2 text-xs text-muted-foreground">{t("directoryPicker.noSubdirectories")}</div>
+        )}
+        {(loadError || error) && <div className="p-2 text-xs text-destructive">{loadError ?? error}</div>}
+      </div>
+
+      <div className="flex shrink-0 items-center justify-end gap-2.5 border-t py-2.5 pb-[max(10px,env(safe-area-inset-bottom))]">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>
+          {t("i18n.cancel")}
+        </Button>
+        <Button
+          type="button"
+          onClick={onSelect}
+          disabled={!canSelect}
+          title={hasUncommittedPath ? t("directoryPicker.openBeforeSelecting") : t("directoryPicker.selectCurrentDirectory")}
+        >
+          {busy ? t("i18n.checking") : t("directoryPicker.selectThisFolder")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false, error }: Props) {
   const { t } = useI18n();
-  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [currentPath, setCurrentPath] = useState("");
   const [parentDirectory, setParentDirectory] = useState<string | null>(null);
   const [pathInput, setPathInput] = useState(initialPath ?? "");
@@ -85,145 +218,48 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
   }, []);
 
   useEffect(() => {
-    setPortalTarget(document.body);
     void navigateTo(initialPath || undefined);
-  }, [initialPath, navigateTo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handlePathSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const candidate = pathInput.trim();
     if (candidate) void navigateTo(candidate);
   };
-  const hasUncommittedPath = pathInput.trim() !== currentPath;
-  const canSelect = Boolean(currentPath) && !hasUncommittedPath && !busy;
-  const canNavigateUp = Boolean(parentDirectory) || isWindowsDriveRoot(currentPath);
 
-  if (!portalTarget) return null;
-
-  return createPortal(
-    <div
-      className="directory-picker-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("directoryPicker.selectDirectory")}
-      onClick={(event) => {
-        if (event.target === event.currentTarget && !busy) onCancel();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && !busy) onCancel();
-      }}
-      style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)" }}
-    >
-      <div className="directory-picker-panel" style={{ width: 520, maxWidth: "calc(100vw - 16px)", height: "min(620px, calc(100dvh - 16px))", maxHeight: "calc(100dvh - 16px)", display: "flex", flexDirection: "column", overflow: "hidden", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, padding: "12px 18px", borderBottom: "1px solid var(--border)" }}>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ color: "var(--text)", fontWeight: 700, fontSize: 15 }}>{t("directoryPicker.selectDirectory")}</div>
-          </div>
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={busy}
-            title={t("i18n.close")}
-            aria-label={t("i18n.close")}
-            style={{ padding: "2px 6px", border: 0, background: "none", color: "var(--text-muted)", fontSize: 20, lineHeight: 1, cursor: busy ? "default" : "pointer", opacity: busy ? 0.5 : 1 }}
-          >
-            ×
-          </button>
-        </div>
-
-        <form onSubmit={handlePathSubmit} style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
-          <button className="directory-picker-back" type="button" onClick={() => void navigateTo(parentDirectory ?? undefined)} disabled={loading || !canNavigateUp} title={t("directoryPicker.goToParent")} aria-label={t("directoryPicker.goToParent")} style={{ width: 36, height: 36, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-hover)", color: "var(--text-muted)", cursor: canNavigateUp ? "pointer" : "default", opacity: canNavigateUp ? 1 : 0.45 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m18 15-6-6-6 6" />
-            </svg>
-          </button>
-          <label htmlFor="directory-path" style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0, 0, 0, 0)", whiteSpace: "nowrap", border: 0 }}>
-            {t("directoryPicker.directoryPath")}
-          </label>
-          <input
-            className="directory-picker-path"
-            id="directory-path"
-            type="text"
-            value={pathInput}
-            placeholder="/path/to/project or ~/project"
-            autoFocus
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(event) => {
-              setPathInput(event.target.value);
+  return (
+    <Dialog open onOpenChange={(next) => { if (!next && !busy) onCancel(); }}>
+      <DialogContent
+        className="flex max-h-[calc(100dvh-16px)] w-[520px] max-w-[calc(100vw-16px)] flex-col gap-0 p-0"
+        aria-label={t("directoryPicker.selectDirectory")}
+      >
+        <DialogHeader className="shrink-0 border-b px-4.5 py-3">
+          <DialogTitle>{t("directoryPicker.selectDirectory")}</DialogTitle>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 px-4">
+          <DirectoryPickerBody
+            currentPath={currentPath}
+            parentDirectory={parentDirectory}
+            pathInput={pathInput}
+            directories={directories}
+            drives={drives}
+            loadError={loadError}
+            loading={loading}
+            busy={busy}
+            error={error}
+            onPathInputChange={(value) => {
+              setPathInput(value);
               setLoadError(null);
             }}
-            style={{ minWidth: 0, flex: 1, height: 36, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 6, outline: "none", background: "var(--bg-panel)", color: "var(--text)", fontFamily: "var(--font-mono)", fontSize: 12 }}
+            onPathSubmit={handlePathSubmit}
+            onNavigateUp={() => void navigateTo(parentDirectory ?? undefined)}
+            onNavigate={(path) => void navigateTo(path)}
+            onCancel={onCancel}
+            onSelect={() => onSelect(currentPath)}
           />
-          <button
-            className="directory-picker-action"
-            type="submit"
-            disabled={loading || !pathInput.trim()}
-            title={t("directoryPicker.goToDirectory")}
-            style={{ minWidth: 58, height: 36, padding: "0 12px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-hover)", color: "var(--text-muted)", cursor: loading || !pathInput.trim() ? "default" : "pointer", opacity: loading || !pathInput.trim() ? 0.6 : 1 }}
-          >
-            {t("directoryPicker.go")}
-          </button>
-        </form>
-
-        <div className="directory-picker-list" style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "8px 10px" }}>
-          {loading ? (
-            <div style={{ padding: 8, color: "var(--text-dim)", fontSize: 11 }}>{t("directoryPicker.loadingDirectories")}</div>
-          ) : drives !== null ? (
-            <>
-              {drives.length > 0 ? (
-                drives.map((drive) => (
-                  <button
-                    key={drive.path}
-                    className="directory-picker-entry"
-                    type="button"
-                    onClick={() => void navigateTo(drive.path)}
-                    title={drive.path}
-                    style={{ width: "100%", minHeight: 34, display: "flex", alignItems: "center", gap: 7, padding: "6px 8px", border: 0, borderRadius: 5, background: "none", color: "var(--text-muted)", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-mono)", fontSize: 11 }}
-                  >
-                    <DriveIcon />
-                    <span>{drive.name}</span>
-                  </button>
-                ))
-              ) : (
-                <div style={{ padding: 8, color: "var(--text-dim)", fontSize: 11 }}>{t("directoryPicker.noDrives")}</div>
-              )}
-            </>
-          ) : directories.length > 0 ? (
-            directories.map((entry) => (
-              <button
-                key={entry.path}
-                className="directory-picker-entry"
-                type="button"
-                onClick={() => void navigateTo(entry.path)}
-                title={entry.path}
-                style={{ width: "100%", minHeight: 30, display: "flex", alignItems: "center", gap: 7, padding: "5px 8px", border: 0, borderRadius: 5, background: "none", color: "var(--text-muted)", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-mono)", fontSize: 11 }}
-              >
-                <FolderIcon />
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.name}</span>
-              </button>
-            ))
-          ) : (
-            <div style={{ padding: 8, color: "var(--text-dim)", fontSize: 11 }}>{t("directoryPicker.noSubdirectories")}</div>
-          )}
-          {(loadError || error) && <div style={{ padding: "8px", color: "#dc2626", fontSize: 11 }}>{loadError ?? error}</div>}
         </div>
-
-        <div className="directory-picker-footer" style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, flexShrink: 0, padding: "10px 18px", borderTop: "1px solid var(--border)" }}>
-          <button className="directory-picker-action" type="button" onClick={onCancel} disabled={busy} style={{ padding: "6px 14px", border: "1px solid var(--border)", borderRadius: 6, background: "none", color: "var(--text-muted)", cursor: busy ? "default" : "pointer", fontSize: 13 }}>{t("i18n.cancel")}</button>
-          <button
-            className="directory-picker-action"
-            type="button"
-            onClick={() => onSelect(currentPath)}
-            disabled={!canSelect}
-            title={hasUncommittedPath ? t("directoryPicker.openBeforeSelecting") : t("directoryPicker.selectCurrentDirectory")}
-            style={{ padding: "6px 16px", border: 0, borderRadius: 6, background: "var(--accent)", color: "var(--accent-contrast)", fontSize: 13, fontWeight: 600, opacity: canSelect ? 1 : 0.6, cursor: canSelect ? "pointer" : "default" }}
-          >
-            {busy ? t("i18n.checking") : t("directoryPicker.selectThisFolder")}
-          </button>
-        </div>
-      </div>
-    </div>,
-    portalTarget,
+      </DialogContent>
+    </Dialog>
   );
 }
