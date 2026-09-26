@@ -67,15 +67,15 @@ try {
     page.on("request", (request) => {
       if (new URL(request.url()).pathname === "/api/terminal" && request.method() === "POST") created.add(request.postDataJSON().id);
     });
-    const ready = () => page.locator(".terminal-panel:visible .is-ready").waitFor();
-    const text = () => page.locator(".terminal-panel:visible .xterm-rows").innerText();
+    const ready = () => page.locator('[data-slot="terminal-panel"]:visible [data-state="ready"]').waitFor();
+    const text = () => page.locator('[data-slot="terminal-panel"]:visible .xterm-rows').innerText();
     const run = async (command) => {
-      await page.locator(".terminal-panel:visible .xterm-helper-textarea").focus();
+      await page.locator('[data-slot="terminal-panel"]:visible .xterm-helper-textarea').focus();
       await page.keyboard.type(command);
       await page.keyboard.press("Enter");
     };
     const waitOutput = (pattern) => page.waitForFunction((source) => {
-      const panel = [...document.querySelectorAll(".terminal-panel")].find((element) => element.getBoundingClientRect().width > 0);
+      const panel = [...document.querySelectorAll('[data-slot="terminal-panel"]')].find((element) => element.getBoundingClientRect().width > 0);
       return new RegExp(source).test(panel?.querySelector(".xterm-rows")?.textContent ?? "");
     }, pattern);
     const showSidebar = async () => {
@@ -103,8 +103,8 @@ try {
       await showSidebar();
       await page.getByText("note.txt", { exact: true }).click();
       await page.getByText("File viewer fixture", { exact: true }).waitFor();
-      assert.equal(await page.locator(".terminal-panel").count(), 1);
-      assert.equal(await page.locator(".terminal-panel").isVisible(), false);
+      assert.equal(await page.locator('[data-slot="terminal-panel"]').count(), 1);
+      assert.equal(await page.locator('[data-slot="terminal-panel"]').isVisible(), false);
       await page.getByRole("tab", { name: "Terminal: workspace-a", exact: true }).click();
       await ready();
       await hidePanel();
@@ -121,7 +121,7 @@ try {
       assert.equal(created.size, 1, "refresh must reconnect, not create");
 
       await context.setOffline(true);
-      await page.locator(".terminal-panel:visible .is-connecting").waitFor();
+      await page.locator('[data-slot="terminal-panel"]:visible [data-state="connecting"]').waitFor();
       await context.setOffline(false);
       await ready();
       await run("printf '\\nRECONNECT:%s:%s\\n' \"$PR695_TOKEN\" \"$$\"");
@@ -129,7 +129,7 @@ try {
       assert.equal(((await text()).match(new RegExp(`REFRESH:alive:${pid}`, "g")) ?? []).length, 1, "reconnect must not replay delivered output");
 
       await page.screenshot({ path: join(artifacts, `${viewport.width}.png`), fullPage: true });
-      const dimensions = await page.locator(".terminal-panel:visible").evaluate((element) => {
+      const dimensions = await page.locator('[data-slot="terminal-panel"]:visible').evaluate((element) => {
         const panel = element.getBoundingClientRect();
         const screen = element.querySelector(".xterm-screen").getBoundingClientRect();
         return { panelWidth: panel.width, screenWidth: screen.width, screenHeight: screen.height, fits: screen.right <= panel.right + 1 && screen.bottom <= panel.bottom + 1 };
@@ -148,7 +148,7 @@ try {
       await page.getByText("Process exited with code 7", { exact: true }).waitFor();
       const currentId = await page.evaluate(() => JSON.parse(sessionStorage.getItem("pi-web:terminal-tabs")).tabs[0].id);
       await page.getByRole("button", { name: "Terminate terminal workspace-a", exact: true }).click();
-      await page.locator(".terminal-panel").waitFor({ state: "detached" });
+      await page.locator('[data-slot="terminal-panel"]').waitFor({ state: "detached" });
       assert.equal((await fetch(`${base}/api/terminal/${currentId}`)).status, 404);
 
       let releaseCreation;
@@ -163,7 +163,7 @@ try {
       await page.getByRole("button", { name: "Open workspace terminal", exact: true }).click();
       await page.getByRole("button", { name: "Terminate terminal workspace-a", exact: true }).click();
       releaseCreation();
-      await page.locator(".terminal-panel").waitFor({ state: "detached" });
+      await page.locator('[data-slot="terminal-panel"]').waitFor({ state: "detached" });
       await page.unroute("**/api/terminal");
       for (const terminalId of created) assert.equal((await fetch(`${base}/api/terminal/${terminalId}`)).status, 404);
 
@@ -189,7 +189,7 @@ try {
       for (const name of ["workspace-a", "workspace-b"]) {
         await page.getByRole("button", { name: `Terminate terminal ${name}`, exact: true }).click();
       }
-      await page.locator(".terminal-panel").waitFor({ state: "detached" });
+      await page.locator('[data-slot="terminal-panel"]').waitFor({ state: "detached" });
       for (const terminalId of created) assert.equal((await fetch(`${base}/api/terminal/${terminalId}`)).status, 404);
       assert.deepEqual(errors, []);
       console.log(`PASS ${viewport.width}: real shell, files, sessions, refresh, reconnect, restart, exit, close during creation, workspace isolation`);
