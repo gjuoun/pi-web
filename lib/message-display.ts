@@ -76,3 +76,42 @@ export function splitFinalAssistantBlocks(
 export function countToolCallBlocks(blocks: AssistantContentBlock[]): number {
   return blocks.filter((block): block is ToolCallContent => block.type === "toolCall").length;
 }
+
+/** An empty, non-deferred thinking block: filtered out of every render, so it can stand in for a hidden block. */
+const HIDDEN_BLOCK: ThinkingContent = { type: "thinking", thinking: "" };
+
+function isSpokenBlock(block: AssistantContentBlock): boolean {
+  return block.type === "image" || (block.type === "text" && block.text.trim().length > 0);
+}
+
+export interface ProcessRun {
+  /** `inline` runs are the assistant speaking (text/images); `fold` runs are thinking and tool calls. */
+  kind: "inline" | "fold";
+  /** The source message with every block outside this run masked, so block indices stay the originals. */
+  message: AssistantMessage;
+  toolCallCount: number;
+}
+
+/**
+ * Splits an intermediate assistant message into contiguous runs: text and images are shown inline,
+ * while thinking and tool calls fold into "Process details". Masking (rather than slicing) keeps each
+ * block at its stored index, which deferred thinking loads by, and leaves `message.content` the same
+ * length. Usage is kept on the last run only, so it is not repeated once per run.
+ */
+export function splitProcessRuns(message: AssistantMessage): ProcessRun[] {
+  const content = message.content ?? [];
+  const groups: { kind: ProcessRun["kind"]; indices: Set<number> }[] = [];
+  content.forEach((block, index) => {
+    if (isEmptyThinkingBlock(block)) return;
+    const kind = isSpokenBlock(block) ? "inline" : "fold";
+    const last = groups[groups.length - 1];
+    if (last?.kind === kind) last.indices.add(index);
+    else groups.push({ kind, indices: new Set([index]) });
+  });
+  return groups.map((group, position) => {
+    const masked = content.map((block, index) => (group.indices.has(index) ? block : HIDDEN_BLOCK));
+    const next: AssistantMessage = { ...message, content: masked };
+    if (position < groups.length - 1) next.usage = undefined;
+    return { kind: group.kind, message: next, toolCallCount: countToolCallBlocks(getDisplayableAssistantBlocks(next)) };
+  });
+}

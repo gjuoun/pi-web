@@ -264,13 +264,17 @@ try {
     await page.getByText("E2E final answer", { exact: true }).waitFor();
     const processDetails = page.getByRole("button", { name: /^Process details/ });
     const thinking = page.getByRole("button", { name: /^Thinking/ });
-    assert.equal(await processDetails.count(), 1);
+    // Tool machinery folds; what the assistant said stays visible. The paragraph and the note split
+    // the folds into three groups: intermediate reasoning | tool call + follow-up reasoning | final reasoning.
+    assert.equal(await processDetails.count(), 3, "one fold per run of tool machinery, broken by spoken text");
     assert.equal(await thinking.count(), 0, "All thinking stays inside process details");
+    await page.getByText("E2E process note", { exact: true }).waitFor();
+    assert.equal(await page.getByText("E2E process paragraph.", { exact: true }).count(), 20, "spoken text between tool calls is visible without expanding");
     const finalMessage = page.locator("[data-entry-id='answer']");
-    assert.equal(await finalMessage.getByRole("button", { name: /^Thinking/ }).count(), 0);
-    assert.equal(await finalMessage.getByText("test/E2E Model", { exact: true }).count(), 1);
+    assert.equal(await finalMessage.last().getByRole("button", { name: /^Thinking/ }).count(), 0);
+    assert.equal(await finalMessage.last().getByText("test/E2E Model", { exact: true }).count(), 1);
     assert.equal(thinkingRequests.length, 0);
-    await processDetails.click();
+    for (let group = 0; group < 3; group++) await processDetails.nth(group).click();
     assert.equal(await thinking.count(), 3);
     assert.equal(await thinking.last().innerText(), "E2E final reasoning");
     assert.equal(thinkingRequests.length, 0);
@@ -279,12 +283,12 @@ try {
       await page.getByText(text, { exact: false }).waitFor();
     }
     assert.equal(thinkingRequests.length, 3);
-    const processText = await processDetails.locator("..").innerText();
-    assert.ok(processText.indexOf("E2E intermediate reasoning") < processText.indexOf("echo E2E tool output"));
-    assert.ok(processText.indexOf("echo E2E tool output") < processText.indexOf("E2E follow-up reasoning"));
-    assert.ok(processText.indexOf("E2E follow-up reasoning") < processText.indexOf("E2E process note"));
-    assert.ok(processText.indexOf("E2E process note") < processText.indexOf("E2E final reasoning"));
-    assert.equal(processText.split("E2E final reasoning").length - 1, 1);
+    const chatText = await page.locator("body").innerText();
+    const order = ["E2E intermediate reasoning", "E2E process paragraph.", "echo E2E tool output", "E2E follow-up reasoning", "E2E process note", "E2E final reasoning", "E2E final answer"];
+    const positions = order.map((needle) => chatText.indexOf(needle));
+    assert.ok(positions.every((position) => position >= 0), "every step is on the page: " + positions);
+    assert.deepEqual([...positions].sort((x, y) => x - y), positions, "process order is preserved around the visible text");
+    assert.equal(chatText.split("E2E final reasoning").length - 1, 1);
     assert.ok(!(await finalMessage.last().innerText()).includes("E2E final reasoning"));
     await page.getByText("echo E2E tool output", { exact: true }).waitFor();
     await page.getByRole("button", { name: /bash.*echo E2E tool output/ }).click();
