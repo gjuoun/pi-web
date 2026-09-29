@@ -16,18 +16,19 @@ export type SidebarRenderRow =
     };
 
 /**
- * Flattens recency-sorted unpinned families into a heterogeneous row array:
+ * Flattens recency-sorted families into a heterogeneous row array:
  * one project-header row per project (clustered by `groupFamiliesByProject`,
  * ordered by each project's own latest activity), followed by that project's
  * session rows only when it's in `expandedProjectKeys` — collapsed groups
  * contribute just their header row, so the virtualized list's total height
- * already reflects fold state.
+ * already reflects fold state. A pinned family leads its own project's rows (the
+ * recency order is otherwise kept), so pinning never lifts a session out of its project.
  */
 export function buildSidebarRenderRows(
-  unpinnedFamilies: readonly SessionFamily[],
+  families: readonly SessionFamily[],
   expandedProjectKeys: ReadonlySet<string>,
 ): SidebarRenderRow[] {
-  const groups = groupFamiliesByProject(unpinnedFamilies);
+  const groups = groupFamiliesByProject(families);
   const rows: SidebarRenderRow[] = [];
 
   for (const group of groups) {
@@ -41,7 +42,11 @@ export function buildSidebarRenderRows(
       projectKey: group.project.key,
     });
     if (expanded) {
-      for (const family of group.families) {
+      // Array#sort is stable, so pinned and unpinned families each keep their recency order.
+      const ordered = [...group.families].sort(
+        (a, b) => Number(b.root.pinned === true) - Number(a.root.pinned === true),
+      );
+      for (const family of ordered) {
         rows.push({ kind: "session", height: SIDEBAR_SESSION_ROW_HEIGHT, family });
       }
     }

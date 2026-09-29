@@ -15,7 +15,7 @@ const sessionItemSource = source.slice(source.indexOf("function SessionItem("));
 // it up correctly.
 test("builds a heterogeneous row list from lib/sidebar-render-rows and virtualizes via prefix sums", () => {
   assert.match(source, /import \{\s*buildSidebarRenderRows,\s*buildRowPrefixSums,\s*getSidebarRowIndices,/);
-  assert.match(source, /const renderRows: SidebarRenderRow\[\] = \[/);
+  assert.match(source, /const renderRows: SidebarRenderRow\[\] = buildSidebarRenderRows\(allFamilies, expandedProjectKeys\)/);
   assert.match(source, /const rowPrefixSums = buildRowPrefixSums\(rowHeights\)/);
   assert.match(source, /const virtualIndices = getSidebarRowIndices\(rowHeights, listScrollTop, listViewportH, focusedRowIndex\)/);
 });
@@ -134,11 +134,11 @@ test("loadSessions conditionally includes includeArchived based on showArchived 
   assert.match(source, /const url = showArchived \? `\$\{base\}\$\{force \? "&" : "\?"\}includeArchived=1` : base;/);
 });
 
-test("groups sessions pinned-first, then buildSidebarRenderRows clusters unpinned families by project", () => {
+test("pinned sessions lead their own project group instead of a global Pinned section", () => {
   assert.match(source, /const allFamilies = listSessionFamilies\(filteredSessions\)/);
-  assert.match(source, /const pinnedFamilies = allFamilies\.filter\(\(family\) => family\.root\.pinned === true\)/);
-  assert.match(source, /const unpinnedFamilies = allFamilies\.filter\(\(family\) => family\.root\.pinned !== true\)/);
-  assert.match(source, /\.\.\.buildSidebarRenderRows\(unpinnedFamilies, expandedProjectKeys\),/);
+  assert.match(source, /buildSidebarRenderRows\(allFamilies, expandedProjectKeys\)/);
+  assert.doesNotMatch(source, /pinnedFamilies|unpinnedFamilies|sectionLabelBySessionId|pinnedProjectLabel/);
+  assert.match(sessionItemSource, /data-slot="session-pin-indicator"/);
   assert.doesNotMatch(source, /bucketFamilies/);
 });
 
