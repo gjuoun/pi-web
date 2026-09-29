@@ -344,6 +344,30 @@ body {
   --font-mono: var(--font-noto-mono), 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace, 'PingFang SC', 'Microsoft YaHei', monospace;
 }
 
+/* z-index scale. Radix portals append overlay content to <body>, so it competes with the app's
+   layout layers in the root stacking context — not inside whatever opened it. Layers, low → high:
+     20–130   in-panel chrome (chat toolbar, composer pickers, minimap preview)
+     199/200  mobile sidebar backdrop / sidebar (--z-sidebar)
+     220–250  panel resize handles, compact right-panel overlay
+     400–600  self-positioned pickers (font, model) and the settings dialog
+     1100     models-config modal
+     1200     --z-popover: menus, popovers, selects and tooltips — transient, always topmost
+   `components/ui/*` is pristine and ships `z-50`, which sits below the sidebar (JW-159: the session
+   row's "More actions" menu opened invisibly). Raise those layers here, by `data-slot`, instead of
+   editing the primitives. A new portaled overlay primitive must be added to this list. */
+:root {
+  --z-sidebar: 200;
+  --z-popover: 1200;
+}
+
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"],
+[data-slot="popover-content"],
+[data-slot="select-content"],
+[data-slot="tooltip-content"] {
+  z-index: var(--z-popover);
+}
+
 pre, code {
   font-family: var(--font-mono);
 }

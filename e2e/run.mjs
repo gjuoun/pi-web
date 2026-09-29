@@ -15,6 +15,7 @@ import { checkFontSelection } from "./font-selection.mjs";
 import { checkStatusBar } from "./status-bar.mjs";
 import { checkMinimalChrome } from "./minimal-chrome.mjs";
 import { checkModelPicker } from "./model-picker.mjs";
+import { checkOverlayStacking } from "./overlay-stacking.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const mode = process.env.E2E_SERVER_MODE || "dev";
@@ -179,7 +180,18 @@ try {
   console.log("PASS: bounded history, branch context, pagination root, and API errors");
 
   browser = await chromium.launch();
-  for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  const only = process.env.E2E_ONLY === "overlay-stacking";
+  if (only) {
+    // Fast path for iterating on the one check; the full suite is what CI runs.
+    context = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: "en-US" });
+    page = await context.newPage();
+    page.setDefaultTimeout(30_000);
+    await checkOverlayStacking(page, { base, sessionId: RICH });
+    await context.close();
+    context = undefined;
+    page = undefined;
+  }
+  for (const viewport of only ? [] : [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
     context = await browser.newContext({ viewport, locale: "en-US" });
     await context.tracing.start({ screenshots: true, snapshots: true });
     page = await context.newPage();
@@ -360,6 +372,8 @@ try {
     if (viewport.width > 600) {
       await page.goto(`${base}/?session=${RICH}`, { waitUntil: "domcontentloaded" });
       await page.locator("[data-slot=\"markdown-code-block\"] pre").waitFor();
+      await checkOverlayStacking(page, { base, sessionId: RICH });
+      await page.goto(`${base}/?session=${RICH}`, { waitUntil: "domcontentloaded" });
       await checkChatAppearance(page);
       await checkFontSelection(page);
       await checkModelPicker(page, { base, cwd: project, sessionId: RICH });

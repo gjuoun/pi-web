@@ -286,6 +286,15 @@ list — none exist as of this writing) and passed to `scripts/ui-pristine.sh --
 Anything else `ui-pristine.sh` flags on a `components/ui/*` file is an illegal edit — revert it and
 compose instead.
 
+### Portaled overlays and the z-index scale
+
+Radix portals put menu/popover/select/tooltip content under `<body>`, where the `z-50` shipped in
+`components/ui/*` loses to the sidebar (`--z-sidebar`, 200) — the session row's "More actions" menu
+once opened invisibly (JW-159). `app/globals.css` documents the app's z-index layers and lifts those
+primitives to `--z-popover` by `data-slot`; a new portaled primitive must be added to that list.
+`e2e/overlay-stacking.mjs` proves it with `elementFromPoint` (state/DOM assertions cannot see paint
+order, and a modal menu's `pointer-events: none` hides the sidebar from hit testing unless restored).
+
 ### Test policy: SSR can't see an open overlay
 
 `renderToStaticMarkup` (this repo's jiti-based unit tests) renders shadcn `Button`/`Switch` with
