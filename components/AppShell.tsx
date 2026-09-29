@@ -1708,7 +1708,7 @@ export function AppShell() {
         id="session-sidebar"
         className={cn(
           `sidebar-container${sidebarOpen ? " sidebar-open" : " sidebar-closed"}${mobileSidebarReady ? "" : " sidebar-mobile-pending"}${sidebarResizer.isResizing ? " sidebar-resizing" : ""}`,
-          "z-[200] flex shrink-0 flex-col border-r border-border bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
+          "z-(--z-sidebar) flex shrink-0 flex-col border-r border-border bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
         )}
         style={{ "--sidebar-width": `${sidebarResizer.width}px` } as React.CSSProperties}
       >
