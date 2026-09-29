@@ -10,7 +10,7 @@ import { IconButton } from "@/components/IconButton";
 import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolEntry, ToolResultMessage, UserMessage } from "@/lib/types";
 import { normalizeCustomPanelLines } from "@/lib/ansi";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
-import { countToolCallBlocks, getAssistantErrorMessage, getDisplayableAssistantBlocks, isMessageGroupAnchor, isStandaloneTextMessage, splitFinalAssistantBlocks } from "@/lib/message-display";
+import { getAssistantErrorMessage, isMessageGroupAnchor, splitFinalAssistantBlocks, splitProcessRuns } from "@/lib/message-display";
 import { extractTurnWrittenFiles, type WrittenFile } from "@/lib/turn-written-files";
 import { setComposerHidden, useChromePreferences } from "@/lib/chrome-preferences";
 import { buildQuotedSelection } from "@/lib/quoted-selection";
@@ -1213,8 +1213,9 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                 // Keep the original prefix so deferred thinking retains its stored block indices.
                 const finalProcessBlocks = finalAssistant.content.slice(0, finalProcessEnd < 0 ? undefined : finalProcessEnd);
 
-                // The fold is split around standalone text replies: each contiguous run of tool-call
-                // machinery is its own group, and a plain-text message between runs renders inline.
+                // Only tool machinery folds: thinking, tool calls and their results. Whatever the assistant
+                // said (text, images) stays visible, so a message is split into runs and the fold breaks
+                // around each spoken run. Each contiguous fold run is its own group with its own counts.
                 let processViews: ReactNode[] = [];
                 let processToolCount = 0;
                 let processRefIdx: number | undefined;
@@ -1252,25 +1253,35 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                     continue;
                   }
                   if (processMessage.role !== "assistant") continue;
-                  if (processIdx !== finalAssistantIdx && isStandaloneTextMessage(processMessage as AssistantMessage)) {
-                    flushProcessGroup();
-                    rendered.push(renderMessage(processIdx));
-                    continue;
-                  }
                   const message = processIdx === finalAssistantIdx
                     ? withAssistantBlocks(processMessage, finalProcessBlocks, { omitUsage: Boolean(finalAnswerMessage) })
                     : processMessage;
-                  const blocks = getDisplayableAssistantBlocks(message);
-                  if (blocks.length === 0) continue;
-                  processRefIdx ??= visibleRefIndexByMessage.get(processIdx);
-                  processToolCount += countToolCallBlocks(blocks);
-                  revealProcess ||= Boolean(pendingSearchScroll && entryIds[processIdx] === pendingSearchScroll.entryId && (!searchBlock || blocks.includes(searchBlock)));
-                  processViews.push(renderMessage(processIdx, {
-                    attachRef: false,
-                    keyPrefix: "process",
-                    messageOverride: message,
-                    showTimestamp: false,
-                  }));
+                  const runs = splitProcessRuns(message);
+                  const hasSpokenRun = runs.some((run) => run.kind === "inline");
+                  let spokenRefAttached = false;
+                  runs.forEach((run, runIdx) => {
+                    if (run.kind === "inline") {
+                      flushProcessGroup();
+                      // One visible ref per message: the first spoken run owns it.
+                      rendered.push(renderMessage(processIdx, {
+                        attachRef: !spokenRefAttached,
+                        keyPrefix: `spoken-${runIdx}`,
+                        messageOverride: run.message,
+                      }));
+                      spokenRefAttached = true;
+                      return;
+                    }
+                    if (!hasSpokenRun) processRefIdx ??= visibleRefIndexByMessage.get(processIdx);
+                    processToolCount += run.toolCallCount;
+                    const runBlocks = run.message.content.filter((block) => !(block.type === "thinking" && block.thinking === "" && !block.deferred));
+                    revealProcess ||= Boolean(pendingSearchScroll && entryIds[processIdx] === pendingSearchScroll.entryId && (!searchBlock || runBlocks.includes(searchBlock)));
+                    processViews.push(renderMessage(processIdx, {
+                      attachRef: false,
+                      keyPrefix: `process-${runIdx}`,
+                      messageOverride: run.message,
+                      showTimestamp: false,
+                    }));
+                  });
                 }
                 flushProcessGroup();
 
