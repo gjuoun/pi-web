@@ -76,3 +76,14 @@ export function splitFinalAssistantBlocks(
 export function countToolCallBlocks(blocks: AssistantContentBlock[]): number {
   return blocks.filter((block): block is ToolCallContent => block.type === "toolCall").length;
 }
+
+/**
+ * An intermediate assistant message that says something (text or an image) without calling a tool.
+ * It is a reply in its own right, so it renders inline instead of hiding in "Process details";
+ * a message with any tool call keeps folding, because the tool call is the machinery being hidden.
+ */
+export function isStandaloneTextMessage(message: AssistantMessage): boolean {
+  const blocks = getDisplayableAssistantBlocks(message);
+  if (countToolCallBlocks(blocks) > 0) return false;
+  return blocks.some((block) => block.type === "image" || (block.type === "text" && block.text.trim().length > 0));
+}
