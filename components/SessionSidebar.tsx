@@ -841,33 +841,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   // listSessionFamilies() must run on the FULL filtered set (not a pinned/bucket split)
   // or a subagent whose root falls in a different bucket becomes an orphan.
   const allFamilies = listSessionFamilies(filteredSessions);
-  const pinnedFamilies = allFamilies.filter((family) => family.root.pinned === true);
-  const unpinnedFamilies = allFamilies.filter((family) => family.root.pinned !== true);
 
-  // "PINNED" is a curated-by-the-user label, not a date grouping, so it stays
-  // (decision 5's date-caption removal doesn't touch it).
-  const sectionLabelBySessionId = new Map<string, string>();
-  if (pinnedFamilies.length > 0) sectionLabelBySessionId.set(pinnedFamilies[0].root.id, t("sidebar.pinnedSection"));
-
-  // Decision 4: pinned rows are never grouped under a project header, so they
-  // always carry an inline project label instead.
-  const pinnedProjectLabelBySessionId = new Map<string, string>();
-  for (const family of pinnedFamilies) {
-    const root = family.root.projectRoot ?? family.root.cwd;
-    pinnedProjectLabelBySessionId.set(family.root.id, projectBasename(root));
-  }
-
-  // Heterogeneous row list: pinned rows stay flat/ungrouped, then unpinned
-  // families flatten into dedicated project-header rows (collapsed by
-  // default) followed by their sessions when expanded (Step 1/3).
-  const renderRows: SidebarRenderRow[] = [
-    ...pinnedFamilies.map((family): SidebarRenderRow => ({
-      kind: "session",
-      height: SIDEBAR_SESSION_ROW_HEIGHT,
-      family,
-    })),
-    ...buildSidebarRenderRows(unpinnedFamilies, expandedProjectKeys),
-  ];
+  // Pinned families lead their own project's rows (see buildSidebarRenderRows); there is no
+  // global "Pinned" section, so a pinned row carries a pin glyph instead of a section label.
+  const renderRows: SidebarRenderRow[] = buildSidebarRenderRows(allFamilies, expandedProjectKeys);
   const rowHeights = renderRows.map((row) => row.height);
   const rowPrefixSums = buildRowPrefixSums(rowHeights);
   const focusedRowIndex = renderRows.findIndex(
@@ -1207,8 +1184,6 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 >
                   <SessionItem
                     session={displaySession}
-                    sectionLabel={sectionLabelBySessionId.get(family.root.id)}
-                    pinnedProjectLabel={pinnedProjectLabelBySessionId.get(family.root.id)}
                     isSelected={familySessions.some((session) => session.id === selectedSessionId)}
                     isRunning={familySessions.some((session) => runningSessionIds.has(session.id))}
                     isUnread={familySessions.some((session) => unreadSessionIds.has(session.id))}
@@ -1477,8 +1452,6 @@ function SessionItem({
   hasChildren = false,
   collapsed = false,
   onToggleCollapse,
-  sectionLabel,
-  pinnedProjectLabel,
 }: {
   session: SessionInfo;
   isSelected: boolean;
@@ -1491,8 +1464,6 @@ function SessionItem({
   hasChildren?: boolean;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
-  sectionLabel?: string;
-  pinnedProjectLabel?: string;
 }) {
   const { t } = useI18n();
   const [hovered, setHovered] = useState(false);
@@ -1701,11 +1672,6 @@ function SessionItem({
             </svg>
           )}
           <div className="min-w-0 flex-1">
-            {sectionLabel && (
-              <div className="mb-px text-[10px] font-semibold uppercase tracking-[0.3px] text-muted-foreground/70">
-                {sectionLabel}
-              </div>
-            )}
             {/* One-line row (decision 5): status dot (if any) + title + branch
                 chip/pinned-project-label — relative-time and message-count text
                 are dropped, recency now comes purely from sort order. */}
@@ -1718,17 +1684,22 @@ function SessionItem({
               ) : isUnread ? (
                 <UnreadSessionIndicator />
               ) : null}
+              {session.pinned && (
+                <svg
+                  data-slot="session-pin-indicator"
+                  role="img"
+                  aria-label={t("sidebar.pinnedSection")}
+                  width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  className="shrink-0 text-muted-foreground"
+                >
+                  <line x1="12" y1="17" x2="12" y2="22" />
+                  <path d="M5 17h14l-1.5-7.5a3 3 0 0 0-1.2-1.9L15 6V4a1 1 0 0 0-1-1H10a1 1 0 0 0-1 1v2l-1.3 1.6a3 3 0 0 0-1.2 1.9L5 17z" />
+                </svg>
+              )}
               <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
                 {title}
               </span>
-              {pinnedProjectLabel && (
-                <span
-                  title={pinnedProjectLabel}
-                  className="shrink-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-muted-foreground/70"
-                >
-                  {pinnedProjectLabel}
-                </span>
-              )}
               {session.isWorktree && session.branch && (
                 <span
                   title={`Worktree: ${session.cwd}`}
