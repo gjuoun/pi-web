@@ -5,7 +5,7 @@
 import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import type { Dirent } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { createInterface } from "node:readline";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { writePrivateFileAtomicSync } from "./atomic-file";
@@ -338,6 +338,15 @@ export async function listSessionsIncremental(): Promise<ScannedSessionInfo[]> {
 				return { filePath, fp: null as Fingerprint | null };
 			}
 		}),
+	);
+
+	// The SDK pre-sorts candidate files by mtime (newest first), then by
+	// basename (descending), before its stable sort by `modified`. Reproduce
+	// that so sessions with equal `modified` keep the SDK's relative order.
+	fingerprints.sort(
+		(a, b) =>
+			(b.fp?.mtimeMs ?? Number.NEGATIVE_INFINITY) - (a.fp?.mtimeMs ?? Number.NEGATIVE_INFINITY) ||
+			basename(b.filePath).localeCompare(basename(a.filePath)),
 	);
 
 	const changed: Array<{ filePath: string; fp: Fingerprint; resultIndex: number }> = [];
