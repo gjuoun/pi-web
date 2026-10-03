@@ -37,7 +37,8 @@ export async function checkUiPreview(page, { base, artifacts }) {
         sidebarWidth: conversation?.querySelector('[data-slot="app-sidebar"]')?.getBoundingClientRect().width,
         canvas: conversation ? getComputedStyle(conversation).backgroundColor : null,
         sidebar: conversation ? getComputedStyle(conversation.querySelector('[data-slot="app-sidebar"]')).backgroundColor : null,
-        textFields: document.querySelectorAll("textarea, input").length,
+        // Radix adds hidden form inputs to switches and radios; the two settings sliders are native, non-interactive range inputs.
+        textFields: document.querySelectorAll('textarea, input:not([aria-hidden="true"]):not([type="range"])').length,
         buttonsInFrames: document.querySelectorAll('[data-shot="app-conversation"] button, [data-shot="app-new"] button').length,
         scrollable: scroller.scrollHeight > scroller.clientHeight,
         shots: [...document.querySelectorAll("[data-shot]")].map((n) => n.getAttribute("data-shot")),
