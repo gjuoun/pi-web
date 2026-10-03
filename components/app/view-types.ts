@@ -102,6 +102,32 @@ export interface StatusBarData {
   thinking?: string;
 }
 
+export interface ProviderItem {
+  id: string;
+  name: string;
+}
+
+export interface SkillItem {
+  /** The skill's name as the real list shows it (its directory name). */
+  name: string;
+  description: string;
+  /** Absolute path of its SKILL.md. */
+  path: string;
+  enabled: boolean;
+}
+
+export interface PluginItem {
+  /** The package name. The real list prints the package's path, which is `path`. */
+  name: string;
+  path: string;
+  version: string;
+  status: "loaded" | "disabled";
+  /** `1 ext`, or `disabled`. */
+  resources: string;
+  enabled: boolean;
+  scope: "global" | "project";
+}
+
 export interface FileTabItem {
   id: string;
   label: string;

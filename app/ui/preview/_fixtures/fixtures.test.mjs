@@ -6,6 +6,7 @@ const jiti = createJiti(import.meta.url, { tsconfigPaths: true });
 const { projects } = await jiti.import("./sessions.ts");
 const { explorerRows } = await jiti.import("./explorer.ts");
 const { turns, minimapNodes } = await jiti.import("./conversation.ts");
+const { providers, skills, plugins, generalSettings } = await jiti.import("./settings.ts");
 
 const sessions = projects.flatMap((project) => project.sessions);
 
@@ -54,3 +55,13 @@ test("explorer: a 14-row tree whose statuses are modified, added or untracked", 
   for (const row of explorerRows) assert.ok([undefined, "modified", "added", "untracked"].includes(row.status));
   assert.ok(explorerRows.some((r) => r.kind === "folder") && explorerRows.some((r) => r.kind === "file"));
 });
+
+test("settings: one provider, skills with paths, plugins with versions and paths, general settings with languages", () => {
+  assert.ok(providers.length >= 1 && providers.every((p) => p.name));
+  assert.ok(skills.length >= 4 && skills.every((s) => s.name && s.description && s.path.endsWith("/SKILL.md") && !s.name.includes("/")));
+  assert.deepEqual(skills.map((s) => s.name), [...skills.map((s) => s.name)].sort(), "the real list is sorted by name");
+  assert.ok(plugins.length >= 3 && plugins.every((p) => p.name && p.version && p.path.endsWith(`/plugins/${p.name}`)));
+  assert.ok(plugins.some((p) => !p.enabled), "a disabled plugin");
+  assert.ok(generalSettings.languages.length === 3 && generalSettings.languages.some((l) => l.name === generalSettings.language));
+});
+

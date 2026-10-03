@@ -18,7 +18,7 @@ test("the page has a root marker, is kept out of search indexes and owns its scr
 
 test("the sections follow the order of the six regions", () => {
   const sections = [...html.matchAll(/data-section="([a-z-]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(sections, ["sidebar", "topbar", "messages", "composer", "timeline"]);
+  assert.deepEqual(sections, ["sidebar", "topbar", "messages", "composer", "timeline", "settings"]);
 });
 
 test("every data-shot name is unique", () => {
@@ -30,8 +30,10 @@ test("every region has its content: no placeholder is left", () => {
   assert.doesNotMatch(html, /Coming in this slice/);
 });
 
-test("stateless: no text fields anywhere, and no button", () => {
-  assert.doesNotMatch(html, /<textarea|<input/i);
-  assert.doesNotMatch(html, /<button/i);
+test("stateless: no text fields anywhere, and no button outside the settings sections", () => {
+  // Radix adds hidden form inputs to switches and radios, and the two settings sliders are native, non-interactive range inputs.
+  assert.doesNotMatch(html, /<textarea|<input(?![^>]*(?:aria-hidden|type="range"))/i);
+  const beforeSettings = html.slice(0, html.indexOf('data-section="settings"'));
+  assert.doesNotMatch(beforeSettings, /<button/i);
   assert.doesNotMatch(html, /onclick/i);
 });
