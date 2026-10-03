@@ -1,0 +1,37 @@
+/** The raw shadcn colour variables that `app/globals.css` `:root` may set — and nothing else. */
+export const SHADCN_COLOR_TOKENS = [
+  "background",
+  "foreground",
+  "card",
+  "card-foreground",
+  "popover",
+  "popover-foreground",
+  "primary",
+  "primary-foreground",
+  "secondary",
+  "secondary-foreground",
+  "muted",
+  "muted-foreground",
+  "accent",
+  "accent-foreground",
+  "destructive",
+  "border",
+  "input",
+  "ring",
+  "chart-1",
+  "chart-2",
+  "chart-3",
+  "chart-4",
+  "chart-5",
+  "sidebar",
+  "sidebar-foreground",
+  "sidebar-primary",
+  "sidebar-primary-foreground",
+  "sidebar-accent",
+  "sidebar-accent-foreground",
+  "sidebar-border",
+  "sidebar-ring",
+] as const;
+
+/** Every custom property `:root` in `globals.css` may declare. */
+export const SHADCN_TOKENS = [...SHADCN_COLOR_TOKENS, "radius"] as const;

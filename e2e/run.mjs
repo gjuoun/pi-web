@@ -16,6 +16,7 @@ import { checkStatusBar } from "./status-bar.mjs";
 import { checkMinimalChrome } from "./minimal-chrome.mjs";
 import { checkModelPicker } from "./model-picker.mjs";
 import { checkOverlayStacking } from "./overlay-stacking.mjs";
+import { checkUiLib } from "./ui-lib.mjs";
 import { checkThemes } from "./themes.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -181,13 +182,14 @@ try {
   console.log("PASS: bounded history, branch context, pagination root, and API errors");
 
   browser = await chromium.launch();
-  const only = ["overlay-stacking", "themes"].includes(process.env.E2E_ONLY ?? "");
+  const only = ["overlay-stacking", "ui-lib", "themes"].includes(process.env.E2E_ONLY ?? "");
   if (only) {
     // Fast path for iterating on the one check; the full suite is what CI runs.
     context = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: "en-US" });
     page = await context.newPage();
     page.setDefaultTimeout(30_000);
-    if (process.env.E2E_ONLY === "themes") await checkThemes(page, { base, sessionId: RICH });
+    if (process.env.E2E_ONLY === "ui-lib") await checkUiLib(page, { base, artifacts });
+    else if (process.env.E2E_ONLY === "themes") await checkThemes(page, { base, sessionId: RICH });
     else await checkOverlayStacking(page, { base, sessionId: RICH });
     await context.close();
     context = undefined;
@@ -388,6 +390,7 @@ try {
       // Last: it navigates away, so anything with an expected starting location runs before it.
       await checkStatusBar(page, { base, cwd: project, sessionId: RICH });
       await checkMinimalChrome(page, { base, cwd: project, sessionId: RICH });
+      await checkUiLib(page, { base, artifacts });
     }
     assert.deepEqual(errors, [], `Browser errors at width ${viewport.width}`);
     console.log(`PASS: ${viewport.width}px browser pagination, branch, markdown, code, tool call, and compaction navigation`);
