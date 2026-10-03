@@ -31,17 +31,17 @@ const {
   ConfigSwitch,
   ConfigListAction,
   ConfigStatusDot,
-} = await jiti.import("./SettingsUi.tsx");
+} = await jiti.import("./settings-ui.tsx");
 
-const templateSource = await readFile(new URL("./SettingsUi.tsx", import.meta.url), "utf8");
-const globalCssSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-const layoutSource = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
-const enSource = await readFile(new URL("../lib/i18n/messages/en.ts", import.meta.url), "utf8");
-const zhSource = await readFile(new URL("../lib/i18n/messages/zh-CN.ts", import.meta.url), "utf8");
+const templateSource = await readFile(new URL("./settings-ui.tsx", import.meta.url), "utf8");
+const globalCssSource = await readFile(new URL("../../app/app.css", import.meta.url), "utf8");
+const layoutSource = await readFile(new URL("../../app/layout.tsx", import.meta.url), "utf8");
+const enSource = await readFile(new URL("../../lib/i18n/messages/en.ts", import.meta.url), "utf8");
+const zhSource = await readFile(new URL("../../lib/i18n/messages/zh-CN.ts", import.meta.url), "utf8");
 const configSources = await Promise.all(
   ["ModelsConfig", "SkillsConfig", "PluginsConfig"].map(async (name) => [
     name,
-    await readFile(new URL(`./${name}.tsx`, import.meta.url), "utf8"),
+    await readFile(new URL(`../${name}.tsx`, import.meta.url), "utf8"),
   ]),
 );
 

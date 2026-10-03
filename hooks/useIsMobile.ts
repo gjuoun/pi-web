@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
-// Mobile breakpoint shared with app/globals.css (max-width: 640px).
+// Mobile breakpoint shared with app/app.css (max-width: 640px).
 const MOBILE_QUERY = "(max-width: 640px)";
 // Narrow phones keep secondary toolbar actions behind the More button.
 const NARROW_MOBILE_QUERY = "(max-width: 480px)";

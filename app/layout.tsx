@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Mono } from "next/font/google";
 import { PwaRegistration } from "@/components/PwaRegistration";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import { FONT_INIT_SCRIPT } from "@/lib/fonts";
+import { THEME_INIT_SCRIPT } from "@/lib/themes";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 
@@ -46,10 +46,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
-  ],
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({
@@ -61,6 +58,7 @@ export default function RootLayout({
     <html lang="en" translate="no" className={`${notoSansMono.variable} notranslate`} suppressHydrationWarning>
       <head>
         <meta name="google" content="notranslate" />
+        {/* Applies the stored theme before hydration, so a reload never flashes the default. */}
         <script
           dangerouslySetInnerHTML={{
             __html: THEME_INIT_SCRIPT,

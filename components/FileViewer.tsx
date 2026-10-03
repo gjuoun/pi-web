@@ -7,9 +7,9 @@ import {
   type SyntaxHighlighterProps,
 } from "react-syntax-highlighter";
 import ReactMarkdown from "react-markdown";
-import { useTheme } from "@/hooks/useTheme";
 import { getPrismStyle } from "@/lib/code-themes";
-import { IconButton } from "./IconButton";
+import { useTheme } from "@/hooks/useTheme";
+import { IconButton } from "@/components/app/icon-button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   DOCX_PREVIEW_MAX_BYTES,
@@ -1197,6 +1197,9 @@ function TextFileViewer({
   const highlightedSource = useMemo(
     () => (
       <SyntaxHighlighter
+        // Remount on theme change: the two Prism styles mix `background` and `backgroundColor`, which
+        // React warns about when one element updates from one to the other.
+        key={theme}
         className={wrapLines ? "file-source-view is-wrapped" : "file-source-view"}
         language={language === "text" ? "plaintext" : language}
         style={getPrismStyle(theme)}

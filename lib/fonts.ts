@@ -6,7 +6,7 @@
  * (`""` meaning "built-in default"), never the composed stack, so changing a tail later cannot
  * strand a saved value; the stack is composed at apply time.
  *
- * `UI_FONT_DEFAULT` and `MONO_FONT_DEFAULT` are duplicated in `app/globals.css` because the
+ * `UI_FONT_DEFAULT` and `MONO_FONT_DEFAULT` are duplicated in `app/app.css` because the
  * stylesheet must render before any JavaScript runs. `components/FontSettings.test.mjs` asserts the
  * two copies stay byte-equal.
  *
@@ -167,7 +167,7 @@ const FONT_INIT_ROLES = {
 };
 
 /**
- * Applies the stored fonts before first paint, mirroring `THEME_INIT_SCRIPT`. Written as a compact
+ * Applies the stored fonts before first paint, as a pre-paint script. Written as a compact
  * IIFE because it is inlined into the server-rendered `<head>`; `fonts.test.mjs` runs it against a
  * stub DOM and asserts it writes exactly what `composeFontStack` would.
  */

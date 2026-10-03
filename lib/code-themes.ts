@@ -1,28 +1,22 @@
-// The @types package only declares these specifiers without a `.js` suffix, but Node's plain
-// ESM loader (used by our `--experimental-strip-types --test` runner) requires the explicit
-// extension for a CJS file with no package.json "exports" map. Ambient re-declarations below
-// let tsc treat the `.js`-suffixed specifiers identically to the untyped ones.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import oneLight from "react-syntax-highlighter/dist/cjs/styles/prism/one-light.js";
-import oneDark from "react-syntax-highlighter/dist/cjs/styles/prism/one-dark.js";
+// Colours for the places that cannot read CSS custom properties, one entry per registry theme
+// (lib/themes.ts): Prism's style objects, Mermaid's detached SVG and xterm's canvas. The literals
+// mirror the raw shadcn variables in app/globals.css. `lib/code-themes.test.mjs` loops over the
+// registry, so a theme cannot ship without all three.
 import ghcolors from "react-syntax-highlighter/dist/cjs/styles/prism/ghcolors.js";
-import draculaPrism from "react-syntax-highlighter/dist/cjs/styles/prism/dracula.js";
+import oneDark from "react-syntax-highlighter/dist/cjs/styles/prism/one-dark.js";
 import type { CSSProperties } from "react";
-import type { ResolvedTheme } from "@/lib/theme";
+import type { ThemeId } from "@/lib/themes";
 
 export type PrismStyle = Record<string, CSSProperties>;
 
-// react-syntax-highlighter's PrismLight/Prism style objects are untyped `any` in its own
-// d.ts, so this is the practical shape we consume: a map of selector -> style object.
-
-const PRISM_STYLES: Record<ResolvedTheme, PrismStyle> = {
-  light: oneLight as unknown as PrismStyle,
-  dark: oneDark as unknown as PrismStyle,
-  github: ghcolors as unknown as PrismStyle,
-  dracula: draculaPrism as unknown as PrismStyle,
+// react-syntax-highlighter's style objects are untyped `any` in its own d.ts, so this is the
+// practical shape we consume: a map of selector -> style object.
+const PRISM_STYLES: Record<ThemeId, PrismStyle> = {
+  default: ghcolors as unknown as PrismStyle,
+  broismypro: oneDark as unknown as PrismStyle,
 };
 
-export function getPrismStyle(theme: ResolvedTheme): PrismStyle {
+export function getPrismStyle(theme: ThemeId): PrismStyle {
   return PRISM_STYLES[theme];
 }
 
@@ -31,64 +25,36 @@ export interface MermaidThemeVariables {
   themeVariables: Record<string, string>;
 }
 
-// Mermaid needs literal hex values (it renders into detached SVG, no access to CSS custom
-// properties), so each theme's variables are hard-coded here rather than read from tokens.
-const MERMAID_THEMES: Record<ResolvedTheme, MermaidThemeVariables> = {
-  light: {
+const MERMAID_THEMES: Record<ThemeId, MermaidThemeVariables> = {
+  default: {
     theme: "base",
     themeVariables: {
       background: "#ffffff",
-      primaryColor: "#f4f4f5",
-      primaryTextColor: "#18181b",
-      primaryBorderColor: "#d4d4d8",
-      lineColor: "#71717a",
-      secondaryColor: "#e4e4e7",
-      tertiaryColor: "#fafafa",
+      primaryColor: "#e2f0f7",
+      primaryTextColor: "#13005a",
+      primaryBorderColor: "#1c82ad",
+      lineColor: "#00337c",
+      secondaryColor: "#e8eff8",
+      tertiaryColor: "#f3f6fb",
       fontFamily: "var(--font-ui)",
     },
   },
-  dark: {
+  broismypro: {
     theme: "base",
     themeVariables: {
-      background: "#18181b",
-      primaryColor: "#27272a",
-      primaryTextColor: "#fafafa",
-      primaryBorderColor: "#3f3f46",
-      lineColor: "#a1a1aa",
-      secondaryColor: "#3f3f46",
-      tertiaryColor: "#27272a",
-      fontFamily: "var(--font-ui)",
-    },
-  },
-  github: {
-    theme: "base",
-    themeVariables: {
-      background: "#ffffff",
-      primaryColor: "#f6f8fa",
-      primaryTextColor: "#1f2328",
-      primaryBorderColor: "#d1d9e0",
-      lineColor: "#59636e",
-      secondaryColor: "#eaeef2",
-      tertiaryColor: "#f6f8fa",
-      fontFamily: "var(--font-ui)",
-    },
-  },
-  dracula: {
-    theme: "base",
-    themeVariables: {
-      background: "#282a36",
-      primaryColor: "#44475a",
-      primaryTextColor: "#f8f8f2",
-      primaryBorderColor: "#6272a4",
-      lineColor: "#6272a4",
-      secondaryColor: "#44475a",
-      tertiaryColor: "#282a36",
+      background: "#0d0033",
+      primaryColor: "#1f1466",
+      primaryTextColor: "#e8ebff",
+      primaryBorderColor: "#4db3df",
+      lineColor: "#4db3df",
+      secondaryColor: "#1b0a55",
+      tertiaryColor: "#150046",
       fontFamily: "var(--font-ui)",
     },
   },
 };
 
-export function getMermaidTheme(theme: ResolvedTheme): MermaidThemeVariables {
+export function getMermaidTheme(theme: ThemeId): MermaidThemeVariables {
   return MERMAID_THEMES[theme];
 }
 
@@ -115,7 +81,7 @@ export interface XtermTheme {
   brightWhite: string;
 }
 
-// Today's palette (used for light/dark/github, all of which share the same terminal look).
+// The default theme's terminal keeps its own dark palette.
 const DEFAULT_XTERM_THEME: XtermTheme = {
   background: "#111318", foreground: "#d7dce5", cursor: "#60a5fa",
   selectionBackground: "#365b8a",
@@ -126,24 +92,14 @@ const DEFAULT_XTERM_THEME: XtermTheme = {
   brightCyan: "#67e8f9", brightWhite: "#ffffff",
 };
 
-// Dracula's official ANSI palette (https://draculatheme.com/contribute#color-palette).
-const DRACULA_XTERM_THEME: XtermTheme = {
-  background: "#282a36", foreground: "#f8f8f2", cursor: "#f8f8f2",
-  selectionBackground: "#44475a",
-  black: "#21222c", red: "#ff5555", green: "#50fa7b", yellow: "#f1fa8c",
-  blue: "#bd93f9", magenta: "#ff79c6", cyan: "#8be9fd", white: "#f8f8f2",
-  brightBlack: "#6272a4", brightRed: "#ff6e6e", brightGreen: "#69ff94",
-  brightYellow: "#ffffa5", brightBlue: "#d6acff", brightMagenta: "#ff92df",
-  brightCyan: "#a4ffff", brightWhite: "#ffffff",
+// Same ANSI colours, on the dark theme's own canvas.
+const BROISMYPRO_XTERM_THEME: XtermTheme = { ...DEFAULT_XTERM_THEME, background: "#0d0033", foreground: "#e8ebff", cursor: "#4db3df", selectionBackground: "#2b1f70" };
+
+const XTERM_THEMES: Record<ThemeId, XtermTheme> = {
+  default: DEFAULT_XTERM_THEME,
+  broismypro: BROISMYPRO_XTERM_THEME,
 };
 
-const XTERM_THEMES: Record<ResolvedTheme, XtermTheme> = {
-  light: DEFAULT_XTERM_THEME,
-  dark: DEFAULT_XTERM_THEME,
-  github: DEFAULT_XTERM_THEME,
-  dracula: DRACULA_XTERM_THEME,
-};
-
-export function getXtermTheme(theme: ResolvedTheme): XtermTheme {
+export function getXtermTheme(theme: ThemeId): XtermTheme {
   return XTERM_THEMES[theme];
 }

@@ -2,7 +2,7 @@
 
 import { forwardRef, useState, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { getFileIcon, FolderIcon } from "./FileIcons";
-import { IconButton } from "./IconButton";
+import { IconButton } from "@/components/app/icon-button";
 import { Button } from "@/components/ui/button";
 import {
   encodeFilePathForApi,

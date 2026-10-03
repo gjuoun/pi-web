@@ -5,7 +5,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { loadInstalledFonts, useInstalledFonts } from "@/hooks/useInstalledFonts";
 import { isDefaultFont, type FontPreset, type FontRole } from "@/lib/fonts";
 import { pickerFamilies } from "@/lib/fonts-installed";
-import { ConfigButton } from "./SettingsUi";
+import { ConfigButton } from "@/components/app/settings-ui";
 import { cn } from "@/lib/utils";
 
 /**

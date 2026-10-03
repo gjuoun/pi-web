@@ -127,6 +127,8 @@ export interface ExtensionUiContextLike {
   setToolsExpanded(expanded: boolean): void;
 }
 
+export type PromptDisposition = "started" | "handled" | "queued";
+
 export interface AgentSessionLike {
   readonly sessionId: string;
   readonly sessionFile: string | undefined;
@@ -164,7 +166,9 @@ export interface AgentSessionLike {
     images?: Array<{ type: "image"; data: string; mimeType: string }>;
     streamingBehavior?: "steer" | "followUp";
     source?: "interactive" | "rpc";
-    preflightResult?: (success: boolean) => void;
+    /** Called once pi accepts the prompt; not called when it is rejected. `started` begins a run,
+     *  `handled` was consumed by an extension, `queued` joined the steer/follow-up queue. */
+    preflightResult?: (disposition: PromptDisposition) => void;
   }): Promise<void>;
   sendCustomMessage<T = unknown>(message: {
     customType: string;
@@ -191,8 +195,8 @@ export interface AgentSessionLike {
   getLastAssistantText(): string | undefined;
   setAutoCompactionEnabled(enabled: boolean): void;
   setAutoRetryEnabled(enabled: boolean): void;
-  steer(text: string, images?: Array<{ type: "image"; data: string; mimeType: string }>): Promise<void>;
-  followUp(text: string, images?: Array<{ type: "image"; data: string; mimeType: string }>): Promise<void>;
+  steer(text: string, images?: Array<{ type: "image"; data: string; mimeType: string }>): Promise<unknown>;
+  followUp(text: string, images?: Array<{ type: "image"; data: string; mimeType: string }>): Promise<unknown>;
   readonly pendingMessageCount: number;
   getSteeringMessages(): readonly string[];
   getFollowUpMessages(): readonly string[];

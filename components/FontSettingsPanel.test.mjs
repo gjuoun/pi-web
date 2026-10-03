@@ -123,6 +123,6 @@ test("the reset control keeps its accessible name for the browser drives", () =>
 
 test("the stored fonts are applied before hydration", () => {
   assert.match(layout, /import \{ FONT_INIT_SCRIPT \} from "@\/lib\/fonts"/);
-  assert.match(layout, /FONT_INIT_SCRIPT[\s\S]{0,200}THEME_INIT_SCRIPT|THEME_INIT_SCRIPT[\s\S]{0,400}FONT_INIT_SCRIPT/);
+  assert.match(layout, /THEME_INIT_SCRIPT[\s\S]{0,400}FONT_INIT_SCRIPT/);
   assert.match(layout, /<head>[\s\S]*__html: FONT_INIT_SCRIPT[\s\S]*<\/head>/);
 });

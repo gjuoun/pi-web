@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { useI18n } from "@/hooks/useI18n";
-import { useTheme } from "@/hooks/useTheme";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { getXtermTheme } from "@/lib/code-themes";
+import { useTheme } from "@/hooks/useTheme";
 import { createTerminalWriter, terminalRequest } from "@/lib/terminal-client";
 import type { TerminalEvent } from "@/lib/terminal-manager";
 import type { TerminalTab } from "./terminal-tab-state";
@@ -185,8 +185,8 @@ export function TerminalPanel({ tab, active, onRestart, onClosed, onCloseError }
     fitRef.current?.();
   }, [monoStack, reconnectKey]);
 
-  // xterm also reads its theme once at construction; push palette changes live so switching
-  // theme (e.g. into Dracula) recolors already-open terminals.
+  // xterm reads its theme once at construction; push palette changes so switching theme recolors
+  // terminals that are already open.
   useEffect(() => {
     const terminal = terminalRef.current;
     if (!terminal) return;

@@ -108,13 +108,17 @@ components/
   FileIcons.tsx       file icon helpers
   FileViewer.tsx      file content in a tab
   TabBar.tsx          tab bar (Chat + open file tabs)
+  app/                named app components — composed from components/ui:
+    icon-button, settings-ui     shared pieces
+    sidebar/ topbar/ chat/ settings/   stateless view replicas of the current UI (see "The app preview")
+  ui/                 native shadcn primitives (pristine; see "UI system")
 
 hooks/
   useAgentSession.ts  messages + streaming + SSE + fork/navigate/reconciliation logic
   useAudio.ts         completion sound + browser AudioContext unlock
+  useTheme.ts         active theme (data-theme) + persisted setter + cross-tab sync
   useDragDrop.ts      shared drag/drop state
   useIsMobile.ts      responsive breakpoint hook
-  useTheme.ts         theme state
 ```
 
 ---
@@ -243,9 +247,69 @@ The UI is `components.json` `style: radix-nova`, neutral base, CSS variables, `l
 `components/ui/*` and Tailwind utilities — no static inline styles, no legacy tokens, no JS
 hover-style mutations, no ad hoc custom CSS classes, no CSS modules.
 
-### Token contract (`app/globals.css`)
+### The component library: `/ui/lib`
 
-Colour comes only from shadcn's own contract, plus one extension pair each for success/warning:
+`app/ui/lib/page.tsx` is a static showcase of every UI part: foundations (colour tokens, radius, type),
+every native primitive in `components/ui/*` with the variants its cva defines, and every named
+component in `components/app/*`. It is the place to *see* a component before using it. It is public
+(`proxy.ts` matches only `/`, `/login`, `/api/*`) and reads no server data — keep it that way, or add it
+to the matcher.
+
+It stays complete by construction: `app/ui/lib/page.test.mjs` fails when a file in `components/ui/` or
+`components/app/**` (any depth) has no `data-specimen="ui-<name>"` / `data-specimen="app-<file stem>"` — a
+component under `components/app/{sidebar,topbar,chat,settings}` may be shown on `/ui/preview` instead (the test
+accepts either page; file stems are unique across folders). Adding a component
+means adding its specimen in `app/ui/lib/_sections/`. Overlay primitives render their trigger closed
+(`data-demo="<name>"`); `e2e/ui-lib.mjs` opens them.
+
+### The app preview: `/ui/preview`
+
+`app/ui/preview/page.tsx` renders the current UI as **stateless replicas** with demo data, so its look can be
+discussed and changed without a running agent: the whole screen (a session with messages, a new session) as
+1280 x 800 frames, then each region on its own — sidebar, top bar, chat messages, composer and status bar, the
+timeline (the right-edge minimap) and the settings dialog. It follows the page's theme. It is public and
+static like `/ui/lib`.
+
+- **Where things live.** The views are in `components/app/{sidebar,topbar,chat,settings}/`; their prop shapes in
+  `components/app/view-types.ts`; the demo data in `app/ui/preview/_fixtures/`. A view is props in, markup out:
+  no hooks, no handlers, no `fetch`, no text field, no i18n hook (labels are English literals). The settings
+  Models/Skills/Plugins views compose the real `Config*` kit, so they contain the kit's own buttons — the only
+  buttons on the page.
+- **They are replicas, not the real components.** They copy today's look by hand and will not follow later changes
+  to `SessionSidebar`, `ChatInput`, `ChatMinimap` and friends until the real app consumes them. Compare with the
+  real screens before trusting a difference.
+- **Iterating.** Every `[data-shot]` element is a screenshot target. `ref-shots.mjs` (real app, needs a dev server)
+  and `preview-shots.mjs` (`--theme default|broismypro`) in the plan's `scripts/`
+  (`~/.notebook/project/gjuoun/pi-web/plan/2026-10-02/ui-preview/`) produce side-by-side PNGs.
+- **Adding a view** means a stateless component in the right folder, a test written first (SSR with `jiti`, as the
+  existing `*.test.mjs` do), a `Specimen name="app-<stem>"` in its `_sections/` file, and — if it needs a new data
+  shape — a fixture. `ui-guard` scans `app/ui/preview`; the only inline `style` allowed is a node position in
+  the timeline, waived with `// ui-guard-allow: <reason>`. `e2e/ui-preview.mjs` (`E2E_ONLY=ui-preview`) checks
+  both themes in a browser.
+
+### Named components: `components/app/*`
+
+Everything the app shows is a named component. Screens import from `components/app/*`; those files
+compose `components/ui/*` through a primitive's public surface only — props, variants, role colours
+(`bg-primary`, `text-muted-foreground`), composition. `scripts/ui-guard.mjs` (part of `npm run lint`)
+scans `components/app/` and `app/ui/lib/` and rejects the `!` important modifier, selectors into a
+primitive's slots (`[&_[data-slot=…]]`), hard-coded colours, raw palette classes (`bg-blue-500`,
+`bg-white`) and static `style={{…}}` (waive with `// ui-guard-allow: <reason>`). If a primitive's stock
+look is not enough, that is a new variant on the primitive (below), not an override. Files are
+kebab-case like `components/ui/*`; `SettingsUi` (`Config*`) and `IconButton` are the first two.
+
+### `app/globals.css` keeps the native shadcn + Tailwind shape
+
+`globals.css` is exactly: the Tailwind/`tw-animate-css`/`shadcn/tailwind.css` imports, one
+`@import "./app.css"`, `@custom-variant dark`, `:root` with the raw shadcn variables, the native
+`@theme inline` colour/radius mappings, and the native `@layer base`. Theming is done by editing the
+raw variables in `:root` and nothing else. Everything that is not native — `--success`/`--warning` and
+their mappings, `--font-ui`/`--font-mono` and `--font-sans`, `--chat-*`, the z-index scale, keyframes,
+panel/sidebar layout, scrollbars — lives in `app/app.css`. (Tailwind v4 only sees `@theme` inside a file
+pulled in by `@import`, which is why `app.css` is imported rather than loaded from `layout.tsx`.)
+`app/globals.test.mjs` enforces the shape.
+
+Raw variables (`:root` may set these and nothing else):
 
 ```
 --background --foreground
@@ -256,8 +320,6 @@ Colour comes only from shadcn's own contract, plus one extension pair each for s
 --muted --muted-foreground
 --accent --accent-foreground
 --destructive
---success --success-foreground   (extension)
---warning --warning-foreground   (extension)
 --border --input --ring
 --radius
 --sidebar --sidebar-foreground --sidebar-primary --sidebar-primary-foreground
@@ -265,34 +327,47 @@ Colour comes only from shadcn's own contract, plus one extension pair each for s
 --chart-1 … --chart-5
 ```
 
-`--font-ui` / `--font-mono` (mapped onto `--font-sans` in `@theme inline`) and
-`FONT_INIT_SCRIPT` stay the app's own font system; shadcn's Geist import was removed at init time
-and never comes back.
+`--success`/`--warning` (+ `-foreground`) are the app's own extension and live in `app.css`. `--success` is
+a darker derivation of the palette green (`#04855c`): the raw `#03C988` is 2.2:1 on white, too light for
+the `text-success` uses (diff additions, git status).
+`--font-ui` / `--font-mono` and `FONT_INIT_SCRIPT` stay the app's own font system; shadcn's Geist
+import was removed at init time and never comes back.
 
 ### Themes
 
-Four themes plus `auto` (follows the OS): `light` and `dark` are shadcn's own neutral palette
-(`.dark` is the dark variant of `light`); `github` (`:root[data-theme="github"]`) is Primer light;
-`dracula` (`:root[data-theme="dracula"]`) is the Dracula spec, dark only. `hooks/useTheme.ts` still
-owns theme state (`useSyncExternalStore`, the View Transitions wipe, the `auto` listener) and the
-`data-theme` attribute plus `.dark` class — not `next-themes`. `lib/code-themes.ts` maps each
-resolved theme to its own Prism style, Mermaid `themeVariables` and xterm `ITheme`.
+Two themes: `default` (the Color Hunt set `#13005A` / `#00337C` / `#1C82AD` / `#03C988` — deep indigo
+text, navy primary, teal ring, green as `--chart-3`; the `:root` values) and `broismypro`, its dark
+counterpart. `lib/themes.ts` is the registry (`THEMES`, `THEME_INIT_SCRIPT`, `applyTheme`). A theme is
+one block of the raw shadcn variables in `globals.css`: `:root, [data-theme="default"]` and
+`[data-theme="broismypro"]`, selected by `data-theme` alone (so a scope can nest) and ordered after
+`:root`. A dark theme also carries the `dark` class on `<html>`, set with the attribute, which is what
+turns on the `dark:` utilities inside `components/ui/*` — `@custom-variant dark` stays the native line.
+The theme is chosen in Settings → General → Appearance (`hooks/useTheme.ts`, persisted as `pi-theme`),
+and applied before first paint by an inline script in `app/layout.tsx`, ahead of `FONT_INIT_SCRIPT`.
+
+A new theme is: a block of **every** raw variable in `globals.css` (`app/globals.test.mjs` fails on a
+missing or extra one, and on a registry id without a block), the app's own `--success`/`--warning`
+colours in `app.css`, an entry in `THEMES`, Prism/Mermaid/xterm values in `lib/code-themes.ts` (they
+cannot read CSS variables; `lib/code-themes.test.mjs` loops over the registry), a label key in each
+locale, and a scope in `/ui/lib` (rendered automatically from the registry). Check contrast with the
+plan's `scripts/contrast.mjs`. Never edit a `components/ui/*` file for a theme. Decision record:
+`docs/adr/0009-themes-default-and-broismypro.md`.
 
 ### `components/ui/*` is pristine
 
 Never hand-edit a file under `components/ui/`. The only sanctioned change is adding a cva variant,
-and every one added must be recorded (search git history / the plan's Risks section for the running
-list — none exist as of this writing) and passed to `scripts/ui-pristine.sh --allow <component>`.
-Anything else `ui-pristine.sh` flags on a `components/ui/*` file is an illegal edit — revert it and
-compose instead.
+marked with a `pi:` comment on every changed hunk and passed to `scripts/ui-pristine.sh --allow
+<file.tsx>`. `npm run ui:pristine` (also in CI) compares each file with what the pinned shadcn CLI
+generates (`shadcn add <name> --view`, read-only); anything else it flags is an illegal edit — revert
+it and compose instead. None exist as of this writing.
 
 ### Portaled overlays and the z-index scale
 
 Radix portals put menu/popover/select/tooltip content under `<body>`, where the `z-50` shipped in
 `components/ui/*` loses to the sidebar (`--z-sidebar`, 200) — the session row's "More actions" menu
-once opened invisibly (JW-159). `app/globals.css` documents the app's z-index layers and lifts those
+once opened invisibly (JW-159). `app/app.css` documents the app's z-index layers and lifts those
 primitives to `--z-popover` by `data-slot`; a new portaled primitive must be added to that list.
-`e2e/overlay-stacking.mjs` proves it with `elementFromPoint` (state/DOM assertions cannot see paint
+`e2e/overlay-stacking.mjs` (and `e2e/ui-lib.mjs` for every primitive) proves it with `elementFromPoint` (state/DOM assertions cannot see paint
 order, and a modal menu's `pointer-events: none` hides the sidebar from hit testing unless restored).
 
 ### Test policy: SSR can't see an open overlay
@@ -304,7 +379,7 @@ test comes back empty. So:
 
 - Pure logic (helpers, reducers, derived state) stays unit-tested as always.
 - Open-overlay behaviour (content, focus return, Escape, keyboard nav) is proven in `e2e/*.mjs` or
-  the plan's `drive-themes.mjs`, never in a unit test that renders a closed overlay and calls it proof.
+  the plan's drive scripts, never in a unit test that renders a closed overlay and calls it proof.
 - Assertions pin roles, labels, `data-slot`, `data-state` and `aria-*` — never a Tailwind class string.
 
 ### `data-slot` is the hook-class convention

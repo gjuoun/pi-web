@@ -33,7 +33,7 @@ import {
   ConfigSplitView,
   ConfigStatusDot,
   ConfigSwitch,
-} from "./SettingsUi";
+} from "@/components/app/settings-ui";
 
 type PluginScope = PluginPackageInfo["scope"];
 type PluginAction = "install" | "remove" | "update" | "disable" | "enable";
