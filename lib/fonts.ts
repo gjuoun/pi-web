@@ -6,7 +6,7 @@
  * (`""` meaning "built-in default"), never the composed stack, so changing a tail later cannot
  * strand a saved value; the stack is composed at apply time.
  *
- * `UI_FONT_DEFAULT` and `MONO_FONT_DEFAULT` are duplicated in `app/globals.css` because the
+ * `UI_FONT_DEFAULT` and `MONO_FONT_DEFAULT` are duplicated in `app/app.css` because the
  * stylesheet must render before any JavaScript runs. `components/FontSettings.test.mjs` asserts the
  * two copies stay byte-equal.
  *

@@ -1522,7 +1522,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
 
   // The rail's colour is the state channel. ChatInput has no thinking level — that lives in the
   // status bar — so there are three states: shell mode, a run in flight, and nothing to announce.
-  // The colours themselves are declared in `app/globals.css` against `data-state`, so that
+  // The colours themselves are declared in `app/app.css` against `data-state`, so that
   // `:focus-within` can override them: an inline colour would outrank the stylesheet and win.
   const railWorking = isStreaming && Boolean(onSteer || onFollowUp);
   const railState = bashMode ? "shell" : railWorking ? "working" : "idle";

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createJiti } from "jiti";
 
-const globals = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+const globals = await readFile(new URL("../app/app.css", import.meta.url), "utf8");
 const jiti = createJiti(import.meta.url);
 const { UI_FONT_DEFAULT, MONO_FONT_DEFAULT } = await jiti.import("../lib/fonts.ts");
 

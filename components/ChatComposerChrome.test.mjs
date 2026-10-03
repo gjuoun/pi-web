@@ -9,7 +9,7 @@ const { renderToStaticMarkup } = await jiti.import("react-dom/server");
 const { ChatInput } = await jiti.import("./ChatInput.tsx");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
 
-const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+const css = await readFile(new URL("../app/app.css", import.meta.url), "utf8");
 
 /** Split a rendered element's `style="a:1;b:2"` into a map, tolerating a space after the colon. */
 function styleMap(html, marker = "data-chat-composer-box") {
