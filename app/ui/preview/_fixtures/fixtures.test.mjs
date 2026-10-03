@@ -64,4 +64,3 @@ test("settings: one provider, skills with paths, plugins with versions and paths
   assert.ok(plugins.some((p) => !p.enabled), "a disabled plugin");
   assert.ok(generalSettings.languages.length === 3 && generalSettings.languages.some((l) => l.name === generalSettings.language));
 });
-
