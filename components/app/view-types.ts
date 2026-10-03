@@ -107,3 +107,15 @@ export interface FileTabItem {
   label: string;
   kind: "file" | "terminal";
 }
+
+/** An attached image above the input (the real composer shows a 56px preview with a remove badge). */
+export interface ComposerChipItem {
+  id: string;
+  label: string;
+}
+
+/** A queued steering or follow-up message row above the input. */
+export interface QueuedMessage {
+  kind: "steer" | "follow-up";
+  text: string;
+}

@@ -18,7 +18,7 @@ test("the page has a root marker, is kept out of search indexes and owns its scr
 
 test("the sections follow the order of the six regions", () => {
   const sections = [...html.matchAll(/data-section="([a-z-]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(sections, ["sidebar", "topbar", "messages"]);
+  assert.deepEqual(sections, ["sidebar", "topbar", "messages", "composer"]);
 });
 
 test("every data-shot name is unique", () => {
