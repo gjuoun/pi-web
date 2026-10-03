@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Section } from "@/app/ui/lib/_showcase/section";
 import { MessagesRegion } from "./_sections/messages";
 import { SidebarRegion } from "./_sections/sidebar";
+import { TopbarRegion } from "./_sections/topbar";
 
 export const metadata: Metadata = {
   title: "pi-web app preview",
@@ -12,12 +13,14 @@ export const metadata: Metadata = {
 
 const REGIONS = [
   { id: "sidebar", label: "Sidebar", title: "Sidebar", description: "Action row, project groups with session rows, the explorer and the settings footer." },
+  { id: "topbar", label: "Top bar", title: "Top bar", description: "Sidebar toggle, chat toolbar, session stats, file panel toggle and the file tabs." },
   { id: "messages", label: "Chat messages", title: "Chat messages", description: "A new session, and a session with user, assistant, process details, error and compaction turns." },
 ] as const;
 
 /** Region content by section id. */
 const REGION_CONTENT: Record<(typeof REGIONS)[number]["id"], ReactNode> = {
   sidebar: <SidebarRegion />,
+  topbar: <TopbarRegion />,
   messages: <MessagesRegion />,
 };
 

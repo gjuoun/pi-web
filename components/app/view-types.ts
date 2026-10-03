@@ -101,3 +101,9 @@ export interface StatusBarData {
   model: string;
   thinking?: string;
 }
+
+export interface FileTabItem {
+  id: string;
+  label: string;
+  kind: "file" | "terminal";
+}
