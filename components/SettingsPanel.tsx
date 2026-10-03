@@ -31,7 +31,7 @@ import { ModelsConfig } from "./ModelsConfig";
 import { setupPushSubscription } from "@/lib/push-client";
 import { SkillsConfig } from "./SkillsConfig";
 import { PluginsConfig } from "./PluginsConfig";
-import { ConfigButton, ConfigSwitch } from "./SettingsUi";
+import { ConfigButton, ConfigSwitch } from "@/components/app/settings-ui";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";

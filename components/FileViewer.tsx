@@ -9,7 +9,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import { useTheme } from "@/hooks/useTheme";
 import { getPrismStyle } from "@/lib/code-themes";
-import { IconButton } from "./IconButton";
+import { IconButton } from "@/components/app/icon-button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   DOCX_PREVIEW_MAX_BYTES,

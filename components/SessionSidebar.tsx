@@ -29,7 +29,7 @@ import { useI18n } from "@/hooks/useI18n";
 import { DirectoryPicker } from "./DirectoryPicker";
 import { FileExplorer, type FileExplorerHandle } from "./FileExplorer";
 import { SessionSearch } from "./SessionSearch";
-import { IconButton } from "./IconButton";
+import { IconButton } from "@/components/app/icon-button";
 
 
 declare global {

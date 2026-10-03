@@ -44,7 +44,7 @@ import {
   ConfigSidebarText,
   ConfigSplitView,
   ConfigStatusDot,
-} from "./SettingsUi";
+} from "@/components/app/settings-ui";
 import { ProviderIcon } from "./ProviderIcon";
 import { ProviderUsageSummary } from "./ProviderUsageSummary";
 

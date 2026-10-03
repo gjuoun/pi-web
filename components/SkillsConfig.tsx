@@ -37,7 +37,7 @@ import {
   ConfigSplitView,
   ConfigStatusDot,
   ConfigSwitch,
-} from "./SettingsUi";
+} from "@/components/app/settings-ui";
 
 function shortenPath(p: string): string {
   // Match common home dir patterns: /Users/xxx, /home/xxx
