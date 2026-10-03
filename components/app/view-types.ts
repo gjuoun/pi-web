@@ -32,3 +32,72 @@ export interface ExplorerRow {
   open?: boolean;
   status?: GitStatus;
 }
+
+export interface UsageLine {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost: number;
+}
+
+export type ProcessStep =
+  | { kind: "thinking"; text: string; duration?: string }
+  | { kind: "tool"; name: string; summary: string; duration: string; failed?: boolean };
+
+export interface ProcessRun {
+  messages: number;
+  toolCalls: number;
+  model: string;
+  steps: ProcessStep[];
+  usage?: UsageLine;
+}
+
+export type AssistantBlock =
+  | { kind: "p"; text: string }
+  | { kind: "h"; level: 1 | 2 | 3; text: string }
+  | { kind: "list"; ordered?: boolean; items: string[] }
+  | { kind: "code"; lang: string; code: string }
+  | { kind: "table"; head: string[]; rows: string[][] }
+  | { kind: "process"; run: ProcessRun };
+
+export type Turn =
+  | { kind: "user"; lines: string[]; time: string }
+  | { kind: "assistant"; model: string; blocks: AssistantBlock[]; usage: UsageLine; time: string }
+  | { kind: "notice"; tone: "error" | "compaction"; title: string; text: string; time: string };
+
+/** One row of an assistant outline in the hover preview: a heading (level 1-3) or, with no level, the first line of text. */
+export interface OutlineItem {
+  level?: 1 | 2 | 3;
+  label: string;
+}
+
+export interface MinimapNode {
+  /** The turn's text as the preview shows it (paragraphs separated by a blank line; clamped to four lines). */
+  text: string;
+  /** The assistant reply's outline under the turn; empty for a compaction entry. */
+  outline: OutlineItem[];
+  /** The turn nearest the top of the viewport. */
+  active?: boolean;
+}
+
+export interface SessionStatsData {
+  up: string;
+  down: string;
+  cache: string;
+  cost: string;
+  contextPercent: number;
+  contextWindow: string;
+}
+
+export interface StatusBarData {
+  project: string;
+  branch?: string;
+  sessionName?: string;
+  /** The counters of line 2, one entry per segment (`↑13`, `R1.7M`, ... `51.6%/1.0M (auto)`). */
+  stats?: string[];
+  /** Colours the last stats segment like the real bar: above 70 warning, above 90 destructive. */
+  contextPercent?: number;
+  model: string;
+  thinking?: string;
+}
