@@ -2,8 +2,8 @@
 
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { getMermaidTheme, getPrismStyle } from "@/lib/code-themes";
 import { useTheme } from "@/hooks/useTheme";
-import { getPrismStyle, getMermaidTheme } from "@/lib/code-themes";
 import { useI18n } from "@/hooks/useI18n";
 import { copyText } from "@/lib/clipboard";
 import { Button } from "@/components/ui/button";
@@ -335,6 +335,8 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
         </pre>
       ) : (
         <SyntaxHighlighter
+          // Remount on theme change (see FileViewer): the Prism styles mix `background`/`backgroundColor`.
+          key={theme}
           language={lang || "text"}
           style={getPrismStyle(theme)}
           showLineNumbers

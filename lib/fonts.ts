@@ -167,7 +167,7 @@ const FONT_INIT_ROLES = {
 };
 
 /**
- * Applies the stored fonts before first paint, mirroring `THEME_INIT_SCRIPT`. Written as a compact
+ * Applies the stored fonts before first paint, as a pre-paint script. Written as a compact
  * IIFE because it is inlined into the server-rendered `<head>`; `fonts.test.mjs` runs it against a
  * stub DOM and asserts it writes exactly what `composeFontStack` would.
  */

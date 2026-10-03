@@ -16,6 +16,7 @@ import { checkStatusBar } from "./status-bar.mjs";
 import { checkMinimalChrome } from "./minimal-chrome.mjs";
 import { checkModelPicker } from "./model-picker.mjs";
 import { checkOverlayStacking } from "./overlay-stacking.mjs";
+import { checkThemes } from "./themes.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const mode = process.env.E2E_SERVER_MODE || "dev";
@@ -180,13 +181,14 @@ try {
   console.log("PASS: bounded history, branch context, pagination root, and API errors");
 
   browser = await chromium.launch();
-  const only = process.env.E2E_ONLY === "overlay-stacking";
+  const only = ["overlay-stacking", "themes"].includes(process.env.E2E_ONLY ?? "");
   if (only) {
     // Fast path for iterating on the one check; the full suite is what CI runs.
     context = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: "en-US" });
     page = await context.newPage();
     page.setDefaultTimeout(30_000);
-    await checkOverlayStacking(page, { base, sessionId: RICH });
+    if (process.env.E2E_ONLY === "themes") await checkThemes(page, { base, sessionId: RICH });
+    else await checkOverlayStacking(page, { base, sessionId: RICH });
     await context.close();
     context = undefined;
     page = undefined;
@@ -380,6 +382,8 @@ try {
       await page.goto(`${base}/?session=${RICH}`, { waitUntil: "domcontentloaded" });
       await checkChatAppearance(page);
       await checkFontSelection(page);
+      await checkThemes(page, { base, sessionId: RICH });
+      await page.goto(`${base}/?session=${RICH}`, { waitUntil: "domcontentloaded" });
       await checkModelPicker(page, { base, cwd: project, sessionId: RICH });
       // Last: it navigates away, so anything with an expected starting location runs before it.
       await checkStatusBar(page, { base, cwd: project, sessionId: RICH });

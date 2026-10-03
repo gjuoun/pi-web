@@ -1,6 +1,7 @@
-import type { ThemePreference } from "@/lib/theme";
+import type { ThemeId } from "@/lib/themes";
 
-export function ThemeIcon({ preference, size = 17 }: { preference: ThemePreference; size?: number }) {
+/** A sun for the light theme and a moon for the dark one, drawn with `currentColor`. */
+export function ThemeIcon({ theme, size = 17 }: { theme: ThemeId; size?: number }) {
   const common = {
     width: size,
     height: size,
@@ -13,22 +14,8 @@ export function ThemeIcon({ preference, size = 17 }: { preference: ThemePreferen
     "aria-hidden": true,
   };
 
-  if (preference === "light") {
-    return <svg {...common}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.41M17.66 6.34l1.41-1.41" /></svg>;
-  }
-  if (preference === "dark") {
+  if (theme === "broismypro") {
     return <svg {...common}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" /></svg>;
   }
-  if (preference === "github" || preference === "dracula") {
-    const bg = preference === "github" ? "#ffffff" : "#282a36";
-    const fg = preference === "github" ? "#0969da" : "#bd93f9";
-    const border = preference === "github" ? "#d1d9e0" : "#44475a";
-    return (
-      <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
-        <rect x="2" y="2" width="20" height="20" rx="4" fill={bg} stroke={border} strokeWidth="1.5" />
-        <circle cx="12" cy="12" r="5" fill={fg} />
-      </svg>
-    );
-  }
-  return <svg {...common}><rect x="3" y="4" width="18" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg>;
+  return <svg {...common}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.41M17.66 6.34l1.41-1.41" /></svg>;
 }

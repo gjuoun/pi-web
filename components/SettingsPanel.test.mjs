@@ -5,8 +5,6 @@ import test from "node:test";
 const panelSource = await readFile(new URL("./SettingsPanel.tsx", import.meta.url), "utf8");
 const shellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
 const sidebarSource = await readFile(new URL("./SessionSidebar.tsx", import.meta.url), "utf8");
-const themeSource = await readFile(new URL("../hooks/useTheme.ts", import.meta.url), "utf8");
-const themeOptionsSource = await readFile(new URL("../lib/theme.ts", import.meta.url), "utf8");
 const enSource = await readFile(new URL("../lib/i18n/messages/en.ts", import.meta.url), "utf8");
 const zhSource = await readFile(new URL("../lib/i18n/messages/zh-CN.ts", import.meta.url), "utf8");
 const loginSource = await readFile(new URL("../app/login/page.tsx", import.meta.url), "utf8");
@@ -56,19 +54,22 @@ test("keeps visited settings sections mounted and contains nested Escape handlin
   assert.match(modelsSource, /e\.preventDefault\(\);\s*e\.stopPropagation\(\);\s*onClose\(\);/);
 });
 
-test("offers light/dark/auto theme selection with a shadcn radio group", () => {
-  for (const preference of ["light", "dark", "auto"]) {
-    assert.match(themeOptionsSource, new RegExp(`id: "${preference}"`));
-  }
-  for (const removed of ['mist', 'rose', 'pine']) {
-    assert.doesNotMatch(themeOptionsSource, new RegExp(`id: "${removed}"`));
-  }
-  assert.match(panelSource, /THEME_OPTIONS\.map/);
+test("offers one radio per registry theme, wired to setTheme", () => {
+  assert.match(panelSource, /import \{ useTheme \} from "@\/hooks\/useTheme"/);
+  assert.match(panelSource, /themes\.map/);
   assert.match(panelSource, /<RadioGroup/);
   assert.match(panelSource, /<RadioGroupItem value=\{option\.id\}/);
-  assert.match(panelSource, /onValueChange=\{\(value\) => setThemePreference/);
+  assert.match(panelSource, /onValueChange=\{\(value\) => setTheme\(value as ThemeId\)\}/);
+  assert.match(panelSource, /data-slot="settings-theme-option"/);
   assert.doesNotMatch(panelSource, /type="radio"/);
-  assert.match(themeSource, /const setThemePreference = useCallback/);
+});
+
+test("every theme has a label in every locale", async () => {
+  const { THEMES } = await import("../lib/themes.ts");
+  for (const locale of ["en", "zh-CN", "zh-TW"]) {
+    const source = await readFile(new URL(`../lib/i18n/messages/${locale}.ts`, import.meta.url), "utf8");
+    for (const { id } of THEMES) assert.match(source, new RegExp(`"settings\\.theme${id[0].toUpperCase()}${id.slice(1)}":`), `${locale} is missing settings.theme${id[0].toUpperCase()}${id.slice(1)}`);
+  }
 });
 
 test("keeps language selection in General settings", () => {

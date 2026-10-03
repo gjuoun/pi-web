@@ -2,9 +2,6 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useI18n } from "@/hooks/useI18n";
-import { useTheme } from "@/hooks/useTheme";
-import { THEME_OPTIONS } from "@/lib/theme";
-import { ThemeIcon } from "./ThemeIcon";
 import {
   CHAT_CONTENT_WIDTH_DEFAULT,
   CHAT_CONTENT_WIDTH_MAX,
@@ -15,6 +12,10 @@ import {
   useChatAppearance,
 } from "@/hooks/useChatAppearance";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
+import { useTheme } from "@/hooks/useTheme";
+import type { ThemeId } from "@/lib/themes";
+import { ThemeIcon } from "./ThemeIcon";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { fontPresets } from "@/lib/fonts";
 import { FontFamilyPicker } from "./FontFamilyPicker";
 import { sendAgentCommand } from "@/lib/agent-client";
@@ -34,7 +35,6 @@ import { PluginsConfig } from "./PluginsConfig";
 import { ConfigButton, ConfigSwitch } from "@/components/app/settings-ui";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -73,9 +73,14 @@ export function SettingsSectionIcon({ section, size = 16, strokeWidth = 1.8 }: {
   return <svg {...common}><path d="M9 7V2M15 7V2M6 13V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5a6 6 0 0 1-12 0ZM12 19v3" /></svg>;
 }
 
+const THEME_LABEL_KEYS: Record<ThemeId, string> = {
+  default: "settings.themeDefault",
+  broismypro: "settings.themeBroismypro",
+};
+
 function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, onQuoteSelectionChange, soundEnabled, onSoundToggle }: Pick<Props, "sessionId" | "onSessionReloaded" | "quoteSelectionEnabled" | "onQuoteSelectionChange" | "soundEnabled" | "onSoundToggle">) {
   const { locale, setLocale, supportedLocales, t } = useI18n();
-  const { preference, setThemePreference } = useTheme();
+  const { theme, setTheme, themes } = useTheme();
   const { width: chatContentWidth, setWidth: setChatContentWidth, fontSize, setFontSize } = useChatAppearance();
   const { uiFont, monoFont, setUiFont, setMonoFont, resetFont } = useFontPreferences();
   const [shellSettings, setShellSettings] = useState<ShellToolSettingsResponse | null>(null);
@@ -176,20 +181,20 @@ function GeneralSettings({ sessionId, onSessionReloaded, quoteSelectionEnabled, 
       <section className="mt-6 first-of-type:mt-6">
         <h3 className="m-0 mb-1.5 text-[13px] font-semibold text-foreground">{t("settings.appearance")}</h3>
         <RadioGroup
-          value={preference}
-          onValueChange={(value) => setThemePreference(value as typeof preference)}
+          value={theme}
+          onValueChange={(value) => setTheme(value as ThemeId)}
           aria-label={t("settings.appearance")}
-          className="grid w-full max-w-[420px] grid-cols-3 gap-[3px] p-[3px]"
+          className="grid w-full max-w-[420px] grid-cols-2 gap-[3px] p-[3px]"
         >
-          {THEME_OPTIONS.map((option) => (
+          {themes.map((option) => (
             <label
               key={option.id}
               data-slot="settings-theme-option"
               className="relative flex min-h-11 min-w-0 cursor-pointer items-center justify-center gap-[7px] rounded-[5px] px-1.5 text-xs font-normal text-muted-foreground has-[[data-state=checked]]:bg-accent has-[[data-state=checked]]:font-semibold has-[[data-state=checked]]:text-primary has-[[data-state=unchecked]]:hover:bg-accent/60 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-primary has-[:focus-visible]:outline-offset-1"
             >
-              <RadioGroupItem value={option.id} className="absolute inset-0 z-10 cursor-pointer rounded-[5px] border-0 bg-transparent opacity-0" />
-              <ThemeIcon preference={option.id} />
-              <span data-slot="settings-theme-option-label" className="min-w-0 overflow-wrap-anywhere">{t(option.label)}</span>
+              <RadioGroupItem value={option.id} aria-label={option.label} className="absolute inset-0 z-10 cursor-pointer rounded-[5px] border-0 bg-transparent opacity-0" />
+              <ThemeIcon theme={option.id} />
+              <span data-slot="settings-theme-option-label" className="min-w-0 overflow-wrap-anywhere">{t(THEME_LABEL_KEYS[option.id])}</span>
             </label>
           ))}
         </RadioGroup>
