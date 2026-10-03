@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Section } from "@/app/ui/lib/_showcase/section";
+import { AppFramesRegion } from "./_sections/app-frames";
 import { ComposerRegion } from "./_sections/composer";
 import { MessagesRegion } from "./_sections/messages";
 import { TimelineRegion } from "./_sections/timeline";
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
 };
 
 const REGIONS = [
+  { id: "app", label: "App frames", title: "App", description: "The whole screen, composed: a session with messages, and a new session." },
   { id: "sidebar", label: "Sidebar", title: "Sidebar", description: "Action row, project groups with session rows, the explorer and the settings footer." },
   { id: "topbar", label: "Top bar", title: "Top bar", description: "Sidebar toggle, chat toolbar, session stats, file panel toggle and the file tabs." },
   { id: "messages", label: "Chat messages", title: "Chat messages", description: "A new session, and a session with user, assistant, process details, error and compaction turns." },
@@ -25,6 +27,7 @@ const REGIONS = [
 
 /** Region content by section id. */
 const REGION_CONTENT: Record<(typeof REGIONS)[number]["id"], ReactNode> = {
+  app: <AppFramesRegion />,
   sidebar: <SidebarRegion />,
   topbar: <TopbarRegion />,
   messages: <MessagesRegion />,

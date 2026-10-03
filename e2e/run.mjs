@@ -18,6 +18,7 @@ import { checkModelPicker } from "./model-picker.mjs";
 import { checkOverlayStacking } from "./overlay-stacking.mjs";
 import { checkUiLib } from "./ui-lib.mjs";
 import { checkThemes } from "./themes.mjs";
+import { checkUiPreview } from "./ui-preview.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const mode = process.env.E2E_SERVER_MODE || "dev";
@@ -182,13 +183,14 @@ try {
   console.log("PASS: bounded history, branch context, pagination root, and API errors");
 
   browser = await chromium.launch();
-  const only = ["overlay-stacking", "ui-lib", "themes"].includes(process.env.E2E_ONLY ?? "");
+  const only = ["overlay-stacking", "ui-lib", "themes", "ui-preview"].includes(process.env.E2E_ONLY ?? "");
   if (only) {
     // Fast path for iterating on the one check; the full suite is what CI runs.
     context = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: "en-US" });
     page = await context.newPage();
     page.setDefaultTimeout(30_000);
     if (process.env.E2E_ONLY === "ui-lib") await checkUiLib(page, { base, artifacts });
+    else if (process.env.E2E_ONLY === "ui-preview") await checkUiPreview(page, { base, artifacts });
     else if (process.env.E2E_ONLY === "themes") await checkThemes(page, { base, sessionId: RICH });
     else await checkOverlayStacking(page, { base, sessionId: RICH });
     await context.close();
@@ -391,6 +393,7 @@ try {
       await checkStatusBar(page, { base, cwd: project, sessionId: RICH });
       await checkMinimalChrome(page, { base, cwd: project, sessionId: RICH });
       await checkUiLib(page, { base, artifacts });
+      await checkUiPreview(page, { base, artifacts });
     }
     assert.deepEqual(errors, [], `Browser errors at width ${viewport.width}`);
     console.log(`PASS: ${viewport.width}px browser pagination, branch, markdown, code, tool call, and compaction navigation`);
