@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Section } from "@/app/ui/lib/_showcase/section";
 import { ComposerRegion } from "./_sections/composer";
 import { MessagesRegion } from "./_sections/messages";
+import { TimelineRegion } from "./_sections/timeline";
 import { SidebarRegion } from "./_sections/sidebar";
 import { TopbarRegion } from "./_sections/topbar";
 
@@ -17,6 +18,7 @@ const REGIONS = [
   { id: "topbar", label: "Top bar", title: "Top bar", description: "Sidebar toggle, chat toolbar, session stats, file panel toggle and the file tabs." },
   { id: "messages", label: "Chat messages", title: "Chat messages", description: "A new session, and a session with user, assistant, process details, error and compaction turns." },
   { id: "composer", label: "Composer", title: "Input and bottom bar", description: "The composer with its variants, and the two-line status bar." },
+  { id: "timeline", label: "Timeline", title: "Timeline", description: "The right-edge minimap of turn nodes, with an open preview." },
 ] as const;
 
 /** Region content by section id. */
@@ -25,6 +27,7 @@ const REGION_CONTENT: Record<(typeof REGIONS)[number]["id"], ReactNode> = {
   topbar: <TopbarRegion />,
   messages: <MessagesRegion />,
   composer: <ComposerRegion />,
+  timeline: <TimelineRegion />,
 };
 
 /**
