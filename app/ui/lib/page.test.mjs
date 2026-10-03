@@ -38,12 +38,14 @@ test("every components/ui primitive has a specimen", () => {
   assert.deepEqual(missing, []);
 });
 
-// Every component under components/app/** (any depth) is shown on this page.
+// Every component under components/app/** (any depth) is shown either on this page or on /ui/preview.
+const { default: PreviewPage } = await jiti.import("../preview/page.tsx");
+const previewHtml = renderToStaticMarkup(React.createElement(TooltipProvider, null, React.createElement(PreviewPage)));
 const appStems = (dir) => readdirSync(new URL(dir, import.meta.url), { recursive: true }).filter((f) => String(f).endsWith(".tsx")).map((f) => String(f).replace(/^.*\//, "").replace(/\.tsx$/, ""));
 
-test("every components/app file, at any depth, has a specimen on /ui/lib", () => {
+test("every components/app file, at any depth, has a specimen on /ui/lib or /ui/preview", () => {
   assert.match(html, /data-section="components"/);
-  const missing = appStems("../../../components/app/").filter((name) => !html.includes(`data-specimen="app-${name}"`));
+  const missing = appStems("../../../components/app/").filter((name) => !html.includes(`data-specimen="app-${name}"`) && !previewHtml.includes(`data-specimen="app-${name}"`));
   assert.deepEqual(missing, []);
 });
 
