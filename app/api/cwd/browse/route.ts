@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stat } from "fs/promises";
+import { getAllowedFileRoots, isFilePathAllowed } from "@/lib/file-access";
 import {
   getBrowseStartDirectory,
   getParentDirectory,
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
         parentPath: null,
         drives: await listWindowsDrives(),
         directories: [],
+        allowed: false,
       });
     }
 
@@ -43,6 +45,8 @@ export async function GET(request: NextRequest) {
       path: resolved,
       parentPath: getParentDirectory(resolved),
       directories,
+      // Whether the explorer may list this directory too (/api/files gate).
+      allowed: isFilePathAllowed(resolved, await getAllowedFileRoots()),
     });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });

@@ -53,3 +53,27 @@ test("DirectoryPickerBody surfaces load errors", () => {
   const html = renderToStaticMarkup(withI18n({ ...baseProps, loadError: "boom" }));
   assert.match(html, /boom/);
 });
+
+test("DirectoryPickerBody renders autocomplete suggestions while open", () => {
+  const html = renderToStaticMarkup(withI18n({
+    ...baseProps,
+    suggestions: [
+      { name: "src", path: "/home/jun/project/src" },
+      { name: "scripts", path: "/home/jun/project/scripts" },
+    ],
+    suggestionsOpen: true,
+    activeSuggestionIndex: 1,
+  }));
+  assert.match(html, /id="directory-suggestions"/);
+  assert.match(html, /\/home\/jun\/project\/scripts/);
+  assert.match(html, /aria-selected="true"/);
+});
+
+test("DirectoryPickerBody hides suggestions while they are closed", () => {
+  const html = renderToStaticMarkup(withI18n({
+    ...baseProps,
+    suggestions: [{ name: "src", path: "/home/jun/project/src" }],
+    suggestionsOpen: false,
+  }));
+  assert.doesNotMatch(html, /id="directory-suggestions"/);
+});

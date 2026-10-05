@@ -81,3 +81,72 @@ export async function listDirectories(directory: string): Promise<BrowsableDirec
     .filter((entry): entry is BrowsableDirectory => entry !== null)
     .sort((left, right) => left.name.localeCompare(right.name));
 }
+
+/** Deepest existing ancestor of a typed path plus its prefix-matched children. */
+export interface DirectoryCompletion {
+  /** Deepest existing directory the typed path falls under (null if nothing exists). */
+  base: string | null;
+  /** First unmatched path segment used to filter `matches` ("" = list all children). */
+  fragment: string;
+  /** Child directories of `base` whose name starts with `fragment`, sorted and capped. */
+  matches: BrowsableDirectory[];
+}
+
+function pathApiFor(candidate: string): typeof path.posix | typeof path.win32 {
+  return /^[a-zA-Z]:[\\/]/.test(candidate) || candidate.startsWith("\\\\")
+    ? path.win32
+    : path.posix;
+}
+
+async function isDirectory(candidate: string): Promise<boolean> {
+  try {
+    return (await stat(candidate)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Complete a partially typed directory path. Never throws for a path that does
+ * not exist yet: it walks up to the deepest existing ancestor and reports the
+ * children that match the first unmatched segment, so typing `/a/b/c` against
+ * an existing `/a` yields the `b*` children of `/a`.
+ */
+export async function completeDirectories(input: string, limit = 20): Promise<DirectoryCompletion> {
+  const empty: DirectoryCompletion = { base: null, fragment: "", matches: [] };
+  const trimmed = input.trim();
+  if (!trimmed) return empty;
+
+  const normalized = normalizeDirectory(trimmed);
+  const pathApi = pathApiFor(normalized);
+
+  let base: string;
+  let fragment: string;
+  if (await isDirectory(normalized)) {
+    base = normalized;
+    fragment = "";
+  } else {
+    base = pathApi.dirname(normalized);
+    fragment = pathApi.basename(normalized);
+    while (!(await isDirectory(base))) {
+      const parent = pathApi.dirname(base);
+      if (parent === base) return empty;
+      fragment = pathApi.basename(base);
+      base = parent;
+    }
+  }
+
+  let resolvedBase: string;
+  try {
+    resolvedBase = await realpath(base);
+  } catch {
+    resolvedBase = base;
+  }
+
+  const entries = await listDirectories(resolvedBase);
+  const stem = fragment.toLowerCase();
+  const matches = (stem ? entries.filter((entry) => entry.name.toLowerCase().startsWith(stem)) : entries)
+    .slice(0, Math.max(1, limit));
+
+  return { base: resolvedBase, fragment, matches };
+}

@@ -284,6 +284,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const wtNewInputRef = useRef<HTMLInputElement>(null);
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [explorerKey, setExplorerKey] = useState(0);
+  // While the directory picker is open the explorer previews the browsed
+  // directory (debounced) without committing it as the session cwd.
+  const [explorerPreviewPath, setExplorerPreviewPath] = useState<string | null>(null);
+  const [explorerPreviewCwd, setExplorerPreviewCwd] = useState<string | null>(null);
   const [explorerUploadBusy, setExplorerUploadBusy] = useState(false);
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
   const [sessionSearchOpen, setSessionSearchOpen] = useState(false);
@@ -539,6 +543,13 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     if (explorerRefreshKey !== undefined) setExplorerKey((k) => k + 1);
   }, [explorerRefreshKey]);
 
+  // The explorer follows the directory picker. 500ms of quiet before the tree
+  // refetches keeps browse/type churn from thrashing /api/files.
+  useEffect(() => {
+    const timer = setTimeout(() => setExplorerPreviewCwd(explorerPreviewPath), 500);
+    return () => clearTimeout(timer);
+  }, [explorerPreviewPath]);
+
   useEffect(() => {
     fetch("/api/home").then((r) => r.json()).then((d: { home?: string }) => {
       if (d.home) setHomeDir(d.home);
@@ -710,6 +721,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       setCustomPathValue(data.cwd);
       setSelectedCwd(data.cwd);
       setCustomPathOpen(false);
+      setExplorerPreviewPath(null);
+      setExplorerPreviewCwd(null);
       // Start the session in the picked workspace. Waiting for the
       // selectedCwd -> onCwdChange round-trip is not enough: re-picking the
       // current project would not re-notify, and a different project would
@@ -850,9 +863,12 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           initialPath={customPathValue}
           busy={customPathValidating}
           error={customPathError}
+          onPreviewPath={setExplorerPreviewPath}
           onCancel={() => {
             setCustomPathOpen(false);
             setCustomPathError(null);
+            setExplorerPreviewPath(null);
+            setExplorerPreviewCwd(null);
           }}
           onSelect={(path) => void commitCustomPath(path)}
         />
@@ -1291,7 +1307,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
             <div className="flex-1 overflow-y-auto overflow-x-hidden">
               <FileExplorer
                 ref={fileExplorerRef}
-                cwd={selectedCwd ?? selectedCwdProp!}
+                cwd={explorerPreviewCwd ?? selectedCwd ?? selectedCwdProp!}
                 onOpenFile={onOpenFile ?? (() => {})}
                 refreshKey={explorerKey}
                 onAtMention={onAtMention}

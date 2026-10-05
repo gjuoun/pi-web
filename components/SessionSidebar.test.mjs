@@ -164,3 +164,10 @@ test("top New always opens the workspace picker and starts a session there", () 
   // The cold-start default-cwd shortcut is gone from this button.
   assert.doesNotMatch(source, /fetch\("\/api\/default-cwd"/);
 });
+
+test("explorer follows the directory picker with a 500ms debounce", () => {
+  assert.match(source, /const \[explorerPreviewPath, setExplorerPreviewPath\] = useState<string \| null>\(null\)/);
+  assert.match(source, /setTimeout\(\(\) => setExplorerPreviewCwd\(explorerPreviewPath\), 500\)/);
+  assert.match(source, /cwd=\{explorerPreviewCwd \?\? selectedCwd \?\? selectedCwdProp!\}/);
+  assert.match(source, /onPreviewPath=\{setExplorerPreviewPath\}/);
+});

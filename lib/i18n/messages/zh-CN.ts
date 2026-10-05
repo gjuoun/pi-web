@@ -190,6 +190,7 @@ export const zhCNLocale: LocalePlugin = {
     "directoryPicker.selectDirectory": "选择目录",
     "directoryPicker.goToParent": "转到上级目录",
     "directoryPicker.directoryPath": "目录路径",
+    "directoryPicker.suggestions": "目录建议",
     "directoryPicker.goToDirectory": "转到目录",
     "directoryPicker.go": "转到",
     "directoryPicker.loadingDirectories": "正在加载目录…",
