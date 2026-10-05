@@ -145,8 +145,13 @@ export async function completeDirectories(input: string, limit = 20): Promise<Di
 
   const entries = await listDirectories(resolvedBase);
   const stem = fragment.toLowerCase();
-  const matches = (stem ? entries.filter((entry) => entry.name.toLowerCase().includes(stem)) : entries)
-    .slice(0, Math.max(1, limit));
+  // The cap belongs to a filtered result. With no fragment the user has typed a
+  // directory, which is the browse case: return every child, exactly like
+  // /api/cwd/browse. Capping there showed only the alphabetically first N entries
+  // (every dot-directory) instead of the directory's actual contents.
+  const matches = stem
+    ? entries.filter((entry) => entry.name.toLowerCase().includes(stem)).slice(0, Math.max(1, limit))
+    : entries;
 
   return { base: resolvedBase, fragment, matches };
 }

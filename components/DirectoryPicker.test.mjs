@@ -117,9 +117,13 @@ test("supplied recents render as a labelled group above the folders", () => {
   assert.match(html, /data-kind="folder"/);
 });
 
-test("a recent that is already a visible folder row is dropped", () => {
-  assert.match(source, /\.filter\(\(path\) => !folderRows\.some\(\(row\) => row\.path === path\)\)/);
+test("a recent already in the list, or the list's own directory, is dropped", () => {
+  assert.match(source, /\.filter\(\(path\) => path !== displayedBase && !folderRows\.some\(\(row\) => row\.path === path\)\)/);
   assert.match(source, /const RECENT_ROWS = 5;/);
+});
+
+test("the resolved breadcrumb ignores a trailing separator", () => {
+  assert.match(source, /withoutTrailingSeparator\(completionBase\) !== withoutTrailingSeparator\(pathInput\.trim\(\)\)/);
 });
 
 test("browse mode hides the path field and renders the current path as chips", () => {

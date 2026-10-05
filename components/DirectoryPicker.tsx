@@ -89,6 +89,12 @@ interface Breadcrumb {
   path: string;
 }
 
+/** A trailing separator does not make a different directory. */
+function withoutTrailingSeparator(directory: string): string {
+  const trimmed = directory.replace(/[\\/]+$/, "");
+  return trimmed === "" ? directory : trimmed;
+}
+
 /**
  * Split a directory into clickable ancestor chips. The browser does not apply OS
  * path rules, so this follows the same best-effort convention as `basenameOf`.
@@ -391,19 +397,25 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
 
   const filtering = pathInput.trim() !== currentPath;
   const folderRows = filtering ? (matches ?? []) : directories;
-  // Recents lead the list, filtered by the same fragment and never duplicated
-  // by a folder row that is already visible.
+  // The directory whose children the list is showing right now.
+  const displayedBase = filtering ? completionBase : currentPath;
+  // Recents lead the list, filtered by the same fragment and never duplicated by
+  // a folder row that is already visible - nor by the directory the list itself
+  // is showing, where the row would be a no-op.
   const visibleRecents = (filtering && fragment
       ? recentPaths.filter((path) => basenameOf(path).toLowerCase().includes(fragment.toLowerCase()))
       : recentPaths
     )
     .slice(0, RECENT_ROWS)
-    .filter((path) => !folderRows.some((row) => row.path === path))
+    .filter((path) => path !== displayedBase && !folderRows.some((row) => row.path === path))
     .map((path) => ({ name: basenameOf(path), path }));
   const rows = [...visibleRecents, ...folderRows];
-  // Type mode shows the resolved ancestor (only when the typed path is not already
-  // at it); browse mode shows the committed path as chips.
-  const resolvedBreadcrumb = filtering && completionBase && completionBase !== pathInput.trim()
+  // Type mode shows the resolved ancestor only when it differs from what was typed -
+  // and a trailing separator is not a difference, or the chips would just echo the
+  // field. Browse mode shows the committed path as chips.
+  const resolvedBreadcrumb = filtering
+    && completionBase !== null
+    && withoutTrailingSeparator(completionBase) !== withoutTrailingSeparator(pathInput.trim())
     ? breadcrumbs(completionBase)
     : [];
 
