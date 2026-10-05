@@ -1,5 +1,6 @@
 "use client";
 
+import "../app/settings.css";
 import { useEffect, useMemo, useState } from "react";
 import type { ToolEntry } from "@/lib/types";
 

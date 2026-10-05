@@ -1,5 +1,6 @@
 "use client";
 
+import "../app/settings.css";
 import { useEffect, useState, type ReactNode } from "react";
 import { useI18n } from "@/hooks/useI18n";
 import { useTheme } from "@/hooks/useTheme";

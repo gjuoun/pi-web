@@ -7,6 +7,9 @@ const source = await readFile(new URL("./SkillsConfig.tsx", import.meta.url), "u
 const jiti = createJiti(import.meta.url, {
   jsx: { runtime: "automatic" },
   tsconfigPaths: true,
+  // SkillsConfig imports app/settings.css for its on-demand stylesheet; CSS has no
+  // runtime meaning under jiti, so the import resolves to an empty module.
+  alias: { "../app/settings.css": new URL("./test-css-stub.mjs", import.meta.url).pathname },
 });
 const { orderSkillsByDormancy } = await jiti.import("./SkillsConfig.tsx");
 

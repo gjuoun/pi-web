@@ -1,5 +1,6 @@
 "use client";
 
+import "../app/settings.css";
 import type { ButtonHTMLAttributes, CSSProperties, HTMLAttributes, ReactNode } from "react";
 
 type ConfigButtonVariant = "primary" | "secondary" | "danger" | "ghost";

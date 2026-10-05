@@ -48,12 +48,31 @@ test("provides one template for config layout and controls", () => {
   assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.config-detail \{[\s\S]*?padding: 14px/);
 });
 
+const SETTINGS_PANELS = [
+  "SettingsPanel",
+  "SettingsUi",
+  "ModelsConfig",
+  "PluginsConfig",
+  "SkillsConfig",
+  "ToolDefinitionsPanel",
+];
+
 test("loads settings presentation from its dedicated stylesheet", () => {
-  assert.match(layoutSource, /import "\.\/globals\.css";\s*import "\.\/settings\.css";/);
+  // The root layout only pulls in the app-wide sheet; the settings sheet is pulled in
+  // on demand by the panels below (step 16 of the pure-css unification).
+  assert.match(layoutSource, /import "\.\/globals\.css";/);
+  assert.doesNotMatch(layoutSource, /settings\.css/);
   assert.match(cssSource, /\.config-panel-root \{/);
   assert.match(cssSource, /\.settings-dialog-backdrop \{/);
   assert.doesNotMatch(globalCssSource, /\.config-panel-root \{/);
   assert.doesNotMatch(globalCssSource, /\.settings-dialog-backdrop \{/);
+});
+
+test("every settings panel pulls in the settings stylesheet", async () => {
+  for (const name of SETTINGS_PANELS) {
+    const source = await readFile(new URL(`./${name}.tsx`, import.meta.url), "utf8");
+    assert.match(source, /import "\.\.\/app\/settings\.css";/, `${name} should import settings.css`);
+  }
 });
 
 test("all four settings sections use the shared list-detail layout", () => {

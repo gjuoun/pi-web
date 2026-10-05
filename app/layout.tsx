@@ -5,7 +5,6 @@ import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import { FONT_INIT_SCRIPT } from "@/lib/fonts";
 import "katex/dist/katex.min.css";
 import "./globals.css";
-import "./settings.css";
 
 const notoSansMono = Noto_Sans_Mono({
   subsets: ["latin", "cyrillic"],
