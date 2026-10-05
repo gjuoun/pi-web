@@ -166,21 +166,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <ConfigField label={label}>{children}</ConfigField>;
 }
 
-const inputStyle = {
-  padding: "6px 9px",
-  background: "var(--bg-panel)",
-  border: "1px solid var(--border)",
-  borderRadius: 5,
-  color: "var(--text)",
-  fontSize: 12,
-  outline: "none",
-  width: "100%",
-  boxSizing: "border-box" as const,
-};
-
-function TextInput({ value, onChange, placeholder, mono }: { value: string; onChange: (v: string) => void; placeholder?: string; mono?: boolean }) {
+function TextInput({ value, onChange, placeholder, mono, className }: { value: string; onChange: (v: string) => void; placeholder?: string; mono?: boolean; className?: string }) {
   return <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
-    style={{ ...inputStyle, fontFamily: mono ? "var(--font-mono)" : "inherit" }} />;
+    className={"models-input" + (mono ? " is-mono" : "") + (className ? " " + className : "")} />;
 }
 
 function SecretTextInput({
@@ -191,6 +179,7 @@ function SecretTextInput({
   onKeyDown,
   autoComplete = "off",
   spellCheck = false,
+  className,
   style,
 }: {
   value: string;
@@ -200,6 +189,7 @@ function SecretTextInput({
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
   autoComplete?: string;
   spellCheck?: boolean;
+  className?: string;
   style?: React.CSSProperties;
 }) {
   const [visible, setVisible] = useState(false);
@@ -210,14 +200,14 @@ function SecretTextInput({
   }, [value]);
 
   return (
-    <div style={{ position: "relative", width: "100%", ...style }}>
+    <div className={"models-secret-field" + (className ? " " + className : "")} style={{ /* dynamic: callers widen or narrow the field wrapper */ ...style }}>
       <input
         type={visible ? "text" : "password"}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
-        style={{ ...inputStyle, paddingRight: 34, fontFamily: mono ? "var(--font-mono)" : "inherit" }}
+        className={"models-input is-secret" + (mono ? " is-mono" : "")}
         autoComplete={autoComplete}
         spellCheck={spellCheck}
       />
@@ -226,22 +216,7 @@ function SecretTextInput({
         onClick={() => setVisible((v) => !v)}
          aria-label={visible ? t("i18n.hideDetails") : t("i18n.showDetails")}
          title={visible ? t("i18n.hideDetails") : t("i18n.showDetails")}
-        style={{
-          position: "absolute",
-          right: 5,
-          top: "50%",
-          transform: "translateY(-50%)",
-          width: 24,
-          height: 24,
-          padding: 0,
-          border: "none",
-          background: "transparent",
-          color: "var(--text-dim)",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
+        className="models-input-toggle"
       >
         {visible ? (
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -262,14 +237,14 @@ function SecretTextInput({
 }
 
 function NumInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
-  return <input type="number" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} style={inputStyle} />;
+  return <input type="number" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="models-input" />;
 }
 
 function Select({ value, onChange, options, required }: { value: string; onChange: (v: string) => void; options: readonly string[]; required?: boolean }) {
   const { t } = useI18n();
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}
-      style={{ ...inputStyle, color: value ? "var(--text)" : "var(--text-dim)" }}>
+      className={"models-input" + (value ? "" : " is-placeholder")}>
        {!required && <option value="">— {t("i18n.default")} / none —</option>}
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -278,9 +253,9 @@ function Select({ value, onChange, options, required }: { value: string; onChang
 
 function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "var(--text-muted)" }}>
+    <label className="models-checkbox-label">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)}
-        style={{ width: 13, height: 13, accentColor: "var(--accent)", cursor: "pointer" }} />
+        className="models-checkbox is-clickable" />
       {label}
     </label>
   );
@@ -386,7 +361,7 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete, onAddMod
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="models-form-stack">
       <ConfigDetailHeader>
         <ConfigDetailHeaderInfo>
           <SectionTitle>{t("i18n.provider")}</SectionTitle>
@@ -400,7 +375,7 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete, onAddMod
         <TextInput value={editingName} onChange={setEditingName} placeholder="provider-name" mono />
         {editingName !== name && editingName.trim() && (
           <button onClick={() => onRename(editingName.trim())}
-            style={{ marginTop: 4, padding: "3px 10px", background: "var(--accent)", border: "none", borderRadius: 4, color: "var(--accent-contrast)", cursor: "pointer", fontSize: 11, alignSelf: "flex-start" }}>
+            className="models-add-button">
              {t("i18n.rename")}
           </button>
         )}
@@ -414,8 +389,8 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete, onAddMod
       <Field label="API Key">
         <SecretTextInput value={provider.apiKey ?? ""} onChange={(v) => set("apiKey", v || undefined)}
           placeholder="ENV_VAR_NAME, !shell-command, or literal key" mono />
-        <span style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>
-          Prefix with <code style={{ fontFamily: "var(--font-mono)" }}>!</code> to run a shell command, or use an env var name
+        <span className="models-hint">
+          Prefix with <code className="models-code">!</code> to run a shell command, or use an env var name
         </span>
       </Field>
 
@@ -428,28 +403,24 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete, onAddMod
           headers={provider.headers}
           onChange={(headers) => set("headers", headers)}
         />
-        <span style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>
+        <span className="models-hint">
           Added to every request from this provider (e.g. User-Agent). Useful for gateways with bot detection.
         </span>
       </Field>
 
-      <div style={{ borderTop: "1px solid var(--border)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="models-subsection">
         {discoveryState.phase !== "success" && (
           <button
             onClick={handleDiscoverModels}
             disabled={!provider.baseUrl?.trim() || discoveryState.phase === "loading"}
-            style={{
-              alignSelf: "flex-start", height: 30, padding: "0 12px", border: "1px solid var(--border)", borderRadius: 5,
-              background: "var(--bg-panel)", color: !provider.baseUrl?.trim() || discoveryState.phase === "loading" ? "var(--text-dim)" : "var(--text-muted)",
-              cursor: !provider.baseUrl?.trim() || discoveryState.phase === "loading" ? "not-allowed" : "pointer", fontSize: 11,
-            }}
+            className={"models-discover-button" + (!provider.baseUrl?.trim() || discoveryState.phase === "loading" ? " is-disabled" : "")}
           >
             {discoveryState.phase === "loading" ? t("models.discoveryFetching") : t("models.discoveryFetch")}
           </button>
         )}
 
         {discoveryState.phase === "error" && (
-          <div style={{ padding: "7px 9px", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 5, color: "#ef4444", fontSize: 11, lineHeight: 1.4 }}>
+          <div className="models-error-box">
             {discoveryState.message}
           </div>
         )}
@@ -461,17 +432,12 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete, onAddMod
               onChange={(event) => setDiscoveryQuery(event.target.value)}
               placeholder={t("models.discoveryFilterPlaceholder", { count: discoveryState.models.length })}
               aria-label={t("models.discoveryFilter")}
-              style={{ ...inputStyle, width: "100%", minWidth: 0 }}
+              className="models-input"
             />
 
-            <div style={{ maxHeight: 220, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-panel)" }}>
+            <div className="models-discovery-list">
               <label
-                style={{
-                  minHeight: 32, padding: "5px 9px", display: "flex", alignItems: "center", gap: 8,
-                  position: "sticky", top: 0, zIndex: 1, borderBottom: "1px solid var(--border)",
-                  background: "var(--bg)", cursor: selectableShownIds.length ? "pointer" : "default",
-                  color: "var(--text-muted)", fontSize: 10, fontWeight: 600,
-                }}
+                className={"models-discovery-header" + (selectableShownIds.length ? " is-selectable" : "")}
               >
                 <input
                   ref={selectShownRef}
@@ -479,43 +445,39 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete, onAddMod
                   checked={allShownSelected}
                   disabled={selectableShownIds.length === 0}
                   onChange={toggleShownModels}
-                  style={{ width: 13, height: 13, accentColor: "var(--accent)", flexShrink: 0 }}
+                  className="models-checkbox is-fixed"
                 />
                 {t("models.discoverySelectShown")}
               </label>
               {shownDiscoveredModels.length === 0 ? (
-                <div style={{ padding: 12, color: "var(--text-dim)", fontSize: 11 }}>{t("models.discoveryNoMatches")}</div>
+                <div className="models-discovery-empty">{t("models.discoveryNoMatches")}</div>
               ) : shownDiscoveredModels.map((model, index) => {
                 const alreadyAdded = existingModelIds.has(model.id);
                 const checked = selectedModelIds.includes(model.id);
                 return (
                   <label
                     key={model.id}
-                    style={{
-                      minHeight: 36, padding: "6px 9px", display: "flex", alignItems: "center", gap: 8,
-                      borderTop: index === 0 ? "none" : "1px solid var(--border)", cursor: alreadyAdded ? "default" : "pointer",
-                      opacity: alreadyAdded ? 0.65 : 1,
-                    }}
+                    className={"models-discovery-row" + (index === 0 ? "" : " is-divided") + (alreadyAdded ? " is-added" : "")}
                   >
                     <input
                       type="checkbox"
                       checked={checked || alreadyAdded}
                       disabled={alreadyAdded}
                       onChange={() => toggleDiscoveredModel(model.id)}
-                      style={{ width: 13, height: 13, accentColor: "var(--accent)", flexShrink: 0 }}
+                      className="models-checkbox is-fixed"
                     />
-                    <span style={{ minWidth: 0, flex: 1 }}>
-                      <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)", fontSize: 11 }}>{model.name ?? model.id}</span>
-                      {model.name && <code style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)" }}>{model.id}</code>}
+                    <span className="models-discovery-label">
+                      <span className="models-discovery-name">{model.name ?? model.id}</span>
+                      {model.name && <code className="models-discovery-id">{model.id}</code>}
                     </span>
-                    {alreadyAdded && <span style={{ color: "var(--text-dim)", fontSize: 10 }}>{t("models.discoveryAdded")}</span>}
+                    {alreadyAdded && <span className="models-discovery-badge">{t("models.discoveryAdded")}</span>}
                   </label>
                 );
               })}
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <span title={discoveryState.endpoint} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-dim)", fontSize: 10 }}>
+            <div className="models-row-between">
+              <span title={discoveryState.endpoint} className="models-catalog-endpoint">
                 {filteredDiscoveredModels.length > shownDiscoveredModels.length
                   ? t("models.discoveryShowing", { shown: shownDiscoveredModels.length, total: filteredDiscoveredModels.length })
                   : t("models.discoveryFetched", { count: discoveryState.models.length })}
@@ -523,7 +485,7 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete, onAddMod
               <button
                 onClick={addSelectedModels}
                 disabled={selectedCount === 0}
-                style={{ height: 28, padding: "0 11px", border: "none", borderRadius: 5, background: selectedCount ? "var(--accent)" : "var(--bg-panel)", color: selectedCount ? "var(--accent-contrast)" : "var(--text-dim)", cursor: selectedCount ? "pointer" : "not-allowed", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}
+                className={"models-select-all-button" + (selectedCount ? " is-active" : " is-idle")}
               >
                 {selectedCount
                   ? t("models.discoveryAddSelectedCount", { count: selectedCount })
@@ -572,7 +534,7 @@ function ThinkingLevelMapEditor({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <div className="models-column-tight">
       {THINKING_LEVELS.map((level) => {
         const raw = map[level];
         const state: "omit" | "null" | "string" =
@@ -580,72 +542,37 @@ function ThinkingLevelMapEditor({
         const strVal = typeof raw === "string" ? raw : "";
         const color = LEVEL_COLORS[level];
 
-        const btnBase: React.CSSProperties = {
-          padding: "4px 10px",
-          fontSize: 10,
-          border: "none",
-          cursor: "pointer",
-          fontWeight: 400,
-          transition: "background 0.1s, color 0.1s",
-          whiteSpace: "nowrap",
-          background: "var(--bg-panel)",
-          color: "var(--text-dim)",
-        };
-        const btnActive: React.CSSProperties = {
-          background: "var(--accent)",
-          color: "var(--accent-contrast)",
-          fontWeight: 600,
-        };
-        const btnActiveDisabled: React.CSSProperties = {
-          background: "#ef4444",
-          color: "#fff",
-          fontWeight: 600,
-        };
-
         return (
           <div
             key={level}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "5px 4px",
-              borderRadius: 6,
-              background: "transparent",
-              border: "1px solid transparent",
-            }}
+            className="models-level-row"
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 5, width: 68, flexShrink: 0 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0, opacity: state === "null" ? 0.3 : 1 }} />
-              <span style={{
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                color: state === "null" ? "var(--text-dim)" : "var(--text-muted)",
-                textDecoration: state === "null" ? "line-through" : "none",
-              }}>
+            <div className="models-level-label">
+              <span className={"models-level-dot" + (state === "null" ? " is-faded" : "")} style={{ /* dynamic: the dot colour comes from the level palette */ background: color }} />
+              <span className={"models-level-name" + (state === "null" ? " is-faded" : "")}>
                 {level}
               </span>
             </div>
 
-            <div style={{ display: "flex", borderRadius: 5, border: "1px solid var(--border)", overflow: "hidden", flexShrink: 0 }}>
+            <div className="models-segment-group">
               <button
                 onClick={() => setLevel(level, "omit")}
-                style={{ ...btnBase, ...(state === "omit" ? btnActive : {}) }}
+                className={"models-level-button" + (state === "omit" ? " is-active" : "")}
               >
                 Default
               </button>
               <button
                 onClick={() => setLevel(level, null)}
-                style={{ ...btnBase, borderLeft: "1px solid var(--border)", ...(state === "null" ? btnActiveDisabled : {}) }}
+                className={"models-level-button is-divided" + (state === "null" ? " is-invalid" : "")}
               >
                 Disabled
               </button>
             </div>
 
-            <div style={{ display: "flex", borderRadius: 5, border: `1px solid ${state === "string" ? "var(--accent)" : "var(--border)"}`, overflow: "hidden", transition: "border-color 0.1s" }}>
+            <div className={"models-segment-group is-transitioning" + (state === "string" ? " is-active" : "")}>
               <button
                 onClick={() => setLevel(level, strVal || level)}
-                style={{ ...btnBase, ...(state === "string" ? btnActive : {}), borderRight: "1px solid var(--border)", flexShrink: 0 }}
+                className={"models-level-button is-right-divided" + (state === "string" ? " is-active" : "")}
               >
                 Custom
               </button>
@@ -655,17 +582,7 @@ function ThinkingLevelMapEditor({
                 onFocus={() => { if (state !== "string") setLevel(level, strVal || level); }}
                 placeholder={level}
                 maxLength={10}
-                style={{
-                  width: "12ch",
-                  background: state === "string" ? "var(--bg)" : "var(--bg-panel)",
-                  border: "none",
-                  outline: "none",
-                  color: state === "string" ? "var(--text)" : "var(--text-dim)",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
-                  padding: "4px 7px",
-                  transition: "background 0.1s, color 0.1s",
-                }}
+                className={"models-level-input" + (state === "string" ? " is-active" : "")}
               />
             </div>
           </div>
@@ -726,32 +643,22 @@ function HeaderListEditor({ headers, onChange }: {
   const removeEntry = (id: number): void => {
     applyRows(rows.filter((row) => row.id !== id));
   };
-  const rowBtnStyle = {
-    padding: "6px 9px",
-    background: "none",
-    border: "1px solid rgba(239,68,68,0.3)",
-    borderRadius: 4,
-    color: "#ef4444",
-    cursor: "pointer",
-    fontSize: 11,
-    lineHeight: 1,
-  } satisfies React.CSSProperties;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div className="models-column">
       {rows.map((row) => (
-        <div key={row.id} style={{ display: "flex", gap: 6 }}>
+        <div key={row.id} className="models-row">
           <input value={row.name} onChange={(e) => setEntry(row.id, { name: e.target.value })}
-            placeholder="Header-Name" style={{ ...inputStyle, fontFamily: "var(--font-mono)", flex: 1 }} />
+            placeholder="Header-Name" className="models-input is-mono models-grow" />
           <input value={row.value} onChange={(e) => setEntry(row.id, { value: e.target.value })}
-            placeholder="value" style={{ ...inputStyle, fontFamily: "var(--font-mono)", flex: 1 }} />
-          <button onClick={() => removeEntry(row.id)} style={rowBtnStyle}>✕</button>
+            placeholder="value" className="models-input is-mono models-grow" />
+          <button onClick={() => removeEntry(row.id)} className="models-row-button">✕</button>
         </div>
       ))}
       <button onClick={() => setRows((current) => [
         ...current,
         { id: nextRowIdRef.current++, name: "", value: "" },
       ])}
-        style={{ padding: "5px 9px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: "var(--text-muted)", cursor: "pointer", fontSize: 11, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, alignSelf: "flex-start" }}>
+        className="models-add-row-button">
         + Add header
       </button>
     </div>
@@ -1020,7 +927,7 @@ function ModelDetail({
     : t("models.providerDefaults");
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="models-form-stack">
       <ConfigDetailHeader>
         <ConfigDetailHeaderInfo>
           <SectionTitle>{t("i18n.model")}</SectionTitle>
@@ -1029,22 +936,7 @@ function ModelDetail({
           {testSummary && (
             <span
               title={testSummary}
-              style={{
-                maxWidth: 260,
-                height: 28,
-                padding: "0 8px",
-                border: `1px solid ${testState.phase === "error" ? "#fecaca" : testState.phase === "success" ? "#bbf7d0" : "var(--border)"}`,
-                borderRadius: 4,
-                background: testState.phase === "error" ? "#fee2e2" : testState.phase === "success" ? "#dcfce7" : "#e5e7eb",
-                color: "#111827",
-                fontSize: 11,
-                display: "inline-flex",
-                alignItems: "center",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                boxSizing: "border-box",
-              }}
+              className={"models-test-badge" + (testState.phase === "error" ? " is-error" : testState.phase === "success" ? " is-success" : "")}
             >
               {testSummary}
             </span>
@@ -1068,23 +960,17 @@ function ModelDetail({
         </ConfigDetailActions>
       </ConfigDetailHeader>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div className="models-split-grid">
         <Field label="ID *"><TextInput value={model.id} onChange={(v) => set("id", v)} placeholder="model-id" mono /></Field>
         <Field label="Name"><TextInput value={model.name ?? ""} onChange={(v) => set("name", v || undefined)} placeholder="Display name" /></Field>
       </div>
 
-      <div style={{ padding: "2px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <div className="models-tight-pad">
+        <div className="models-inline-row">
           <button
             onClick={() => void handleCatalogFill()}
             disabled={!model.id.trim() || catalogState.phase === "loading"}
-            style={{
-              height: 28, padding: "0 10px", border: "1px solid var(--border)", borderRadius: 5,
-              background: "var(--bg-panel)",
-              color: !model.id.trim() || catalogState.phase === "loading" ? "var(--text-dim)" : "var(--text-muted)",
-              cursor: !model.id.trim() || catalogState.phase === "loading" ? "not-allowed" : "pointer",
-              fontSize: 11,
-            }}
+            className={"models-catalog-button" + (!model.id.trim() || catalogState.phase === "loading" ? " is-disabled" : "")}
           >
             {catalogState.phase === "loading" ? t("models.catalogFilling") : t("models.catalogFill")}
           </button>
@@ -1092,7 +978,7 @@ function ModelDetail({
             href="https://github.com/anomalyco/models.dev"
             target="_blank"
             rel="noreferrer"
-            style={{ marginLeft: "auto", color: "var(--text-dim)", fontSize: 10, textDecoration: "none" }}
+            className="models-catalog-link"
           >
             {t("models.catalogSource")}
           </a>
@@ -1101,21 +987,19 @@ function ModelDetail({
         {catalogStatusText && (
           <div
             aria-live="polite"
-            style={{
-              marginTop: 8, display: "flex", alignItems: "center",
-              justifyContent: "space-between", gap: 8, color: catalogStatusColor, fontSize: 10,
-            }}
+            className="models-catalog-status"
+            style={{ /* dynamic: the catalog status tone is computed from the fetch state */ color: catalogStatusColor }}
           >
             <span
               title={catalogStatusText}
-              style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              className="models-truncate"
             >
               {catalogStatusText}
             </span>
             {catalogUndoRef.current && (
               <button
                 onClick={undoCatalogFill}
-                style={{ flexShrink: 0, padding: "0 2px", border: "none", background: "none", color: "var(--accent)", cursor: "pointer", fontSize: 10 }}
+                className="models-link-button"
               >
                 {t("models.catalogUndo")}
               </button>
@@ -1126,7 +1010,7 @@ function ModelDetail({
 
       <div>
         <SectionTitle>{t("models.capabilities")}</SectionTitle>
-        <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 8 }}>
+        <div className="models-field-row">
           <Check label={t("models.reasoning")} checked={model.reasoning ?? false} onChange={(v) => set("reasoning", v || undefined)} />
           <Check label={t("models.imageInput")} checked={model.input?.includes("image") ?? false}
             onChange={(v) => set("input", v ? ["text", "image"] : undefined)} />
@@ -1134,19 +1018,19 @@ function ModelDetail({
       </div>
 
       <section>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div className="models-field-header">
           <SectionTitle>{t("models.modelSpecs")}</SectionTitle>
           <button
             type="button"
             onClick={toggleCostEditing}
             aria-expanded={costEditing}
-            style={{ padding: "2px 4px", border: "none", background: "transparent", color: "var(--accent)", cursor: "pointer", fontSize: 10 }}
+            className="models-inline-button"
           >
             {costEditing ? t("models.finishEditingCosts") : t("models.editCosts")}
           </button>
         </div>
 
-        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10 }}>
+        <div className="models-card-grid">
           <Field label={t("models.contextWindow")}>
             <NumInput value={model.contextWindow !== undefined ? String(model.contextWindow) : ""}
               onChange={(v) => set("contextWindow", v ? parseInt(v) : undefined)} placeholder="128000" />
@@ -1157,31 +1041,31 @@ function ModelDetail({
           </Field>
         </div>
 
-        <div style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 600, textTransform: "uppercase" }}>
+        <div className="models-section">
+          <div className="models-section-label">
             {t("models.costPerMillion")}
           </div>
           {costEditing ? (
-            <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8 }}>
+            <div className="models-usage-grid">
               {costFields.map(({ key, label }) => (
                 <Field key={key} label={label}>
                   <NumInput value={costDraft[key]} onChange={(v) => setCost(key, v)} placeholder="0" />
                 </Field>
               ))}
               {hasModelCostDraftValue(costDraft) && !parseCompleteModelCost(costDraft) && (
-                <div aria-live="polite" style={{ gridColumn: "1 / -1", color: "#d97706", fontSize: 10 }}>
+                <div aria-live="polite" className="models-warning">
                   {t("models.costAllRequired")}
                 </div>
               )}
             </div>
           ) : (
-            <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(105px, 1fr))", gap: "8px 16px" }}>
+            <div className="models-usage-grid is-dense">
               {costFields.map(({ key, label }) => {
                 const missing = model.cost?.[key] === undefined;
                 return (
-                  <div key={key} style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 10, color: "var(--text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
-                    <div style={{ marginTop: 3, color: missing ? "var(--text-dim)" : "var(--text)", fontSize: 12, fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" }}>
+                  <div key={key} className="models-usage-cell">
+                    <div className="models-usage-label">{label}</div>
+                    <div className={"models-usage-value" + (missing ? " is-missing" : "")}>
                       {formatCost(key)}
                     </div>
                   </div>
@@ -1192,21 +1076,17 @@ function ModelDetail({
         </div>
       </section>
 
-      <section style={{ borderTop: "1px solid var(--border)", paddingTop: 4 }}>
+      <section className="models-advanced-section">
         <button
           type="button"
           onClick={() => setAdvancedOpen((open) => !open)}
           aria-expanded={advancedOpen}
           aria-controls="model-advanced-settings"
-          style={{
-            width: "100%", minHeight: 48, padding: "8px 0", border: "none", background: "transparent",
-            display: "grid", gridTemplateColumns: "minmax(0, 1fr) 18px", alignItems: "center", gap: 10,
-            color: "var(--text)", cursor: "pointer", textAlign: "left",
-          }}
+          className="models-advanced-toggle"
         >
-          <span style={{ minWidth: 0 }}>
-            <span style={{ display: "block", fontSize: 11, fontWeight: 600 }}>{t("models.advancedSettings")}</span>
-            <span style={{ display: "block", marginTop: 3, color: "var(--text-dim)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span className="models-advanced-copy">
+            <span className="models-advanced-title">{t("models.advancedSettings")}</span>
+            <span className="models-advanced-subtitle">
               {advancedSummary}
             </span>
           </span>
@@ -1220,14 +1100,14 @@ function ModelDetail({
             strokeLinecap="round"
             strokeLinejoin="round"
             aria-hidden="true"
-            style={{ color: "var(--text-dim)", transform: advancedOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}
+            className={"models-advanced-chevron" + (advancedOpen ? " is-open" : "")}
           >
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </button>
 
         {advancedOpen && (
-          <div id="model-advanced-settings" style={{ display: "flex", flexDirection: "column", gap: 14, padding: "4px 0 16px" }}>
+          <div id="model-advanced-settings" className="models-advanced-body">
             <Field label={t("models.apiOverride")}>
               <Select value={model.api ?? ""} onChange={(v) => set("api", v || undefined)} options={API_OPTIONS} />
             </Field>
@@ -1237,13 +1117,13 @@ function ModelDetail({
                 headers={model.headers}
                 onChange={(headers) => set("headers", headers)}
               />
-              <span style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>
+              <span className="models-hint">
                 {t("models.headersHelp")}
               </span>
             </Field>
 
             {model.reasoning && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="models-stack">
                 <SectionTitle>{t("models.compatibility")}</SectionTitle>
                 <Check
                   label={t("models.deepSeekThinkingCompat")}
@@ -1255,14 +1135,14 @@ function ModelDetail({
                   checked={effectiveCompat(provider, model)["supportsDeveloperRole"] !== false}
                   onChange={(v) => onChange(setCompatBool(model, "supportsDeveloperRole", v))}
                 />
-                <div style={{ marginTop: 4 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+                <div className="models-spaced">
+                  <div className="models-field-header is-stacked">
                     <SectionTitle>{t("models.thinkingLevelMap")}</SectionTitle>
                     {model.thinkingLevelMap && (
                       <button
                         type="button"
                         onClick={() => set("thinkingLevelMap", undefined)}
-                        style={{ fontSize: 10, padding: "2px 5px", background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer" }}
+                        className="models-clear-button"
                       >
                         {t("models.clearAll")}
                       </button>
@@ -1409,15 +1289,15 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     loginState.phase === "prompt" || loginState.phase === "select";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: provider.loggedIn && loginState.phase === "idle" ? 0 : 16 }}>
+    <div className={"models-form-stack" + (provider.loggedIn && loginState.phase === "idle" ? " is-compact" : "")}>
       <ConfigDetailHeader>
         <ConfigDetailHeaderInfo>
           <SectionTitle>{t("i18n.subscription")}</SectionTitle>
         </ConfigDetailHeaderInfo>
         <ConfigDetailActions>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.loggedIn ? "#4ade80" : "var(--border)", display: "inline-block" }} />
-            <span style={{ fontSize: 11, color: provider.loggedIn ? "#4ade80" : "var(--text-dim)" }}>
+          <div className="models-status-row">
+            <span className="models-status-dot" style={{ /* dynamic: the dot colour tracks the logged-in flag */ background: provider.loggedIn ? "#4ade80" : "var(--border)" }} />
+            <span className={"models-status-text" + (provider.loggedIn ? " is-ok" : "")}>
                {provider.loggedIn ? t("i18n.connected") : t("i18n.notConnected")}
             </span>
           </div>
@@ -1452,28 +1332,28 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       </ConfigDetailHeader>
 
       {/* Status */}
-      <div style={{ minHeight: provider.loggedIn && loginState.phase === "idle" ? 0 : 48 }}>
+      <div className={"models-login-body" + (provider.loggedIn && loginState.phase === "idle" ? " is-collapsed" : "")}>
         {loginState.phase === "idle" && (
           !provider.loggedIn && (
-            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+            <p className="models-paragraph">
               Connect your {provider.name} account.
             </p>
           )
         )}
         {loginState.phase === "connecting" && (
-            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{t("i18n.openingBrowser")}</p>
+            <p className="models-paragraph is-tight">{t("i18n.openingBrowser")}</p>
         )}
         {loginState.phase === "select" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+          <div className="models-stack-lg">
+            <p className="models-paragraph">
               {loginState.message}
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div className="models-column">
               {loginState.options.map((option) => (
                 <button
                   key={option.id}
                   onClick={() => submitSelection(loginState.token, option.id)}
-                  style={{ padding: "6px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", cursor: "pointer", fontSize: 12, textAlign: "left" }}
+                  className="models-picker-button"
                 >
                   {option.label}
                 </button>
@@ -1482,34 +1362,34 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           </div>
         )}
         {(loginState.phase === "auth" || loginState.phase === "prompt") && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+          <div className="models-stack-lg">
+            <p className="models-paragraph">
               {loginState.phase === "auth"
                 ? "Complete sign-in in the browser, then copy the redirect URL from the address bar and paste it below."
                 : loginState.message}
             </p>
             {loginState.phase === "auth" && (
-              <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
+              <p className="models-note">
                 If the browser window did not open,{" "}
-                <a href={loginState.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", wordBreak: "break-all" }}>
+                <a href={loginState.url} target="_blank" rel="noopener noreferrer" className="models-link">
                   click here to open the login page
                 </a>
                 .
               </p>
             )}
-            <div style={{ display: "flex", gap: 6 }}>
+            <div className="models-button-row">
               <input
                 ref={inputRef}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") submitCode(loginState.token, inputValue); }}
                 placeholder={loginState.phase === "auth" ? "http://localhost:1455/auth/callback?code=…" : (loginState.placeholder ?? "Enter value…")}
-                style={{ flex: 1, padding: "6px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", fontSize: 12, outline: "none", fontFamily: "var(--font-mono)", boxSizing: "border-box" }}
+                className="models-code-input"
               />
               <button
                 onClick={() => submitCode(loginState.token, inputValue)}
                 disabled={!inputValue.trim()}
-                style={{ padding: "6px 12px", background: inputValue.trim() ? "var(--accent)" : "var(--bg-panel)", border: "none", borderRadius: 5, color: inputValue.trim() ? "var(--accent-contrast)" : "var(--text-dim)", cursor: inputValue.trim() ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, flexShrink: 0 }}
+                className={"models-submit-button" + (inputValue.trim() ? " is-ready" : " is-disabled")}
               >
                  {t("i18n.submit")}
               </button>
@@ -1517,15 +1397,15 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           </div>
         )}
         {loginState.phase === "device_code" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+          <div className="models-stack-lg">
+            <p className="models-paragraph">
               Open the verification page and enter this code:
             </p>
-            <div style={{ padding: "8px 10px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", fontSize: 16, fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: 0 }}>
+            <div className="models-device-code">
               {loginState.userCode}
             </div>
-            <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
-              <a href={loginState.verificationUri} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", wordBreak: "break-all" }}>
+            <p className="models-note">
+              <a href={loginState.verificationUri} target="_blank" rel="noopener noreferrer" className="models-link">
                 {loginState.verificationUri}
               </a>
               {loginState.expiresInSeconds ? ` Expires in ${Math.ceil(loginState.expiresInSeconds / 60)} minutes.` : ""}
@@ -1533,13 +1413,13 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           </div>
         )}
         {loginState.phase === "progress" && (
-          <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{loginState.message}</p>
+          <p className="models-paragraph is-tight">{loginState.message}</p>
         )}
         {loginState.phase === "success" && (
-             <p style={{ margin: 0, fontSize: 12, color: "#4ade80" }}>{t("i18n.connectedSuccessfully")}</p>
+             <p className="models-success-text">{t("i18n.connectedSuccessfully")}</p>
         )}
         {loginState.phase === "error" && (
-          <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{loginState.message}</p>
+          <p className="models-error-text">{loginState.message}</p>
         )}
       </div>
 
@@ -1608,15 +1488,15 @@ function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRef
   }, [provider.id, onRefresh]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="models-form-stack">
       <ConfigDetailHeader>
         <ConfigDetailHeaderInfo>
           <SectionTitle>API Key</SectionTitle>
         </ConfigDetailHeaderInfo>
         <ConfigDetailActions>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: provider.configured ? "#4ade80" : "var(--border)", display: "inline-block" }} />
-            <span style={{ fontSize: 11, color: provider.configured ? "#4ade80" : "var(--text-dim)" }}>
+          <div className="models-status-row">
+            <span className="models-status-dot" style={{ /* dynamic: the dot colour tracks the configured flag */ background: provider.configured ? "#4ade80" : "var(--border)" }} />
+            <span className={"models-status-text" + (provider.configured ? " is-ok" : "")}>
                {provider.configured ? t("i18n.configured") : t("i18n.notConfigured")}
             </span>
           </div>
@@ -1634,18 +1514,18 @@ function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRef
       </ConfigDetailHeader>
 
       {!provider.configured && (
-        <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+        <p className="models-paragraph">
           Enter your {provider.displayName} API key to enable {provider.modelCount} model{provider.modelCount !== 1 ? "s" : ""}.
         </p>
       )}
 
-      <div style={{ display: "flex", gap: 6 }}>
+      <div className="models-button-row">
         <SecretTextInput
           value={apiKey}
           onChange={setApiKey}
           onKeyDown={(e) => { if (e.key === "Enter" && apiKey.trim()) handleSave(); }}
           placeholder={provider.configured ? "Enter new key to replace…" : "sk-…"}
-          style={{ flex: 1 }}
+          className="models-grow"
           autoComplete="off"
           spellCheck={false}
           mono
@@ -1653,15 +1533,7 @@ function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRef
         <button
           onClick={handleSave}
           disabled={saving || !apiKey.trim() || savedOk}
-          style={{
-            padding: "6px 12px",
-            background: savedOk ? "#16a34a" : apiKey.trim() ? "var(--accent)" : "var(--bg-panel)",
-            border: "none", borderRadius: 5,
-            color: savedOk ? "#fff" : apiKey.trim() ? "var(--accent-contrast)" : "var(--text-dim)",
-            cursor: (saving || !apiKey.trim() || savedOk) ? "not-allowed" : "pointer",
-            fontSize: 12, fontWeight: 600, flexShrink: 0,
-            display: "flex", alignItems: "center", gap: 5,
-          }}
+          className={"models-save-button" + (savedOk ? " is-saved" : apiKey.trim() ? " is-ready" : " is-idle") + (saving || !apiKey.trim() || savedOk ? " is-disabled" : "")}
         >
           {savedOk && (
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -1672,8 +1544,8 @@ function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRef
         </button>
       </div>
 
-      {error && <p style={{ margin: 0, fontSize: 12, color: "#f87171" }}>{error}</p>}
-
+      {error && <p className="models-error-text">{error}</p>}
+{error && <p className="models-error-text">{error}</p>}
       <ProviderUsageSummary providerId={provider.id} enabled={provider.configured} />
     </div>
   );
@@ -1708,25 +1580,11 @@ function AddProviderPicker({
 
   const totalCount = availableOAuth.length + availableApiKey.length + (showCustom ? 1 : 0);
 
-  const cardStyle: React.CSSProperties = {
-    display: "flex", flexDirection: "row", alignItems: "center", gap: 8,
-    padding: "10px 12px",
-    background: "var(--bg-panel)",
-    border: "1px solid var(--border)",
-    borderRadius: 7,
-    boxSizing: "border-box",
-    cursor: "pointer",
-    minWidth: 0,
-    textAlign: "left",
-    transition: "border-color 0.12s, background 0.12s",
-    width: "100%",
-  };
-
 
 
   return (
     <div
-      style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      className="models-modal-backdrop"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       onKeyDown={(e) => {
         if (e.key !== "Escape") return;
@@ -1735,10 +1593,10 @@ function AddProviderPicker({
         onClose();
       }}
     >
-      <div style={{ width: 820, maxWidth: "calc(100vw - 32px)", maxHeight: "min(72vh, calc(100vh - 32px))", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.22)", overflow: "hidden" }}>
+      <div className="models-modal">
         {/* Search */}
-        <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-dim)", flexShrink: 0 }}>
+        <div className="models-modal-header">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="models-icon-dim is-fixed">
             <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           <input
@@ -1746,32 +1604,32 @@ function AddProviderPicker({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
              placeholder={t("i18n.searchProviders")}
-            style={{ flex: 1, background: "none", border: "none", outline: "none", color: "var(--text)", fontSize: 13, boxSizing: "border-box" }}
+            className="models-modal-search"
           />
         </div>
 
         {/* Card grid */}
-        <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
+        <div className="models-modal-body">
           {totalCount === 0 ? (
-            <div style={{ padding: "20px 0", fontSize: 12, color: "var(--text-dim)", textAlign: "center" }}>{t("i18n.noProviders")}</div>
+            <div className="models-modal-empty">{t("i18n.noProviders")}</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))", gap: 8 }}>
+            <div className="models-provider-grid">
               {showCustom && (
-                 <div style={{ gridColumn: "1 / -1", fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.07em" }}>{t("i18n.custom")}</div>
+                 <div className="models-modal-label">{t("i18n.custom")}</div>
               )}
               {showCustom && (
                 <button
                   onClick={() => { onAddCustom(); onClose(); }}
-                  style={cardStyle}
+                  className="models-provider-card"
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-panel)"; }}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>OpenAI / Anthropic compatible</div>
-                     <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>{t("i18n.customEndpoint")}</div>
+                  <div className="models-provider-body">
+                    <div className="models-provider-title">OpenAI / Anthropic compatible</div>
+                     <div className="models-provider-subtitle">{t("i18n.customEndpoint")}</div>
                   </div>
-                  <span style={{ width: 26, height: 26, borderRadius: 5, background: "var(--bg-hover)", border: "1px dashed var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-dim)" }}>
+                  <span className="models-provider-add-icon">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="models-icon-dim">
                       <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                     </svg>
                   </span>
@@ -1779,34 +1637,34 @@ function AddProviderPicker({
               )}
 
               {availableOAuth.length > 0 && (
-                 <div style={{ gridColumn: "1 / -1", paddingTop: showCustom ? 6 : 0, fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.07em" }}>{t("i18n.subscriptions")}</div>
+                 <div className={"models-modal-label" + (showCustom ? " is-spaced" : "")}>{t("i18n.subscriptions")}</div>
               )}
               {availableOAuth.map((p) => (
                 <button key={p.id} onClick={() => { onSelectOAuth(p.id); onClose(); }}
-                  style={cardStyle}
+                  className="models-provider-card"
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-panel)"; }}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
-                    <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>OAuth</div>
+                  <div className="models-provider-body">
+                    <div className="models-provider-title">{p.name}</div>
+                    <div className="models-provider-subtitle">OAuth</div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
                 </button>
               ))}
 
               {availableApiKey.length > 0 && (
-                <div style={{ gridColumn: "1 / -1", paddingTop: availableOAuth.length > 0 ? 6 : 0, fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.07em" }}>API Key</div>
+                <div className={"models-modal-label" + (availableOAuth.length > 0 ? " is-spaced" : "")}>API Key</div>
               )}
               {availableApiKey.map((p) => (
                 <button key={p.id} onClick={() => { onSelectApiKey(p.id); onClose(); }}
-                  style={cardStyle}
+                  className="models-provider-card"
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-panel)"; }}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.displayName}</div>
-                    <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>{p.modelCount} models</div>
+                  <div className="models-provider-body">
+                    <div className="models-provider-title">{p.displayName}</div>
+                    <div className="models-provider-subtitle">{p.modelCount} models</div>
                   </div>
                   <ProviderIcon id={p.id} size={28} />
                 </button>
@@ -2062,23 +1920,23 @@ export function ModelsConfig({ onClose, embedded = false }: { onClose: () => voi
 
               {/* Divider before custom providers, only when there are active managed providers */}
               {(activeOAuth.length > 0 || activeApiKey.length > 0) && providers.length > 0 && (
-                <div style={{ margin: "4px 8px", borderTop: "1px solid var(--border)" }} />
+                <div className="models-sidebar-divider" />
               )}
 
               {/* Custom providers */}
               {loading ? (
-                 <div style={{ padding: "10px 8px", fontSize: 12, color: "var(--text-muted)" }}>{t("i18n.loading")}</div>
+                 <div className="models-sidebar-loading">{t("i18n.loading")}</div>
               ) : providers.map(([pName, pData]) => {
                 const isProviderSelected = selection?.type === "provider" && selection.name === pName;
                 const models = pData.models ?? [];
                 return (
-                  <div key={pName} style={{ marginBottom: 2 }}>
+                  <div key={pName} className="models-sidebar-group">
                     {/* Provider row */}
                     <ConfigSidebarItem
                       onClick={() => setSelection({ type: "provider", name: pName })}
                       active={isProviderSelected}
                     >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-dim)", flexShrink: 0 }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="models-icon-dim is-fixed">
                         <rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" />
                         <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
                         <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
@@ -2100,11 +1958,11 @@ export function ModelsConfig({ onClose, embedded = false }: { onClose: () => voi
                           className="models-sidebar-indented-item"
                           onClick={() => setSelection({ type: "model", providerName: pName, index: i })}
                         >
-                          <ConfigSidebarText className="is-grow" style={{ color: m.id ? "var(--text-muted)" : "var(--text-dim)" }}>
+                          <ConfigSidebarText className={"is-grow " + (m.id ? "is-subtle" : "is-muted")}>
                              {m.id || t("i18n.newModel")}
                           </ConfigSidebarText>
                           {m.reasoning && (
-                            <span style={{ fontSize: 9, padding: "1px 4px", background: "rgba(99,102,241,0.12)", color: "rgba(99,102,241,0.8)", borderRadius: 3, flexShrink: 0 }}>T</span>
+                            <span className="models-tag-badge">T</span>
                           )}
                         </ConfigSidebarItem>
                       );
@@ -2137,7 +1995,7 @@ export function ModelsConfig({ onClose, embedded = false }: { onClose: () => voi
         </ConfigSplitView>
 
         {/* Footer */}
-        <ConfigFooter status={saveError && <span style={{ color: "#f87171" }}>{saveError}</span>}>
+        <ConfigFooter status={saveError && <span className="models-error-inline">{saveError}</span>}>
           {!embedded && <ConfigButton onClick={onClose}>{t("i18n.cancel")}</ConfigButton>}
           <ConfigButton
             variant="primary"
