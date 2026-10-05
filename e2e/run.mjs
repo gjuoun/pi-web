@@ -43,6 +43,28 @@ function message(id, parentId, role, content) {
   return { type: "message", id, parentId, timestamp, message: { role, content } };
 }
 
+/**
+ * Session rows only render inside an expanded project group, and groups default to
+ * folded in a fresh profile (lib/sidebar-expanded-projects.ts) - which is exactly what
+ * a throwaway e2e profile has. Each project header carries aria-expanded, so open them
+ * all before reaching for a row.
+ */
+async function expandProjectGroups() {
+  for (let guard = 0; guard < 50; guard += 1) {
+    const collapsed = page.locator('[data-slot="project-group-header"][aria-expanded="false"]');
+    if ((await collapsed.count()) === 0) return;
+    await collapsed.first().click();
+  }
+  throw new Error("project groups did not finish expanding");
+}
+
+/** Click a sidebar session row, expanding its project group when it is folded. */
+async function clickSessionRow(title) {
+  const row = page.locator(`[title="${title}"]`);
+  if ((await row.count()) === 0) await expandProjectGroups();
+  await row.click();
+}
+
 function writeSession(id, entries) {
   const header = { type: "session", version: 3, id, timestamp, cwd: project };
   writeFileSync(join(sessionDir, `2026-08-23T00-00-00-000Z_${id}.jsonl`),
@@ -320,18 +342,31 @@ try {
       await page.screenshot({ path: join(artifacts, "compaction-minimap.png") });
 
       const selectSession = async (title, entryId) => {
-        await page.locator(`[title="${title}"]`).click();
+        await clickSessionRow(title);
         await page.locator(`[data-entry-id="${entryId}"]:not([data-message-role])`).waitFor({ state: "visible" });
       };
-      const readingOffset = (target) => target.evaluate((element) => (
-        element.getBoundingClientRect().top - element.closest(".overflow-y-auto").getBoundingClientRect().top
-      ));
+
+      // Scroll restoration settles over a few frames, so a single synchronous read can land
+      // mid-flight and turn these comparisons into coin flips. Wait for the offset to hold
+      // steady across three frames before believing it.
+      const settledReadingOffset = (target) => target.evaluate((element) => new Promise((resolve) => {
+        let previous = null;
+        let stable = 0;
+        const tick = () => {
+          const scroll = element.closest(".overflow-y-auto");
+          const offset = element.getBoundingClientRect().top - scroll.getBoundingClientRect().top;
+          if (previous !== null && Math.abs(offset - previous) < 0.5) stable += 1; else stable = 0;
+          previous = offset;
+          if (stable >= 3) resolve(offset); else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }));
       const positionForReading = async (target) => {
         await target.evaluate((element) => {
           const scroll = element.closest(".overflow-y-auto");
           scroll.scrollTop += element.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 120;
         });
-        return readingOffset(target);
+        return settledReadingOffset(target);
       };
       await selectSession(text(0), "e4999");
       const olderPage = page.waitForResponse((response) => response.url().includes(`/api/sessions/${LONG}/context?`));
@@ -340,15 +375,20 @@ try {
       const olderMessage = page.locator("[data-entry-id='e4920']");
       const olderOffset = await positionForReading(olderMessage);
       await selectSession("Render **E2E markdown**", "user");
-      const process = page.getByRole("button", { name: /process details/i });
+      // A message can hold more than one process run (thinking -> text -> thinking -> text), and
+      // three folds render here. The answer is the last message and its final run is the last
+      // fold, which is the one whose expansion displaces the answer text.
+      const process = page.locator('[data-slot="process-details-toggle"]').last();
+      assert.equal(await process.count(), 1, "expected the answer's process fold");
       await process.click();
       const answerHeading = page.getByRole("heading", { name: "E2E reading position", exact: true });
       const answerOffset = await positionForReading(answerHeading);
       await selectSession(text(0), "e4920");
-      assert.ok(Math.abs(await readingOffset(olderMessage) - olderOffset) < 5, "Returning to older history must restore its reading offset");
+      assert.ok(Math.abs(await settledReadingOffset(olderMessage) - olderOffset) < 5, "Returning to older history must restore its reading offset");
       await selectSession("Render **E2E markdown**", "user");
       assert.equal(await process.getAttribute("aria-expanded"), "false");
-      assert.ok(Math.abs(await readingOffset(answerHeading) - answerOffset) < 5, "Collapsing process details on remount must not displace the answer");
+
+      assert.ok(Math.abs(await settledReadingOffset(answerHeading) - answerOffset) < 5, "Collapsing process details on remount must not displace the answer");
 
       // Hold pagination until a different branch has loaded, exercising effect cancellation.
       let releaseHistory;
@@ -363,7 +403,7 @@ try {
       await page.route(agentRoute, (route) => route.fulfill({ json: {} }));
       try {
         const pendingHistory = page.waitForRequest((request) => request.url().includes(`/api/sessions/${LONG}/context?`) && new URL(request.url()).searchParams.has("before"));
-        await page.locator(`[title="${text(0)}"]`).click();
+        await clickSessionRow(text(0));
         await pendingHistory;
         await page.getByRole("button", { name: "Branches", exact: true }).click();
         await page.getByText("E2E alternate history branch", { exact: true }).click();

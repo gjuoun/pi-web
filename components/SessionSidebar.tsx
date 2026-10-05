@@ -25,6 +25,7 @@ import {
   type SidebarRenderRow,
 } from "@/lib/sidebar-render-rows";
 import { getExpandedProjects, setProjectExpanded } from "@/lib/sidebar-expanded-projects";
+import { pushRecentDirectory } from "@/lib/recent-directories";
 import { useI18n } from "@/hooks/useI18n";
 import { DirectoryPicker } from "./DirectoryPicker";
 import { FileExplorer, type FileExplorerHandle } from "./FileExplorer";
@@ -284,6 +285,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const wtNewInputRef = useRef<HTMLInputElement>(null);
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [explorerKey, setExplorerKey] = useState(0);
+  // While the directory picker is open the explorer previews the browsed
+  // directory (debounced) without committing it as the session cwd.
+  const [explorerPreviewPath, setExplorerPreviewPath] = useState<string | null>(null);
+  const [explorerPreviewCwd, setExplorerPreviewCwd] = useState<string | null>(null);
   const [explorerUploadBusy, setExplorerUploadBusy] = useState(false);
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
   const [sessionSearchOpen, setSessionSearchOpen] = useState(false);
@@ -539,6 +544,13 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     if (explorerRefreshKey !== undefined) setExplorerKey((k) => k + 1);
   }, [explorerRefreshKey]);
 
+  // The explorer follows the directory picker. 500ms of quiet before the tree
+  // refetches keeps browse/type churn from thrashing /api/files.
+  useEffect(() => {
+    const timer = setTimeout(() => setExplorerPreviewCwd(explorerPreviewPath), 500);
+    return () => clearTimeout(timer);
+  }, [explorerPreviewPath]);
+
   useEffect(() => {
     fetch("/api/home").then((r) => r.json()).then((d: { home?: string }) => {
       if (d.home) setHomeDir(d.home);
@@ -670,6 +682,15 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     : undefined;
   const currentWorktreePath = currentWorktree?.path ?? null;
 
+  const newSessionForProject = useCallback((root: string) => {
+    // Generate a temporary UUID client-side — no backend call needed.
+    // Pi will be spawned lazily when the user sends the first message.
+    const tempId = typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+    onNewSession?.(tempId, root);
+  }, [onNewSession]);
+
   const commitCustomPath = useCallback(async (candidate?: string) => {
     const path = (candidate ?? customPathValue).trim();
     if (!path || customPathValidating) return;
@@ -698,15 +719,24 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         key: data.projectKey,
       });
       saveLastCustomCwd(data.cwd);
+      pushRecentDirectory(data.cwd);
       setCustomPathValue(data.cwd);
       setSelectedCwd(data.cwd);
       setCustomPathOpen(false);
+      setExplorerPreviewPath(null);
+      setExplorerPreviewCwd(null);
+      // Start the session in the picked workspace. Waiting for the
+      // selectedCwd -> onCwdChange round-trip is not enough: re-picking the
+      // current project would not re-notify, and a different project would
+      // restore its last session instead of a new draft. newSessionForProject
+      // sets newSessionCwd, so handleCwdChange early-returns and keeps it.
+      newSessionForProject(data.cwd);
     } catch (e) {
       setCustomPathError(e instanceof Error ? e.message : String(e));
     } finally {
       setCustomPathValidating(false);
     }
-  }, [customPathValue, customPathValidating]);
+  }, [customPathValue, customPathValidating, newSessionForProject]);
 
   const handleCreateWorktree = useCallback(async () => {
     const branch = wtNewBranch.trim();
@@ -801,39 +831,14 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     onSelectSession(s, false, entryId, blockIndex);
   }, [onSelectSession]);
 
-  const newSessionForProject = useCallback((root: string) => {
-    // Generate a temporary UUID client-side — no backend call needed.
-    // Pi will be spawned lazily when the user sends the first message.
-    const tempId = typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
-    onNewSession?.(tempId, root);
-  }, [onNewSession]);
-
-  // Cold start (decision 7): with no prior selectedCwd, try the "use default
-  // cwd" shortcut first (formerly inside the deleted dropdown); only fall
-  // back to the directory picker when there is no usable default.
+  // The global "New" button always opens the workspace picker: choose a
+  // directory, then a fresh session draft starts there. A new session in an
+  // already-known project does not need a dialog — that is the project
+  // header's "+" (newSessionForProject) instead.
   const handleNewSession = useCallback(() => {
-    if (selectedCwd) {
-      newSessionForProject(selectedCwd);
-      return;
-    }
-    void (async () => {
-      try {
-        const res = await fetch("/api/default-cwd", { method: "POST" });
-        const data = await res.json() as { cwd?: string; error?: string };
-        if (data.cwd) {
-          setSelectedCwd(data.cwd);
-          newSessionForProject(data.cwd);
-          return;
-        }
-      } catch {
-        // fall through to the picker
-      }
-      setCustomPathOpen(true);
-      setCustomPathError(null);
-    })();
-  }, [selectedCwd, newSessionForProject]);
+    setCustomPathError(null);
+    setCustomPathOpen(true);
+  }, []);
 
   // Locked decision 1: the sidebar always shows every session, no project gate.
   const filteredSessions = allSessions;
@@ -860,9 +865,12 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           initialPath={customPathValue}
           busy={customPathValidating}
           error={customPathError}
+          onPreviewPath={setExplorerPreviewPath}
           onCancel={() => {
             setCustomPathOpen(false);
             setCustomPathError(null);
+            setExplorerPreviewPath(null);
+            setExplorerPreviewCwd(null);
           }}
           onSelect={(path) => void commitCustomPath(path)}
         />
@@ -873,13 +881,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           <div className="flex gap-1.5">
             <button
               onClick={handleNewSession}
-              disabled={!selectedCwd}
-              title={selectedCwd ? t("sidebar.newSessionTitle", { path: selectedCwd }) : t("sidebar.selectProject")}
+              title={t("sidebar.newWorkspaceTitle")}
               className={cn(
-                "flex h-[32px] shrink-0 items-center justify-center gap-[5px] rounded-[7px] border border-border pl-[10px] pr-3 text-xs font-medium tracking-[-0.01em] transition-colors",
-                selectedCwd
-                  ? "cursor-pointer bg-accent/60 text-muted-foreground hover:border-primary/35 hover:bg-accent hover:text-primary"
-                  : "cursor-not-allowed bg-accent/60 text-muted-foreground/70",
+                "flex h-[32px] shrink-0 cursor-pointer items-center justify-center gap-[5px] rounded-[7px] border border-border bg-accent/60 pl-[10px] pr-3 text-xs font-medium tracking-[-0.01em] text-muted-foreground transition-colors",
+                "hover:border-primary/35 hover:bg-accent hover:text-primary",
               )}
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
@@ -1304,7 +1309,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
             <div className="flex-1 overflow-y-auto overflow-x-hidden">
               <FileExplorer
                 ref={fileExplorerRef}
-                cwd={selectedCwd ?? selectedCwdProp!}
+                cwd={explorerPreviewCwd ?? selectedCwd ?? selectedCwdProp!}
                 onOpenFile={onOpenFile ?? (() => {})}
                 refreshKey={explorerKey}
                 onAtMention={onAtMention}
@@ -1390,6 +1395,7 @@ function ProjectHeaderRow({
     <div
       onClick={onToggleCollapse}
       role="button"
+      data-slot="project-group-header"
       aria-expanded={!collapsed}
       className="flex cursor-pointer select-none items-center gap-1.5 px-3.5"
       style={{ height: SIDEBAR_PROJECT_HEADER_ROW_HEIGHT }}
