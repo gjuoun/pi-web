@@ -5,6 +5,13 @@ import test from "node:test";
 const source = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
 const globalsCss = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const mobileHookSource = await readFile(new URL("../hooks/useIsMobile.ts", import.meta.url), "utf8");
+// The shell chrome moved out of inline styles into the stylesheet, so read a rule by selector.
+const cssRule = (selector) => {
+  // lastIndexOf: the shell's own rules are appended after the responsive ones for the same class.
+  const start = globalsCss.lastIndexOf("." + selector + " {");
+  if (start === -1) return "";
+  return globalsCss.slice(start + selector.length + 3, globalsCss.indexOf("}", start));
+};
 
 test("keeps action icons inline in medium mobile sidebars", () => {
   assert.match(mobileHookSource, /NARROW_MOBILE_QUERY = "\(max-width: 480px\)"/);
@@ -14,11 +21,15 @@ test("keeps action icons inline in medium mobile sidebars", () => {
 });
 
 test("uses a compact narrow-mobile toolbar with a floating action layer", () => {
-  assert.match(source, /data-mobile-toolbar="true"[\s\S]*?flex: 1,[\s\S]*?minWidth: 0/);
-  assert.match(
-    source,
-    /data-mobile-toolbar-actions="true"[\s\S]*?position: "absolute"[\s\S]*?right: 0,[\s\S]*?left: TOP_BAR_ICON_BUTTON_SIZE/,
-  );
+  assert.match(source, /data-mobile-toolbar="true"[\s\S]*?className="app-shell-mobile-toolbar"/);
+  assert.match(cssRule("app-shell-mobile-toolbar"), /flex: 1/);
+  assert.match(cssRule("app-shell-mobile-toolbar"), /min-width: 0/);
+  // The floating action layer keeps its inset in .app-shell-mobile-actions.
+  assert.match(source, /data-mobile-toolbar-actions="true"[\s\S]*?className="app-shell-mobile-actions"/);
+  const actionsRule = cssRule("app-shell-mobile-actions");
+  assert.match(actionsRule, /position: absolute/);
+  assert.match(actionsRule, /right: 0/);
+  assert.match(actionsRule, /left: 36px/);
 
   for (const action of ["history", "name", "agents", "branches", "system", "tools"]) {
     assert.match(source, new RegExp(`data-mobile-toolbar-action=(?:\\{mobile \\? )?"${action}"`));
@@ -54,7 +65,9 @@ test("only renders branch toolbar controls for sessions with branches", () => {
 test("keeps covered statistics and file controls out of interaction and focus", () => {
   assert.match(source, /const covered = mobile && isNarrowMobile && mobileToolbarMoreOpen;/);
   assert.match(source, /disabled=\{!showChat \|\| covered\}[\s\S]*?tabIndex=\{covered \? -1 : undefined\}/);
-  assert.match(source, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}[\s\S]*?visibility: covered \? "hidden" : "visible"/);
+  assert.match(source, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}[\s\S]*?className=\{"app-shell-panel-toggle"/);
+  assert.match(cssRule("app-shell-panel-toggle.is-covered"), /visibility: hidden/);
+  assert.match(cssRule("app-shell-stats-button.is-covered"), /visibility: hidden/);
   assert.match(source, /aria-hidden=\{covered \? true : undefined\}/);
 });
 

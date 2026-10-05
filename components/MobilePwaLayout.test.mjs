@@ -9,6 +9,13 @@ const appShellSource = await readFile(new URL("./AppShell.tsx", import.meta.url)
 const chatWindowSource = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
 const chatInputSource = await readFile(new URL("./ChatInput.tsx", import.meta.url), "utf8");
 const viewportHookSource = await readFile(new URL("../hooks/useViewportHeight.ts", import.meta.url), "utf8");
+// The shell chrome moved out of inline styles into the stylesheet, so read a rule by selector.
+const cssRule = (selector) => {
+  // lastIndexOf: the shell's own rules are appended after the responsive ones for the same class.
+  const start = cssSource.lastIndexOf("." + selector + " {");
+  if (start === -1) return "";
+  return cssSource.slice(start + selector.length + 3, cssSource.indexOf("}", start));
+};
 
 test("configures iOS standalone mode to use the full screen", () => {
   assert.match(layoutSource, /statusBarStyle: "black-translucent"/);
@@ -19,13 +26,17 @@ test("configures iOS standalone mode to use the full screen", () => {
 
 test("tracks the visual viewport while the software keyboard is open", () => {
   assert.match(appShellSource, /useViewportHeight\(\)/);
-  assert.match(appShellSource, /paddingTop: "env\(safe-area-inset-top\)"/);
-  assert.match(appShellSource, /paddingBottom: "env\(safe-area-inset-bottom\)"/);
-  assert.match(appShellSource, /paddingLeft: "env\(safe-area-inset-left\)"/);
-  assert.match(appShellSource, /paddingRight: "env\(safe-area-inset-right\)"/);
-  assert.match(appShellSource, /height: "calc\(36px \+ env\(safe-area-inset-top\)\)"/);
-  assert.match(appShellSource, /\/\* Right panel tab bar \*\/[\s\S]*?height: "calc\(36px \+ env\(safe-area-inset-top\)\)"/);
-  assert.match(appShellSource, /height: "var\(--app-viewport-height, 100dvh\)"/);
+  // The shell's safe-area insets and its viewport height are declared on its classes now.
+  assert.match(cssRule("app-shell-root"), /height: var\(--app-viewport-height, 100dvh\)/);
+  assert.match(cssRule("app-shell-root"), /padding-left: env\(safe-area-inset-left\)/);
+  assert.match(cssRule("app-shell-root"), /padding-right: env\(safe-area-inset-right\)/);
+  assert.match(cssRule("app-shell-topbar-row"), /padding-top: env\(safe-area-inset-top\)/);
+  assert.match(cssRule("app-shell-topbar-row"), /height: calc\(36px \+ env\(safe-area-inset-top\)\)/);
+  // Right panel tab bar
+  assert.match(cssRule("app-shell-panel-tabbar"), /height: calc\(36px \+ env\(safe-area-inset-top\)\)/);
+  assert.match(cssRule("app-shell-panel-tabbar"), /padding-top: env\(safe-area-inset-top\)/);
+  assert.match(cssRule("app-shell-panel-body"), /padding-bottom: env\(safe-area-inset-bottom\)/);
+  assert.match(cssRule("sidebar-container"), /padding-top: env\(safe-area-inset-top\)/);
   assert.match(appShellSource, /data-mobile-toolbar-file=\{mobile \? "true" : undefined\}/);
   assert.match(viewportHookSource, /window\.visualViewport/);
   assert.match(viewportHookSource, /window\.requestAnimationFrame\(update\)/);
