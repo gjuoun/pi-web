@@ -154,3 +154,13 @@ test("hides subagent rows and aggregates their state into the main session row",
   assert.match(source, /familySessions\.some\(\(session\) => runningSessionIds\.has\(session\.id\)\)/);
   assert.doesNotMatch(source, /function SessionTreeItem/);
 });
+
+test("top New always opens the workspace picker and starts a session there", () => {
+  // The button is never disabled: the picker works with no prior workspace.
+  assert.doesNotMatch(source, /disabled=\{!selectedCwd\}/);
+  assert.match(source, /const handleNewSession = useCallback\(\(\) => \{\s*setCustomPathError\(null\);\s*setCustomPathOpen\(true\);/);
+  // Picking a path opens a fresh session in it, not just a cwd switch.
+  assert.match(source, /setCustomPathOpen\(false\);[\s\S]*?newSessionForProject\(data\.cwd\);/);
+  // The cold-start default-cwd shortcut is gone from this button.
+  assert.doesNotMatch(source, /fetch\("\/api\/default-cwd"/);
+});

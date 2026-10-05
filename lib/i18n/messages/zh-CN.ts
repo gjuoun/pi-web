@@ -180,6 +180,7 @@ export const zhCNLocale: LocalePlugin = {
     "layout.resizeHint": "拖动调整宽度。双击或按 Enter 恢复默认值。",
     "sidebar.new": "新建",
     "sidebar.newSessionTitle": "在 {path} 中新建会话",
+    "sidebar.newWorkspaceTitle": "新建会话 — 选择工作区",
     "sidebar.refresh": "刷新",
     "sidebar.selectProject": "选择项目…",
     "sidebar.filterProjects": "筛选项目…",

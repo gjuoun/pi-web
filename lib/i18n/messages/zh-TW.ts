@@ -180,6 +180,7 @@ export const zhTWLocale: LocalePlugin = {
     "layout.resizeHint": "拖曳以調整寬度。按兩下或按 Enter 鍵即可重設。",
     "sidebar.new": "新增",
     "sidebar.newSessionTitle": "在 {path} 中新增工作階段",
+    "sidebar.newWorkspaceTitle": "新增工作階段 — 選擇工作區",
     "sidebar.refresh": "重新整理",
     "sidebar.selectProject": "選擇專案…",
     "sidebar.filterProjects": "篩選專案…",

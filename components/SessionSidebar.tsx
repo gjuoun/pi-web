@@ -670,6 +670,15 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     : undefined;
   const currentWorktreePath = currentWorktree?.path ?? null;
 
+  const newSessionForProject = useCallback((root: string) => {
+    // Generate a temporary UUID client-side — no backend call needed.
+    // Pi will be spawned lazily when the user sends the first message.
+    const tempId = typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+    onNewSession?.(tempId, root);
+  }, [onNewSession]);
+
   const commitCustomPath = useCallback(async (candidate?: string) => {
     const path = (candidate ?? customPathValue).trim();
     if (!path || customPathValidating) return;
@@ -701,12 +710,18 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       setCustomPathValue(data.cwd);
       setSelectedCwd(data.cwd);
       setCustomPathOpen(false);
+      // Start the session in the picked workspace. Waiting for the
+      // selectedCwd -> onCwdChange round-trip is not enough: re-picking the
+      // current project would not re-notify, and a different project would
+      // restore its last session instead of a new draft. newSessionForProject
+      // sets newSessionCwd, so handleCwdChange early-returns and keeps it.
+      newSessionForProject(data.cwd);
     } catch (e) {
       setCustomPathError(e instanceof Error ? e.message : String(e));
     } finally {
       setCustomPathValidating(false);
     }
-  }, [customPathValue, customPathValidating]);
+  }, [customPathValue, customPathValidating, newSessionForProject]);
 
   const handleCreateWorktree = useCallback(async () => {
     const branch = wtNewBranch.trim();
@@ -801,39 +816,14 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     onSelectSession(s, false, entryId, blockIndex);
   }, [onSelectSession]);
 
-  const newSessionForProject = useCallback((root: string) => {
-    // Generate a temporary UUID client-side — no backend call needed.
-    // Pi will be spawned lazily when the user sends the first message.
-    const tempId = typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
-    onNewSession?.(tempId, root);
-  }, [onNewSession]);
-
-  // Cold start (decision 7): with no prior selectedCwd, try the "use default
-  // cwd" shortcut first (formerly inside the deleted dropdown); only fall
-  // back to the directory picker when there is no usable default.
+  // The global "New" button always opens the workspace picker: choose a
+  // directory, then a fresh session draft starts there. A new session in an
+  // already-known project does not need a dialog — that is the project
+  // header's "+" (newSessionForProject) instead.
   const handleNewSession = useCallback(() => {
-    if (selectedCwd) {
-      newSessionForProject(selectedCwd);
-      return;
-    }
-    void (async () => {
-      try {
-        const res = await fetch("/api/default-cwd", { method: "POST" });
-        const data = await res.json() as { cwd?: string; error?: string };
-        if (data.cwd) {
-          setSelectedCwd(data.cwd);
-          newSessionForProject(data.cwd);
-          return;
-        }
-      } catch {
-        // fall through to the picker
-      }
-      setCustomPathOpen(true);
-      setCustomPathError(null);
-    })();
-  }, [selectedCwd, newSessionForProject]);
+    setCustomPathError(null);
+    setCustomPathOpen(true);
+  }, []);
 
   // Locked decision 1: the sidebar always shows every session, no project gate.
   const filteredSessions = allSessions;
@@ -873,13 +863,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           <div className="flex gap-1.5">
             <button
               onClick={handleNewSession}
-              disabled={!selectedCwd}
-              title={selectedCwd ? t("sidebar.newSessionTitle", { path: selectedCwd }) : t("sidebar.selectProject")}
+              title={t("sidebar.newWorkspaceTitle")}
               className={cn(
-                "flex h-[32px] shrink-0 items-center justify-center gap-[5px] rounded-[7px] border border-border pl-[10px] pr-3 text-xs font-medium tracking-[-0.01em] transition-colors",
-                selectedCwd
-                  ? "cursor-pointer bg-accent/60 text-muted-foreground hover:border-primary/35 hover:bg-accent hover:text-primary"
-                  : "cursor-not-allowed bg-accent/60 text-muted-foreground/70",
+                "flex h-[32px] shrink-0 cursor-pointer items-center justify-center gap-[5px] rounded-[7px] border border-border bg-accent/60 pl-[10px] pr-3 text-xs font-medium tracking-[-0.01em] text-muted-foreground transition-colors",
+                "hover:border-primary/35 hover:bg-accent hover:text-primary",
               )}
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">

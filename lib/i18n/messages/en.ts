@@ -180,6 +180,7 @@ export const enLocale: LocalePlugin = {
     "layout.resizeHint": "Drag to resize. Double-click or press Enter to reset.",
     "sidebar.new": "New",
     "sidebar.newSessionTitle": "New session in {path}",
+    "sidebar.newWorkspaceTitle": "New session — choose a workspace",
     "sidebar.refresh": "Refresh",
     "sidebar.selectProject": "Select project…",
     "sidebar.filterProjects": "Filter projects…",
