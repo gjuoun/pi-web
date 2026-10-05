@@ -4,6 +4,7 @@ import test from "node:test";
 
 const source = await readFile(new URL("./useAgentSession.ts", import.meta.url), "utf8");
 const chatWindowSource = await readFile(new URL("../components/ChatWindow.tsx", import.meta.url), "utf8");
+const globalsSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const chatInputSource = await readFile(new URL("../components/ChatInput.tsx", import.meta.url), "utf8");
 const appShellSource = await readFile(new URL("../components/AppShell.tsx", import.meta.url), "utf8");
 
@@ -494,7 +495,9 @@ test("restores an in-page session viewport without the default tail jump", () =>
   assert.match(chatWindowSource, /context\.oldestEntryId === position\.oldestEntryId/);
   assert.match(chatWindowSource, /if \(!context\) \{\s*scrollToBottom\("instant"\);\s*setPendingScrollRestore\(null\);/);
   assert.match(chatWindowSource, /scrollToMessage\(element, position\.anchorOffset\)/);
-  assert.match(chatWindowSource, /visibility: pendingScrollRestore \? "hidden" : undefined/);
+  // The restore-hiding moved from the scroll container's inline style into .chat-window-scroll.is-restoring.
+  assert.match(chatWindowSource, /chat-window-scroll" \+ \(pendingScrollRestore \? " is-restoring" : ""\)/);
+  assert.match(globalsSource, /\.chat-window-scroll\.is-restoring \{ visibility: hidden; \}/);
 });
 
 test("keeps a newly sent user message at the top while its response starts", () => {
@@ -558,7 +561,8 @@ test("keeps prompt anchor measurement outside the React update cycle", () => {
   assert.match(anchorLifecycleEffectSource, /promptAnchorMeasureFrameRef\.current = requestAnimationFrame\(\(\) => \{\s*promptAnchorMeasureFrameRef\.current = null;\s*updatePromptAnchorSpacer\(\)/);
   assert.match(anchorLifecycleEffectSource, /disposed = true;[\s\S]*?promptAnchorUpdateRef\.current === updatePromptAnchorSpacer[\s\S]*?cancelAnimationFrame\(promptAnchorMeasureFrameRef\.current\)/);
   assert.match(anchorSyncEffectSource, /promptAnchorUpdateRef\.current\?\.\(\);\s*\}, \[streamState\.streamingMessage\]\)/);
-  assert.match(chatWindowSource, /<div ref=\{messageContentRef\}[^>]*style=\{\{/);
+  // The message column's frame moved from its inline style into .chat-window-message-content.
+  assert.match(chatWindowSource, /<div ref=\{messageContentRef\}[^>]*className="chat-window-message-content"/);
 });
 
 test("uses the prompt anchor as the only trailing message spacer", () => {

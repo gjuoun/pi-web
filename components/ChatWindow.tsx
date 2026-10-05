@@ -86,7 +86,6 @@ function phaseLabel(phase: AgentPhase, t: (key: string, params?: Record<string, 
 }
 
 const CHAT_MINIMAP_WIDTH = 36;
-const CHAT_COLUMN_PADDING = 16;
 
 function NewSessionUpdateLink({
   label,
@@ -125,27 +124,10 @@ function NewSessionUpdateLink({
       aria-label={accessibleLabel}
       onMouseEnter={(event) => { event.currentTarget.style.background = "var(--bg-hover)"; }}
       onMouseLeave={(event) => { event.currentTarget.style.background = "transparent"; }}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        alignSelf: "center",
-        gap: 3,
-        minHeight: 32,
-        minWidth: 0,
-        padding: "0 4px",
-        background: "transparent",
-        borderRadius: 5,
-        color: "var(--accent)",
-        fontSize: 12,
-        fontWeight: 600,
-        lineHeight: 1.2,
-        textDecoration: "none",
-        transition: "background 0.12s",
-        whiteSpace: "nowrap",
-      }}
+      className="chat-window-update-link"
     >
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>v{update.latestVersion}</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <span className="chat-window-update-version">v{update.latestVersion}</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="chat-window-update-arrow">
         <path d="M7 17 17 7" />
         <path d="M7 7h10v10" />
       </svg>
@@ -203,36 +185,23 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, defaultExpanded = fa
   if (toolCallCount > 0) parts.push(`${toolCallCount} ${t(toolCallCount === 1 ? "chat.toolCall" : "chat.toolCalls")}`);
 
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div className="process-details-group">
       <button
         type="button"
         aria-expanded={expanded || reveal}
         onClick={() => setExpanded((v) => !v)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          width: "auto",
-          minHeight: 24,
-          padding: "2px 0",
-          border: "none",
-          background: "transparent",
-          color: "var(--text-muted)",
-          cursor: "pointer",
-          fontSize: 12,
-          textAlign: "left",
-        }}
+        className="process-details-toggle"
         title={expanded ? t("chat.collapseProcess") : t("chat.expandProcess")}
       >
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: expanded ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={"process-details-chevron" + (expanded ? " is-open" : "")}>
           <polyline points="4 2.5 7.5 6 4 9.5" />
         </svg>
-        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span className="process-details-label">
           {parts.join(" · ")}
         </span>
       </button>
       {(expanded || reveal) && (
-        <div style={{ marginTop: 8 }}>
+        <div className="process-details-body">
           {children}
         </div>
       )}
@@ -1059,8 +1028,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
 
   return (
     <div
-      className="chat-content relative flex h-full min-w-0 flex-col overflow-hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="chat-content chat-window-safe-area relative flex h-full min-w-0 flex-col overflow-hidden"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -1072,8 +1040,8 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
             {[0, 0.8, 1.6].map((delay) => (
               <div
                 key={delay}
-                className="absolute h-[720px] w-[720px] rounded-full border-[1.5px] border-solid border-[rgba(37,99,235,0.5)] animate-[drop-ripple_2.4s_ease-out_infinite_backwards]"
-                style={{ transformOrigin: "center", animationDelay: `${delay}s` }}
+                className="chat-window-drop-ripple absolute h-[720px] w-[720px] rounded-full border-[1.5px] border-solid border-[rgba(37,99,235,0.5)] animate-[drop-ripple_2.4s_ease-out_infinite_backwards]"
+                style={{ /* dynamic: each ripple ring is offset by its own delay */ animationDelay: `${delay}s` }}
               />
             ))}
           </div>
@@ -1099,18 +1067,8 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       )}
 
       <div
-        style={{
-          position: "absolute",
-          top: 12,
-          left: 0,
-          right: isMobile ? 0 : CHAT_MINIMAP_WIDTH,
-          zIndex: 40,
-          display: "flex",
-          // Toasts live in the top-right corner
-          justifyContent: "flex-end",
-          padding: `0 ${CHAT_COLUMN_PADDING}px`,
-          pointerEvents: "none",
-        }}
+        className="chat-window-notice-rail"
+        style={{ /* dynamic: the minimap rail narrows the toast rail */ right: isMobile ? 0 : CHAT_MINIMAP_WIDTH }}
       >
         <NoticeShelf notices={notices} floating onPauseChange={setNoticePaused} />
       </div>
@@ -1125,11 +1083,10 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
         {!isEmptyNew && <>
         <div
           ref={scrollContainerRef}
-          className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 [scrollbar-width:none]"
-          style={{ visibility: pendingScrollRestore ? "hidden" : undefined }}
+          className={"min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 [scrollbar-width:none] chat-window-scroll" + (pendingScrollRestore ? " is-restoring" : "")}
         >
-          <div style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING}px` }}>
-            <div ref={messageContentRef} onPointerUp={captureQuotedSelection} style={{ width: "100%", minWidth: 0, maxWidth: "var(--chat-content-max-width, 820px)", margin: "0 auto" }}>
+          <div className="chat-window-column">
+            <div ref={messageContentRef} onPointerUp={captureQuotedSelection} className="chat-window-message-content">
             {(() => {
               let lastUserIdx = -1;
               for (let i = messages.length - 1; i >= 0; i--) {
@@ -1377,34 +1334,18 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
           ref={quotePopoverRef}
           role={quoteInputOpen ? "dialog" : "toolbar"}
           aria-label={t(quoteInputOpen ? "chat.newQuoteChat" : "chat.askSelection")}
-          style={{
-            position: "fixed",
-            top: quotedSelection.top,
-            left: quotedSelection.left,
-            zIndex: 130,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 3,
-            width: quoteInputOpen ? "min(420px, calc(100vw - 16px))" : undefined,
-            maxWidth: "calc(100vw - 16px)",
-            maxHeight: "calc(var(--app-viewport-height, 100dvh) - 16px)",
-            overflowY: "auto",
-            padding: quoteInputOpen ? 12 : 3,
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            background: "var(--bg)",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
-          }}
+          className={"chat-window-quote-popover" + (quoteInputOpen ? " is-open" : "")}
+          style={{ /* dynamic: the selection rect anchors the popover */ top: quotedSelection.top, left: quotedSelection.left }}
         >
           {quoteInputOpen ? (
             <fieldset
               disabled={quoteSubmitting}
               aria-busy={quoteSubmitting}
-              style={{ width: "100%", minWidth: 0, margin: 0, padding: 0, border: "none", display: "flex", flexDirection: "column", gap: 10 }}
+              className="chat-window-quote-form"
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600 }}>{t("chat.askInNewChat")}</span>
-                <button type="button" className="file-viewer-icon-button" title={t("i18n.close")} aria-label={t("i18n.close")} disabled={quoteSubmitting} onClick={closeQuotedSelection} style={{ border: "none" }}>
+              <div className="chat-window-quote-header">
+                <span className="chat-window-quote-title">{t("chat.askInNewChat")}</span>
+                <button type="button" className="file-viewer-icon-button chat-window-quote-close" title={t("i18n.close")} aria-label={t("i18n.close")} disabled={quoteSubmitting} onClick={closeQuotedSelection}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
                 </button>
               </div>
@@ -1415,30 +1356,28 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
                 onAbort={closeQuotedSelection}
                 isStreaming={false}
               />
-              {quoteError && <div role="alert" style={{ color: "#dc2626", fontSize: 12, overflowWrap: "anywhere" }}>{quoteError}</div>}
+              {quoteError && <div role="alert" className="chat-window-quote-error">{quoteError}</div>}
             </fieldset>
           ) : <>
           <button
             type="button"
-            className="file-viewer-icon-button"
             title={t("chat.askInCurrent")}
             aria-label={t("chat.askInCurrent")}
             onPointerDown={(event) => event.preventDefault()}
             onClick={askSelectionHere}
-            style={{ width: "auto", height: 35, flex: "0 0 auto", gap: 5, padding: "0 10px", border: "none", fontSize: 12, fontWeight: 500 }}
+            className="file-viewer-icon-button chat-window-quote-action"
           >
-            <span aria-hidden="true" style={{ fontSize: 15 }}>@</span>
+            <span aria-hidden="true" className="chat-window-quote-at">@</span>
             <span>{t("chat.askInCurrent")}</span>
           </button>
           {onAskInNewChat && quotedSelection.sourceEntryId && !sessionBusy && (
             <button
               type="button"
-              className="file-viewer-icon-button"
               title={t("chat.askInNewChat")}
               aria-label={t("chat.askInNewChat")}
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => { setQuoteInputOpen(true); window.getSelection()?.removeAllRanges(); }}
-              style={{ width: "auto", height: 35, flex: "0 0 auto", gap: 5, padding: "0 10px", border: "none", fontSize: 12, fontWeight: 500 }}
+              className="file-viewer-icon-button chat-window-quote-action"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M6 3v12M18 9a9 9 0 0 1-9 9" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" />
@@ -1453,18 +1392,18 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
 
       <div className="relative shrink-0">
         {isEmptyNew && (
-          <div className="mx-auto mb-3 w-full" style={{ maxWidth: "var(--chat-content-max-width, 820px)", paddingLeft: 32, paddingRight: isMobile ? 32 : 68 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontFamily: "var(--font-mono)" }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: isMobile ? 7 : 10, minWidth: 0, flex: 1, lineHeight: 1.4, overflow: "hidden" }}>
-                <span style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", flexShrink: 0, whiteSpace: "nowrap" }}>π</span>
+          <div className={"mx-auto mb-3 w-full chat-window-empty-hero" + (isMobile ? " is-mobile" : "")}>
+            <div className="chat-window-hero-row">
+              <div className={"chat-window-hero-brand" + (isMobile ? " is-mobile" : "")}>
+                <span className="chat-window-hero-mark">π</span>
                 <NewSessionUpdateLink label={(version) => t("appUpdate.releaseNotes", { version })} />
               </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  web <span style={{ color: "var(--text)" }}>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
+              <div className="chat-window-hero-versions">
+                <span className="chat-window-hero-version">
+                  web <span className="chat-window-hero-version-value">v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}</span>
                 </span>
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  pi <span style={{ color: "var(--text)" }}>v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
+                <span className="chat-window-hero-version">
+                  pi <span className="chat-window-hero-version-value">v{process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}</span>
                 </span>
               </div>
             </div>
@@ -1480,7 +1419,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
               column's centre. The footer follows that frame instead of the raw column — and the inset
               lives on this inner block rather than on the scroll container, because a scroll container's
               right padding is not honoured past the overflow edge. */}
-          <div className="chat-bottom-bar-inner" style={{ paddingLeft: 16, paddingRight: isMobile ? 16 : 52 }}>
+          <div className={"chat-bottom-bar-inner chat-window-bottom-inner" + (isMobile ? " is-mobile" : "")}>
             <ChatStatusBar
               cwd={session?.cwd ?? newSessionCwd}
               projectRoot={session?.projectRoot ?? null}
@@ -1530,13 +1469,7 @@ function NoticeShelf({ notices, floating = false, onPauseChange }: { notices: No
   if (notices.length === 0) return null;
   return (
     <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        // Right-anchored: every toast's right edge aligns here, widths extend leftward
-        alignItems: "flex-end",
-        marginBottom: floating ? 0 : 10,
-      }}
+      className={"notice-shelf" + (floating ? " is-floating" : "")}
     >
       {notices.map((notice, index) => {
         const color = notice.type === "error"
@@ -1549,7 +1482,6 @@ function NoticeShelf({ notices, floating = false, onPauseChange }: { notices: No
         return (
           <div
             key={notice.id}
-            className="notice-shelf-item"
             onMouseEnter={() => onPauseChange?.(notice.id)}
             onMouseLeave={(event) => {
               if (!event.currentTarget.contains(document.activeElement)) onPauseChange?.(null);
@@ -1558,60 +1490,23 @@ function NoticeShelf({ notices, floating = false, onPauseChange }: { notices: No
             onBlur={(event) => {
               if (!event.currentTarget.matches(":hover")) onPauseChange?.(null);
             }}
-            style={{
-              display: "flex",
-              // Top-align children so the type dot sits by the first line on multi-line toasts
-              alignItems: "flex-start",
-              gap: 10,
-              minHeight: 60,
-              height: "auto",
-              // 整体高度上限：超出后由文本区内部滚动承担（见下方 span 的 overflowY），
-              // 容器自身保持 hidden，小圆点固定在顶部不随文本滚动
-              maxHeight: NOTICE_MAX_HEIGHT_PX,
-              // The floating wrapper is pointerEvents:"none" (click-through by design),
-              // so the toast itself must opt back into interactivity or hover events never reach it
-              pointerEvents: "auto",
-              marginBottom: index === notices.length - 1 ? 0 : 6,
-              overflow: "hidden",
-              borderRadius: 14,
-              border: "1px solid color-mix(in srgb, var(--border) 70%, transparent)",
-              background: "var(--bg)",
-              color: "var(--text-muted)",
-              width: "fit-content",
-              maxWidth: "min(100%, 620px)",
-              boxShadow: floating
-                ? "0 1px 2px rgba(15,23,42,0.05), 0 10px 28px -14px rgba(15,23,42,0.24)"
-                : "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)",
-              fontSize: 14,
-              lineHeight: 1.5,
-              transformOrigin: "top right",
-              // Use backwards fill for the entrance animation so height styles return to
-              // inline styles once it finishes; otherwise the keyframe's fixed 60px would
-              // stick around in fill mode and permanently clamp the expanded toast
-              animation: notice.exiting
-                ? "notice-shelf-out 0.18s ease-in forwards"
-                : "notice-shelf-in 0.18s ease-out backwards",
-              padding: "0 12px",
-            }}
+            className={"notice-shelf-item"
+              + (floating ? " is-floating" : "")
+              + (notice.exiting ? " is-exiting" : "")
+              + (index === notices.length - 1 ? " is-last" : "")}
+            style={{ /* dynamic: NOTICE_MAX_HEIGHT_PX caps the toast body */ maxHeight: NOTICE_MAX_HEIGHT_PX }}
           >
             <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: color,
-                flexShrink: 0,
-                // Align with the optical center of the first text line: 14px vertical
-                // padding + (21px line box - 7px dot) / 2
-                marginTop: 21,
-              }}
+              className="notice-shelf-dot"
+              style={{ /* dynamic: the notice type selects the dot colour */ background: color }}
             />
             {/* Full text by default: pre-line preserves \n (nowrap/normal collapse
                 newlines into spaces) and long lines wrap instead of truncating;
                 content taller than the cap scrolls inside the text area */}
             <span
               tabIndex={0}
-              style={{ padding: "14px 0", minWidth: 0, maxWidth: "100%", maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX, overflowY: "auto", scrollbarWidth: "thin", whiteSpace: "pre-line", wordBreak: "break-word" }}
+              className="notice-shelf-text"
+              style={{ /* dynamic: NOTICE_TEXT_MAX_HEIGHT_PX caps the scrollable text area */ maxHeight: NOTICE_TEXT_MAX_HEIGHT_PX }}
             >
               {notice.message}
             </span>
@@ -1658,7 +1553,7 @@ function ExtensionDialog({
   }, [request.expiresAt]);
 
   const countdown = remainingSeconds !== null && (
-    <span style={{ fontSize: 11, color: "var(--text-dim)", whiteSpace: "nowrap", flexShrink: 0 }}>
+    <span className="extension-dialog-countdown">
       {t("chat.extensionExpiresIn", { seconds: remainingSeconds })}
     </span>
   );
@@ -1679,52 +1574,28 @@ function ExtensionDialog({
         event.stopPropagation();
         onRespond(request, { cancelled: true });
       }}
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 90,
-        display: "flex",
-        alignItems: collapsed ? "flex-start" : "center",
-        justifyContent: "center",
-        padding: 20,
-        pointerEvents: "none",
-      }}
+      className={"extension-dialog-overlay" + (collapsed ? " is-collapsed" : "")}
     >
       {collapsed ? (
         <button
           type="button"
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
-          style={{
-            pointerEvents: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            maxWidth: "min(560px, 100%)",
-            width: "100%",
-            padding: "10px 12px",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            background: "var(--bg)",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
-            color: "var(--text)",
-            cursor: "pointer",
-            textAlign: "left",
-          }}
+          className="extension-dialog-collapsed"
         >
-          <span style={{ fontSize: 11, fontWeight: 650, color: "var(--accent)", flexShrink: 0 }}>
+          <span className="extension-dialog-pending">
             {t("chat.extensionPending")}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+          <span className="extension-dialog-title">
             {request.title}
           </span>
           {summary && (
-            <span style={{ fontSize: 12, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "34%", flexShrink: 1 }}>
+            <span className="extension-dialog-summary">
               {summary}
             </span>
           )}
           {countdown}
-          <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
+          <span className="extension-dialog-expand">
             {t("chat.extensionExpand")}
           </span>
         </button>
@@ -1732,23 +1603,12 @@ function ExtensionDialog({
       <div
         role="dialog"
         aria-label={request.title}
-        style={{
-          pointerEvents: "auto",
-          width: "min(560px, 100%)",
-          maxHeight: "min(760px, 100%)",
-          display: "flex",
-          flexDirection: "column",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          background: "var(--bg)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.28)",
-          overflow: "hidden",
-        }}
+        className="extension-dialog-panel"
       >
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", borderBottom: "1px solid var(--border)" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: "var(--text)", fontSize: 14, fontWeight: 650 }}>{request.title}</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
+        <div className="extension-dialog-header">
+          <div className="extension-dialog-header-text">
+            <div className="extension-dialog-heading">{request.title}</div>
+            <div className="extension-dialog-meta">
               <span>{t("chat.extensionRequest")}</span>
               {countdown}
             </div>
@@ -1759,18 +1619,7 @@ function ExtensionDialog({
             aria-expanded={true}
             title={t("chat.extensionCollapse")}
             aria-label={t("chat.extensionCollapse")}
-            style={{
-              display: "grid",
-              placeItems: "center",
-              width: 28,
-              height: 28,
-              borderRadius: 6,
-              border: "1px solid var(--border)",
-              background: "var(--bg-panel)",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
+            className="extension-dialog-icon-button"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points="2 3.5 5 6.5 8 3.5" />
@@ -1778,12 +1627,7 @@ function ExtensionDialog({
           </button>
         </div>
 
-        <div
-          style={{
-            padding: 14,
-            flex: "1 1 auto", minHeight: 0, overflowY: "auto",
-          }}
-        >
+        <div className="extension-dialog-body">
           {request.method === "confirm" && (
             <MarkdownBody>{request.message}</MarkdownBody>
           )}
@@ -1801,7 +1645,7 @@ function ExtensionDialog({
                 buttons[next].focus({ preventScroll: true });
                 buttons[next].scrollIntoView({ block: "nearest" });
               }}
-              style={{ display: "grid", gap: 8 }}
+              className="extension-dialog-options"
             >
               {request.options.map((option, index) => (
                 <div
@@ -1817,23 +1661,7 @@ function ExtensionDialog({
                     event.preventDefault();
                     onRespond(request, { value: option });
                   }}
-                  style={{
-                    width: "100%",
-                    padding: "9px 10px",
-                    borderRadius: 7,
-                    border: "1px solid var(--border)",
-                    background: "var(--bg-panel)",
-                    color: "var(--text)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontSize: 13,
-                    overflowWrap: "anywhere",
-                    // `focus({preventScroll})` + `scrollIntoView({block: "nearest"})` aligns the option
-                    // edge to the scrollport edge, which with the dialog's fractional offsets leaves a
-                    // sub-pixel of the option clipped (measured 0.4px). A 2px scroll margin keeps the
-                    // focused option strictly inside the scrollport.
-                    scrollMarginBlock: 2,
-                  }}
+                  className="extension-dialog-option"
                 >
                   <div inert>
                     <MarkdownBody>{option}</MarkdownBody>
@@ -1851,16 +1679,7 @@ function ExtensionDialog({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
               }}
-              style={{
-                width: "100%",
-                padding: "9px 10px",
-                borderRadius: 7,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text)",
-                outline: "none",
-                fontSize: 13,
-              }}
+              className="extension-dialog-input"
             />
           )}
           {request.method === "editor" && (
@@ -1871,64 +1690,30 @@ function ExtensionDialog({
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.nativeEvent.isComposing) submitValue();
               }}
-              style={{
-                width: "100%",
-                minHeight: 220,
-                padding: 10,
-                borderRadius: 7,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text)",
-                outline: "none",
-                resize: "vertical",
-                fontSize: 13,
-                lineHeight: 1.55,
-                fontFamily: "var(--font-mono)",
-              }}
+              className="extension-dialog-editor"
             />
           )}
         </div>
 
-        <div style={{ flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 14px", borderTop: "1px solid var(--border)", background: "var(--bg-panel)" }}>
+        <div className="extension-dialog-footer">
           <button
             autoFocus={request.method === "confirm" || (request.method === "select" && request.options.length === 0)}
             onClick={() => onRespond(request, { cancelled: true })}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 6,
-              border: "1px solid var(--border)",
-              background: "var(--bg)",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-            }}
+            className="extension-dialog-button"
           >
              {t("chat.cancel")}
           </button>
           {request.method === "confirm" ? (
             <button
               onClick={submitValue}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 6,
-                border: "1px solid var(--accent)",
-                background: "var(--accent)",
-                color: "var(--accent-contrast)",
-                cursor: "pointer",
-              }}
+              className="extension-dialog-button is-primary"
             >
                {t("chat.confirm")}
             </button>
           ) : request.method !== "select" ? (
             <button
               onClick={submitValue}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 6,
-                border: "1px solid var(--accent)",
-                background: "var(--accent)",
-                color: "var(--accent-contrast)",
-                cursor: "pointer",
-              }}
+              className="extension-dialog-button is-primary"
             >
                {t("chat.submit")}
             </button>
@@ -1962,51 +1747,27 @@ function ExtensionCustomPanel({
 
   return (
     <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 95,
-        display: "flex",
-        alignItems: collapsed ? "flex-start" : "center",
-        justifyContent: "center",
-        padding: 20,
-        pointerEvents: "none",
-      }}
+      className={"extension-panel-overlay" + (collapsed ? " is-collapsed" : "")}
     >
       {collapsed ? (
         <button
           type="button"
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
-          style={{
-            pointerEvents: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            maxWidth: "min(920px, 100%)",
-            width: "100%",
-            padding: "10px 12px",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            background: "var(--bg)",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
-            color: "var(--text)",
-            cursor: "pointer",
-            textAlign: "left",
-          }}
+          className="extension-panel-collapsed"
         >
-          <span style={{ fontSize: 11, fontWeight: 650, color: "var(--accent)", flexShrink: 0 }}>
+          <span className="extension-dialog-pending">
             {t("chat.extensionPending")}
           </span>
-          <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+          <span className="extension-dialog-title">
             {t("chat.extensionPanel")}
           </span>
           {summary && (
-            <span style={{ fontSize: 12, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "34%", flexShrink: 1 }}>
+            <span className="extension-dialog-summary">
               {summary}
             </span>
           )}
-          <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
+          <span className="extension-dialog-expand">
             {t("chat.extensionExpand")}
           </span>
         </button>
@@ -2016,20 +1777,7 @@ function ExtensionCustomPanel({
         onClick={(event) => {
           if (!(event.target as HTMLElement).closest("button")) inputRef.current?.focus();
         }}
-        style={{
-          pointerEvents: "auto",
-          position: "relative",
-          width: "min(920px, 100%)",
-          maxHeight: "min(760px, 100%)",
-          display: "flex",
-          flexDirection: "column",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          background: "var(--bg)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.28)",
-          overflow: "hidden",
-          outline: "none",
-        }}
+        className="extension-panel-panel"
       >
         <textarea
           ref={inputRef}
@@ -2069,37 +1817,18 @@ function ExtensionCustomPanel({
             const text = event.clipboardData.getData("text");
             if (text) onInput(request, asBracketedPaste(text));
           }}
-          style={{
-            position: "absolute",
-            width: 1,
-            height: 1,
-            padding: 0,
-            border: 0,
-            opacity: 0,
-            pointerEvents: "none",
-          }}
+          className="extension-panel-input"
         />
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
-           <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 650 }}>{t("chat.extensionPanel")}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="extension-panel-header">
+           <div className="extension-panel-heading">{t("chat.extensionPanel")}</div>
+          <div className="extension-panel-actions">
             <button
               type="button"
               onClick={() => setCollapsed(true)}
               aria-expanded={true}
               title={t("chat.extensionCollapse")}
               aria-label={t("chat.extensionCollapse")}
-              style={{
-                display: "grid",
-                placeItems: "center",
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                flexShrink: 0,
-              }}
+              className="extension-dialog-icon-button"
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="2 3.5 5 6.5 8 3.5" />
@@ -2107,33 +1836,14 @@ function ExtensionCustomPanel({
             </button>
             <button
               onClick={() => onInput(request, "\x03")}
-              style={{
-                padding: "5px 9px",
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: "var(--bg-panel)",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                fontSize: 12,
-              }}
+              className="extension-panel-close"
             >
                {t("chat.close")}
             </button>
           </div>
         </div>
         <pre
-          style={{
-            margin: 0,
-            padding: 14,
-            minHeight: 0,
-            overflow: "auto",
-            background: "var(--bg-panel)",
-            color: "var(--text)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 13,
-            lineHeight: 1.45,
-            whiteSpace: "pre",
-          }}
+          className="extension-panel-output"
         >
           <AnsiText text={displayLines.join("\n")} />
         </pre>

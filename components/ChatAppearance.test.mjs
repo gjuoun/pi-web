@@ -14,9 +14,12 @@ const { clampChatContentWidth, clampChatContentFontSize } = await jiti.import(".
 const widthVariable = /var\(--chat-content-max-width, 820px\)/g;
 
 test("chat content keeps the existing 820px default behind one shared variable", () => {
-  // The message column and the empty-state banner still read it; the composer no longer does — it
-  // spans the full column now, so it must not be capped by the reading-width preference.
-  assert.equal((chatWindow.match(widthVariable) ?? []).length, 2);
+  // The message column and the empty-state banner are still the only two readers; the composer is
+  // not one — it spans the full column now, so it must not be capped by the reading-width
+  // preference. Both readers moved into the stylesheet (.chat-window-message-content and
+  // .chat-window-empty-hero), which is where the variable is counted now.
+  assert.equal((chatWindow.match(widthVariable) ?? []).length, 0);
+  assert.equal((globals.match(widthVariable) ?? []).length, 2);
   assert.equal((chatInput.match(widthVariable) ?? []).length, 0);
   assert.match(globals, /--chat-content-max-width: 820px;/);
   assert.doesNotMatch(chatWindow, /max-w-\[820px\]|maxWidth: 820/);

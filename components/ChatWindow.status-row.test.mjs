@@ -3,6 +3,15 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const source = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
+const globals = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+
+// The chrome for these surfaces moved out of inline styles into the stylesheet, so the assertions
+// read the rule body by selector instead of the JSX attribute.
+const cssRule = (selector) => {
+  const start = globals.indexOf("." + selector + " {");
+  if (start === -1) return "";
+  return globals.slice(start + selector.length + 3, globals.indexOf("}", start));
+};
 
 test("renders the widget shelf on its own row above the status row", () => {
   const shelfAt = source.indexOf("<ExtensionStatusBar");
@@ -35,7 +44,7 @@ test("renders the extension status line as its own bar below the status row", ()
 
 test("puts every line of the bar inside one shared scroll surface", () => {
   const surfaceAt = source.indexOf('className="chat-bottom-bar"');
-  const innerAt = source.indexOf('className="chat-bottom-bar-inner"');
+  const innerAt = source.indexOf('className={"chat-bottom-bar-inner chat-window-bottom-inner"');
   const rowAt = source.indexOf("<ChatStatusBar");
   const extAt = source.indexOf("<ExtensionStatusLine");
 
@@ -53,9 +62,10 @@ test("puts every line of the bar inside one shared scroll surface", () => {
   // The inline inset belongs to the inner block, not the scroll container: a scroll container's right
   // padding is not honoured past the overflow edge, so 52px there would leave the tail of an
   // overflowing line sitting cut off at the viewport edge.
-  const inner = source.slice(innerAt, source.indexOf("</div>", innerAt));
-  assert.match(inner, /paddingLeft: 16/);
-  assert.match(inner, /paddingRight: isMobile \? 16 : 52/);
+  const innerRule = cssRule("chat-window-bottom-inner");
+  assert.match(innerRule, /padding-left: 16px/);
+  assert.match(innerRule, /padding-right: 52px/);
+  assert.match(cssRule("chat-window-bottom-inner.is-mobile"), /padding-right: 16px/);
 });
 
 test("feeds the status row the fresh predicate and the project root", () => {
