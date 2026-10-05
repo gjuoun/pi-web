@@ -3,6 +3,15 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createJiti } from "jiti";
 
+const globalsCss = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+
+// The view's chrome moved out of inline styles into the stylesheet, so a rule is read by selector.
+const cssRule = (selector) => {
+  const start = globalsCss.lastIndexOf("." + selector + " {");
+  if (start === -1) return "";
+  return globalsCss.slice(start + selector.length + 3, globalsCss.indexOf("}", start));
+};
+
 const jiti = createJiti(import.meta.url, {
   jsx: { runtime: "automatic" },
   tsconfigPaths: true,
@@ -81,7 +90,13 @@ test("pins the collapsed chip to the newest characters instead of the first", as
   // A one-line chip cannot wrap, so the head has to overflow and be clipped while its end stays in
   // view — that is what makes a streaming block read as motion rather than a frozen first line.
   assert.match(source, /element\.scrollLeft = element\.scrollWidth/);
-  assert.match(source, /ref=\{tailRef\} style=\{\{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" \}\}/);
+  // The chip's one-line sizing moved into .thinking-tail.
+  assert.match(source, /ref=\{tailRef\} className="thinking-tail"/);
+  const tailRule = cssRule("thinking-tail");
+  assert.match(tailRule, /flex: 1 1 auto/);
+  assert.match(tailRule, /min-width: 0/);
+  assert.match(tailRule, /overflow: hidden/);
+  assert.match(tailRule, /white-space: nowrap/);
   assert.match(source, /const tail = getThinkingTail\(block\.thinking\) \|\| preview;/);
 });
 
@@ -250,7 +265,9 @@ test("renders a package Agent call as a standard tool call with no session link"
     toolResults: new Map([[block.toolCallId, result]]),
   });
 
-  assert.match(html, /border:1px solid rgba\(34,197,94,0\.25\)/);
+  // The card's green frame moved into .tool-call-card.
+  assert.match(html, /class="tool-call-card"/);
+  assert.match(cssRule("tool-call-card"), /border: 1px solid rgba\(34, 197, 94, 0\.25\)/);
   assert.match(html, />Agent</);
   assert.match(html, />Explore</);
   assert.doesNotMatch(html, /Open sub-agent session/);
