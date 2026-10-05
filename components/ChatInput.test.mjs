@@ -15,6 +15,7 @@ const { BUILTIN_SLASH_COMMANDS, ChatInput, ModelErrorBanner, pickerRequestForBui
 const { ModelSelector } = await jiti.import("./ModelSelector.tsx");
 const { clearDraft, getDraft, mergeRestoredSubmissionDraft, mergeRestoredSubmissionText, rekeyDraft, setDraft } = await jiti.import("@/lib/draft-store.ts");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
+const globalsCss = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
 
 test("preserves pasted HTML links as Markdown without changing plain text layout", () => {
   const link = (label, href, occurrence = 0) => ({ label, href, occurrence });
@@ -298,8 +299,11 @@ test("file mention menu applies the measured upward height cap", () => {
   const block = source.slice(start, start + 4000);
   assert.match(block, /ref=\{atMenuRef\}/);
   assert.match(block, /min\(48vh, 400px, \$\{atMenuMaxHeight\}px\)/);
-  assert.match(block, /flexDirection: "column"/);
-  assert.match(block, /minHeight: 0/);
+  // The menu's column flow and its scroll body's min-height moved into the stylesheet.
+  const menuRule = globalsCss.match(/\.chat-input-menu \{([^}]*)\}/)?.[1] ?? "";
+  assert.match(menuRule, /flex-direction: column/);
+  const menuBodyRule = globalsCss.match(/\.chat-input-menu-body \{([^}]*)\}/)?.[1] ?? "";
+  assert.match(menuBodyRule, /min-height: 0/);
   assert.equal(block.includes("maxHeight: \"min(48vh, 400px)\""), false);
 });
 
@@ -563,7 +567,11 @@ test("renders compact errors above the input as a wrapping alert", () => {
   assert.match(html, /role="alert"/);
   assert.match(html, /Compaction failed: OpenAI API error/);
   assert.match(html, /&lt;html&gt;request forbidden&lt;\/html&gt;/);
-  assert.match(html, /white-space:pre-wrap/);
+  // The wrapping moved from the alert's inline style into .chat-input-compact-error.
+  assert.match(html, /class="chat-input-compact-error"/);
+  const compactErrorRule = globalsCss.match(/\.chat-input-compact-error \{([^}]*)\}/)?.[1] ?? "";
+  assert.match(compactErrorRule, /white-space: pre-wrap/);
+  assert.match(compactErrorRule, /overflow-wrap: anywhere/);
   assert.ok(html.indexOf('role="alert"') < html.indexOf("<textarea"));
 });
 

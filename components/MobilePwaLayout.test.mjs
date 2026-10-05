@@ -43,7 +43,14 @@ test("contains chat content and inputs within the mobile viewport", () => {
   assert.match(cssSource, /\.markdown-code-block \{[\s\S]*?min-width: 0;[\s\S]*?max-width: 100%;/);
   assert.match(chatWindowSource, /overflow-x-hidden overflow-y-auto/);
   assert.match(chatWindowSource, /maxHeight: "min\(760px, 100%\)"/);
-  assert.match(chatInputSource, /flex: compact \? "none" : 1,\s*minWidth: 0,\s*width: "100%",/);
+  // The composer textarea's sizing moved from its inline style into .chat-input-textarea. The
+  // 640px media query redefines the same class, so pick the rule that actually carries the sizing.
+  const textareaRule = cssSource.match(/\.chat-input-textarea \{([^}]*flex: 1;[^}]*)\}/)?.[1] ?? "";
+  assert.match(textareaRule, /flex: 1/);
+  assert.match(textareaRule, /min-width: 0/);
+  assert.match(textareaRule, /width: 100%/);
+  const compactTextareaRule = cssSource.match(/\.chat-input-textarea\.is-compact \{([^}]*)\}/)?.[1] ?? "";
+  assert.match(compactTextareaRule, /flex: none/);
 });
 
 test("prevents iOS focus zoom from widening the layout", () => {

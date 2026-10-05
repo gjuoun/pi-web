@@ -417,54 +417,21 @@ function QueuedMessageRow({ kind, text }: { kind: "steer" | "follow-up"; text: s
   return (
     <div
       title={text}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "3px 10px",
-        fontSize: 12,
-        color: "var(--text-muted)",
-        minWidth: 0,
-      }}
+      className="chat-input-queued-row"
     >
-      <span
-        style={{
-          flexShrink: 0,
-          fontSize: 10,
-          fontFamily: "var(--font-mono)",
-          padding: "1px 7px",
-          borderRadius: 999,
-          border: `1px solid ${kind === "steer" ? "color-mix(in srgb, var(--accent) 45%, transparent)" : "var(--border)"}`,
-          color: kind === "steer" ? "var(--accent)" : "var(--text-dim)",
-        }}
-      >
+      <span className={"chat-input-queued-kind" + (kind === "steer" ? " is-steer" : "")}>
         {kind}
       </span>
-      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</span>
+      <span className="chat-input-queued-text">{text}</span>
     </div>
   );
 }
 
 function ModelNoticeBanner({ tone, title, body, onClose }: { tone: "error" | "warning"; title: string; body: string; onClose?: () => void }) {
-  const color = tone === "error" ? "239,68,68" : "234,179,8";
   return (
     <div
       role="alert"
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 8,
-        maxHeight: 120,
-        marginBottom: 8,
-        padding: "7px 10px",
-        overflowY: "auto",
-        border: `1px solid rgba(${color},0.3)`,
-        borderRadius: 6,
-        background: `rgba(${color},0.07)`,
-        color: `rgb(${color})`,
-        fontSize: 11,
-        lineHeight: 1.45,
-      }}
+      className={"chat-input-notice" + (tone === "error" ? " is-error" : " is-warning")}
     >
       <svg
         width="13"
@@ -475,33 +442,23 @@ function ModelNoticeBanner({ tone, title, body, onClose }: { tone: "error" | "wa
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{ flexShrink: 0, marginTop: 1 }}
+        className="chat-input-notice-icon"
         aria-hidden="true"
       >
         <path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0Z" />
         <line x1="12" y1="9" x2="12" y2="13" />
         <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontWeight: 600 }}>{title}</div>
-        <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{body}</div>
+      <div className="chat-input-notice-copy">
+        <div className="chat-input-notice-title">{title}</div>
+        <div className="chat-input-notice-body">{body}</div>
       </div>
       {onClose && (
         <button
           type="button"
           onClick={onClose}
           aria-label="Dismiss"
-          style={{
-            flexShrink: 0,
-            background: "none",
-            border: "none",
-            padding: "0 2px",
-            cursor: "pointer",
-            color: "inherit",
-            opacity: 0.7,
-            fontSize: 13,
-            lineHeight: 1,
-          }}
+          className="chat-input-notice-dismiss"
         >
           ×
         </button>
@@ -1574,17 +1531,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     <fieldset
       disabled={builtinCommandPending}
       aria-busy={builtinCommandPending}
-      style={{
-        flexShrink: 0,
-        minWidth: 0,
-        margin: 0,
-        border: 0,
-        background: "transparent",
-        padding: compact ? 0 : "0 16px",
-        paddingRight: compact ? 0 : isMobile ? 16 : 52, // desktop: 16px base + 36px for ChatMinimap alignment
-        opacity: builtinCommandPending ? 0.5 : 1,
-        transition: "opacity 0.15s",
-      }}
+      className={"chat-input-shell"
+        + (compact ? " is-compact" : isMobile ? " is-mobile" : "")
+        + (builtinCommandPending ? " is-pending" : "")}
     >
       {/* Hidden file input */}
       {!compact && <input
@@ -1592,7 +1541,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         type="file"
         accept="image/*"
         multiple
-        style={{ display: "none" }}
+        className="chat-input-file-input"
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
           processImageFiles(files);
@@ -1617,7 +1566,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             the shape pi itself uses (`Steering:` / `Follow-up:`) — not a bordered panel: the panel's
             header and its `Queued · N` count were chrome around information the row already carries. */}
         {((queuedMessages?.steering.length ?? 0) + (queuedMessages?.followUp.length ?? 0)) > 0 && (
-          <div style={{ marginBottom: 6 }}>
+          <div className="chat-input-queued">
             {queuedMessages?.steering.map((text, i) => (
               <div key={`steer-${i}`} data-chat-queued="steer">
                 <QueuedMessageRow kind="steer" text={text} />
@@ -1629,18 +1578,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               </div>
             ))}
             {onRecallQueue && (
-              <div style={{ display: "flex", justifyContent: "flex-end", padding: "2px 4px 0" }}>
+              <div className="chat-input-recall-row">
                 <button
                   type="button"
                   data-chat-recall=""
                   onClick={onRecallQueue}
                   title={t("chat.recallTitle")}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    padding: "1px 2px", border: "none", background: "transparent",
-                    color: "var(--text-muted)", cursor: "pointer",
-                    fontFamily: "var(--font-mono)", fontSize: 10,
-                  }}
+                  className="chat-input-recall"
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <polyline points="9 14 4 9 9 4" />
@@ -1654,27 +1598,17 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         )}
         {/* Retry banner */}
         {retryInfo && (
-          <div style={{
-            marginBottom: 8, padding: "5px 10px",
-            background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.25)",
-            borderRadius: 6, fontSize: 12, color: "rgba(180,130,0,0.9)",
-            display: "flex", alignItems: "center", gap: 6,
-          }}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <div className="chat-input-retry-banner">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="chat-input-retry-icon">
               <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
               <path d="M3 3v5h5" />
             </svg>
-             {t("chat.retrying", { attempt: retryInfo.attempt, max: retryInfo.maxAttempts })}{retryInfo.errorMessage && <span style={{ opacity: 0.7, marginLeft: 4 }}>— {retryInfo.errorMessage}</span>}
+             {t("chat.retrying", { attempt: retryInfo.attempt, max: retryInfo.maxAttempts })}{retryInfo.errorMessage && <span className="chat-input-retry-detail">— {retryInfo.errorMessage}</span>}
           </div>
         )}
         {compactResultText && (
-          <div style={{
-            marginBottom: 8, padding: "5px 10px",
-            background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.24)",
-            borderRadius: 6, fontSize: 12, color: "rgba(5,150,105,0.95)",
-            display: "flex", alignItems: "center", gap: 6,
-          }}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <div className="chat-input-result-banner">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="chat-input-result-icon">
               <polyline points="20 6 9 17 4 12" />
             </svg>
             {compactResultText}
@@ -1683,43 +1617,25 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         {compactError && (
           <div
             role="alert"
-            style={{
-              marginBottom: 8,
-              padding: "7px 10px",
-              background: "rgba(239,68,68,0.07)",
-              border: "1px solid rgba(239,68,68,0.3)",
-              borderRadius: 6,
-              color: "#ef4444",
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-              lineHeight: 1.5,
-              whiteSpace: "pre-wrap",
-              overflowWrap: "anywhere",
-            }}
+            className="chat-input-compact-error"
           >
             {compactError}
           </div>
         )}
         {/* Image previews, above the input frame and visible at rest — never collapsed behind a count. */}
         {attachedImages.length > 0 && (
-          <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+          <div className="chat-input-chips">
             {attachedImages.map((img, i) => (
-              <div key={i} data-chat-chip="" style={{ position: "relative", flexShrink: 0 }}>
+              <div key={i} data-chat-chip="" className="chat-input-chip">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={img.previewUrl}
                   alt=""
-                  style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: "1px solid var(--border)", display: "block" }}
+                  className="chat-input-chip-image"
                 />
                 <button
                   onClick={() => removeImage(i)}
-                  style={{
-                    position: "absolute", top: -4, right: -4,
-                    width: 16, height: 16, borderRadius: "50%",
-                    background: "var(--bg-panel)", border: "1px solid var(--border)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: "pointer", padding: 0, color: "var(--text-muted)",
-                  }}
+                  className="chat-input-chip-remove"
                 >
                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                     <line x1="1" y1="1" x2="7" y2="7" /><line x1="7" y1="1" x2="1" y2="7" />
@@ -1731,34 +1647,15 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         )}
 
         {/* Main input */}
-        <div style={{ position: "relative", minWidth: 0 }}>
+        <div className="chat-input-main">
           {historyMenuOpen && inputHistory.length > 0 && (
             <div
               ref={historyMenuRef}
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: "calc(100% + 8px)",
-                zIndex: 120,
-                background: "var(--bg)",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                boxShadow: "0 -6px 20px rgba(0,0,0,0.12)",
-                overflow: "hidden",
-                maxHeight: "min(44vh, 360px)",
-              }}
+              className="chat-input-history-menu"
             >
               <div
                 title={t("chat.inputHistory")}
-                style={{
-                  height: 30,
-                  padding: "0 10px",
-                  borderBottom: "1px solid var(--border)",
-                  display: "flex",
-                  alignItems: "center",
-                  color: "var(--text-dim)",
-                }}
+                className="chat-input-history-header"
               >
                 <svg
                   width="14"
@@ -1776,7 +1673,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                   <path d="M12 7v5l3 2" />
                 </svg>
               </div>
-              <div style={{ maxHeight: "calc(min(44vh, 360px) - 31px)", overflowY: "auto", padding: 4 }}>
+              <div className="chat-input-history-list">
                 {inputHistory.map((item, index) => {
                   const active = index === historyActiveIndex;
                   return (
@@ -1791,26 +1688,12 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                         applyHistoryInput(item);
                       }}
                       onMouseEnter={() => setHistoryActiveIndex(index)}
-                      style={{
-                        width: "100%",
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 8,
-                        padding: "7px 8px",
-                        border: "none",
-                        borderRadius: 6,
-                        background: active ? "var(--bg-selected)" : "none",
-                        color: "var(--text)",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        fontSize: 12.5,
-                        lineHeight: 1.45,
-                      }}
+                      className={"chat-input-history-item" + (active ? " is-active" : "")}
                     >
-                      <span style={{ flexShrink: 0, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)", paddingTop: 1 }}>
+                      <span className="chat-input-history-index">
                         {index + 1}
                       </span>
-                      <span style={{ minWidth: 0, display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", overflowWrap: "anywhere" }}>
+                      <span className="chat-input-history-text">
                         {item}
                       </span>
                     </button>
@@ -1822,76 +1705,32 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           {slashMenuOpen && slashQuery !== null && (
             <div
               ref={slashMenuRef}
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: "calc(100% + 8px)",
-                zIndex: 120,
-                background: "var(--bg)",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                boxShadow: "0 -6px 20px rgba(0,0,0,0.12)",
-                overflow: "hidden",
-                boxSizing: "border-box",
-                display: "flex",
-                flexDirection: "column",
-                maxHeight: slashMenuMaxHeight === null
-                  ? "min(72.8vh, 598px)"
-                  : `min(72.8vh, 598px, ${slashMenuMaxHeight}px)`,
-              }}
+              className="chat-input-menu"
+              style={{ /* dynamic: the measured upward space caps the menu height */ maxHeight: slashMenuMaxHeight === null
+                ? "min(72.8vh, 598px)"
+                : `min(72.8vh, 598px, ${slashMenuMaxHeight}px)` }}
             >
               <div
-                style={{
-                  padding: "8px 10px",
-                  borderBottom: "1px solid var(--border)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  fontSize: 11,
-                  color: "var(--text-dim)",
-                  flexShrink: 0,
-                }}
+                className="chat-input-menu-header"
               >
                  <span>{slashCommandsLoading ? t("chat.loadingCommands") : t("chat.slashCommands", { label: slashCommandCountLabel })}</span>
-                 <span style={{ fontFamily: "var(--font-mono)" }}>{t("chat.tabEnter")}</span>
+                 <span className="chat-input-menu-hint">{t("chat.tabEnter")}</span>
               </div>
-              <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", padding: 10 }}>
+              <div className="chat-input-menu-body">
                 {!slashCommandsLoading && filteredSlashCommands.length === 0 ? (
-                  <div style={{ padding: "2px 2px 4px", fontSize: 12, color: "var(--text-dim)" }}>
+                  <div className="chat-input-menu-empty">
                      {t("chat.noCommands")}
                   </div>
                 ) : (
                   groupedSlashCommands.map((group) => (
-                    <section key={group.source} style={{ marginBottom: 12 }}>
+                    <section key={group.source} className="chat-input-command-group">
                       <div
-                        style={{
-                          position: "sticky",
-                          top: -10,
-                          zIndex: 1,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 8,
-                          padding: "4px 0 6px",
-                          background: "var(--bg)",
-                          color: "var(--text-dim)",
-                          fontSize: 10,
-                          fontWeight: 600,
-                          textTransform: "uppercase",
-                        }}
+                        className="chat-input-command-group-label"
                       >
                            <span>{t(SLASH_SOURCE_GROUP_LABEL_KEYS[group.source])}</span>
-                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500 }}>{group.items.length}</span>
+                        <span className="chat-input-command-count">{group.items.length}</span>
                       </div>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                          gap: 8,
-                        }}
-                      >
+                      <div className="chat-input-command-grid">
                         {group.items.map(({ command, index }) => {
                           const active = index === slashActiveIndex;
                           const dormant = isDormantSkillCommand(command, skillDormancy);
@@ -1907,56 +1746,18 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                                 applySlashCommand(command);
                               }}
                               onMouseEnter={() => setSlashActiveIndex(index)}
-                              style={{
-                                width: "100%",
-                                minWidth: 0,
-                                minHeight: 58,
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 4,
-                                justifyContent: "center",
-                                padding: "9px 10px",
-                                border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-                                borderRadius: 7,
-                                background: active ? "var(--bg-selected)" : "var(--bg-panel)",
-                                color: "var(--text)",
-                                cursor: "pointer",
-                                textAlign: "left",
-                                boxShadow: active ? "0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent)" : "none",
-                              }}
+                              className={"chat-input-command" + (active ? " is-active" : "")}
                             >
-                              <span style={{
-                                fontSize: 13,
-                                fontFamily: "var(--font-mono)",
-                                overflowWrap: "anywhere",
-                                wordBreak: "break-word",
-                                color: dormant ? "var(--text-dim)" : undefined,
-                              }}>
+                              <span className={"chat-input-command-name" + (dormant ? " is-dormant" : "")}>
                                 /{command.name}
                                 {dormant && (
-                                  <span style={{
-                                    marginLeft: 6,
-                                    padding: "0 4px",
-                                    border: "1px solid var(--border)",
-                                    borderRadius: 3,
-                                    fontSize: 9,
-                                    color: "var(--text-dim)",
-                                    whiteSpace: "nowrap",
-                                  }}>
+                                  <span className="chat-input-command-badge">
                                     {t("chat.dormant")}
                                   </span>
                                 )}
                               </span>
                                {command.description && (
-                                <span style={{
-                                  display: "-webkit-box",
-                                  WebkitBoxOrient: "vertical",
-                                  WebkitLineClamp: 2,
-                                  overflow: "hidden",
-                                  fontSize: 11,
-                                  lineHeight: 1.35,
-                                  color: "var(--text-dim)",
-                                }}>
+                                <span className="chat-input-command-desc">
                                    {getSlashDescription(command, t)}
                                 </span>
                               )}
@@ -1981,48 +1782,22 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             return (
               <div
                 ref={atMenuRef}
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  bottom: "calc(100% + 8px)",
-                  zIndex: 120,
-                  background: "var(--bg)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  boxShadow: "0 -6px 20px rgba(0,0,0,0.12)",
-                  overflow: "hidden",
-                  boxSizing: "border-box",
-                  display: "flex",
-                  flexDirection: "column",
-                  maxHeight: atMenuMaxHeight === null
-                    ? "min(48vh, 400px)"
-                    : `min(48vh, 400px, ${atMenuMaxHeight}px)`,
-                }}
+                className="chat-input-menu"
+                style={{ /* dynamic: the measured upward space caps the menu height */ maxHeight: atMenuMaxHeight === null
+                  ? "min(48vh, 400px)"
+                  : `min(48vh, 400px, ${atMenuMaxHeight}px)` }}
               >
-                <div
-                  style={{
-                    padding: "8px 10px",
-                    borderBottom: "1px solid var(--border)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 8,
-                    fontSize: 11,
-                    color: "var(--text-dim)",
-                    flexShrink: 0,
-                  }}
-                >
+                <div className="chat-input-menu-header">
                   <span>
                     {indexLoading
                        ? t("chat.loadingFiles")
                        : t("chat.files", { label: matchCountLabel, hint: truncatedHint })}
                   </span>
-                   <span style={{ fontFamily: "var(--font-mono)" }}>{t("chat.tabEnter")}</span>
+                   <span className="chat-input-menu-hint">{t("chat.tabEnter")}</span>
                 </div>
-                <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", padding: 4 }}>
+                <div className="chat-input-menu-body is-tight">
                   {!indexLoading && atMatches.length === 0 ? (
-                    <div style={{ padding: "6px 8px", fontSize: 12, color: "var(--text-dim)" }}>
+                    <div className="chat-input-menu-empty is-wide">
                        {needsServerSearch && !serverResultInUse ? t("chat.searching") : t("chat.noMatchingFiles")}
                     </div>
                   ) : (
@@ -2042,29 +1817,15 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                             applyAtCompletion(entry);
                           }}
                           onMouseEnter={() => setAtActiveIndex(index)}
-                          style={{
-                            width: "100%",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "6px 8px",
-                            border: "none",
-                            borderRadius: 6,
-                            background: active ? "var(--bg-selected)" : "none",
-                            color: "var(--text)",
-                            cursor: "pointer",
-                            textAlign: "left",
-                            fontSize: 12.5,
-                            fontFamily: "var(--font-mono)",
-                          }}
+                          className={"chat-input-at-item" + (active ? " is-active" : "")}
                         >
-                          <span style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
+                          <span className="chat-input-at-icon">
                             {entry.isDir ? <FolderIcon size={14} /> : getFileIcon(name, 14)}
                           </span>
-                          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {dirPrefix && <span style={{ color: "var(--text-dim)" }}>{dirPrefix}</span>}
+                          <span className="chat-input-at-text">
+                            {dirPrefix && <span className="chat-input-at-prefix">{dirPrefix}</span>}
                             {name}
-                            {entry.isDir && <span style={{ color: "var(--text-dim)" }}>/</span>}
+                            {entry.isDir && <span className="chat-input-at-prefix">/</span>}
                           </span>
                         </button>
                       );
@@ -2081,7 +1842,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             data-state={railState}
             data-compact={compact ? "true" : undefined}
             className="chat-rail"
-            style={{
+            style={{ /* dynamic: compact/multiline drive the rail's flow; ChatComposerChrome.test.mjs reads this inline map */
               position: "relative",
               minWidth: 0,
               display: "flex",
@@ -2120,7 +1881,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           )}
           <textarea
             ref={textareaRef}
-            className="chat-input-textarea"
+            className={"chat-input-textarea" + (compact ? " is-compact" : "")}
             aria-label={compact ? t("chat.quoteQuestion") : undefined}
             value={value}
             onChange={(e) => {
@@ -2152,44 +1913,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 : t("chat.messagePlaceholder")
             }
             rows={1}
-            style={{
-              flex: compact ? "none" : 1,
-              minWidth: 0,
-              width: "100%",
-              background: "none",
-              border: "none",
-              outline: "none",
-              resize: "none",
-              color: "var(--text)",
-              fontSize: "var(--chat-content-font-size, 14px)",
-              lineHeight: 1.6,
-              fontFamily: "inherit",
-              minHeight: compact ? 96 : 24,
-              maxHeight: 200,
-              overflow: "auto",
-            }}
           />
 
           {showPrimary && (compact ? (
             <button
               onClick={handleSend}
               disabled={!value.trim() && !attachedImages.length}
-              style={{
-                flexShrink: 0,
-                alignSelf: "flex-end",
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "7px 14px",
-                background: (value.trim() || attachedImages.length) ? "var(--accent)" : "var(--bg-panel)",
-                border: "none",
-                borderRadius: 8,
-                color: (value.trim() || attachedImages.length) ? "var(--accent-contrast)" : "var(--text-dim)",
-                cursor: (value.trim() || attachedImages.length) ? "pointer" : "not-allowed",
-                fontSize: 13,
-                fontWeight: 600,
-                letterSpacing: "-0.01em",
-                boxShadow: (value.trim() || attachedImages.length) ? "0 1px 3px color-mix(in srgb, var(--accent) 25%, transparent)" : "none",
-                transition: "background 0.15s, box-shadow 0.15s",
-              }}
+              className={"chat-input-send-compact" + (value.trim() || attachedImages.length ? "" : " is-disabled")}
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <line x1="2" y1="7" x2="11" y2="7" />
