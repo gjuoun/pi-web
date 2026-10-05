@@ -5,6 +5,7 @@ import React from "react";
 import ts from "typescript";
 
 const source = await readFile(new URL("./FileViewer.tsx", import.meta.url), "utf8");
+const globalsCss = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
 test("large source previews bypass the per-line syntax highlighter", () => {
   assert.match(source, /const SOURCE_HIGHLIGHT_MAX_LINES = 1_000;/);
@@ -15,7 +16,7 @@ test("large source previews bypass the per-line syntax highlighter", () => {
   assert.match(source, /const highlightedSource = useMemo\(/);
 
   const lightweightStart = source.indexOf("const lightweightSourceLines = useMemo(");
-  const lightweightEnd = source.indexOf("[sourceLines, useLightweightSource, wrapLines]", lightweightStart);
+  const lightweightEnd = source.indexOf("[sourceLines, useLightweightSource]", lightweightStart);
   assert.notEqual(lightweightStart, -1);
   assert.notEqual(lightweightEnd, -1);
 
@@ -64,5 +65,12 @@ test("lightweight source rows are skipped for highlighted, diff, and preview vie
     assert.equal(rows[0].props["data-line-number"], 1);
     assert.equal(rows[0].props.children[1].props.children, "line");
   }
-  assert.equal(render(large, "source", false, false, true)[0].props.children[1].props.style.whiteSpace, "pre-wrap");
+  // The wrap behaviour left the row's inline style for the stylesheet: the source view carries
+  // .is-wrapped and the descendant rule reflows the line content.
+  const wrappedRow = render(large, "source", false, false, true)[0];
+  assert.equal(wrappedRow.props.children[1].props.style, undefined);
+  assert.match(
+    globalsCss,
+    /\.file-source-view\.is-wrapped \.file-source-line-content \{[\s\S]*?white-space: pre-wrap;[\s\S]*?\}/,
+  );
 });
