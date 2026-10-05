@@ -1059,11 +1059,6 @@ function PatchTextView({ text }: { text: string }) {
           line.startsWith("+") && !line.startsWith("+++") ? "added" :
           line.startsWith("-") && !line.startsWith("---") ? "removed" :
           "context";
-        const bg =
-          kind === "added" ? "rgba(34,197,94,0.12)" :
-          kind === "removed" ? "rgba(248,113,113,0.13)" :
-          kind === "hunk" ? "rgba(96,165,250,0.12)" :
-          "transparent";
         const color =
           kind === "added" ? "#22c55e" :
           kind === "removed" ? "#f87171" :

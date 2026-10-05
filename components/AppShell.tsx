@@ -69,7 +69,6 @@ type AutoNameStatus =
   | { kind: "success" }
   | { kind: "error"; message: string };
 
-const TOP_BAR_ICON_BUTTON_SIZE = 36;
 /** The top-bar dropdowns. `agents` is the one sub-agent surface (docs/adr/0006). */
 type TopPanelId = "agents" | "branches" | "system" | "tools" | "session";
 const AGENT_PANEL_WIDTH = 420;
