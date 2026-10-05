@@ -145,7 +145,7 @@ export async function completeDirectories(input: string, limit = 20): Promise<Di
 
   const entries = await listDirectories(resolvedBase);
   const stem = fragment.toLowerCase();
-  const matches = (stem ? entries.filter((entry) => entry.name.toLowerCase().startsWith(stem)) : entries)
+  const matches = (stem ? entries.filter((entry) => entry.name.toLowerCase().includes(stem)) : entries)
     .slice(0, Math.max(1, limit));
 
   return { base: resolvedBase, fragment, matches };

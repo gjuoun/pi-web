@@ -171,3 +171,8 @@ test("explorer follows the directory picker with a 500ms debounce", () => {
   assert.match(source, /cwd=\{explorerPreviewCwd \?\? selectedCwd \?\? selectedCwdProp!\}/);
   assert.match(source, /onPreviewPath=\{setExplorerPreviewPath\}/);
 });
+
+test("a committed directory is remembered as a recent", () => {
+  assert.ok(source.includes('import { pushRecentDirectory } from "@/lib/recent-directories";'));
+  assert.match(source, /saveLastCustomCwd\(data\.cwd\);\s*pushRecentDirectory\(data\.cwd\);/);
+});

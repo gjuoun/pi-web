@@ -25,6 +25,7 @@ import {
   type SidebarRenderRow,
 } from "@/lib/sidebar-render-rows";
 import { getExpandedProjects, setProjectExpanded } from "@/lib/sidebar-expanded-projects";
+import { pushRecentDirectory } from "@/lib/recent-directories";
 import { useI18n } from "@/hooks/useI18n";
 import { DirectoryPicker } from "./DirectoryPicker";
 import { FileExplorer, type FileExplorerHandle } from "./FileExplorer";
@@ -718,6 +719,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         key: data.projectKey,
       });
       saveLastCustomCwd(data.cwd);
+      pushRecentDirectory(data.cwd);
       setCustomPathValue(data.cwd);
       setSelectedCwd(data.cwd);
       setCustomPathOpen(false);
