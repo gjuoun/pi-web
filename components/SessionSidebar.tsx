@@ -1395,6 +1395,7 @@ function ProjectHeaderRow({
     <div
       onClick={onToggleCollapse}
       role="button"
+      data-slot="project-group-header"
       aria-expanded={!collapsed}
       className="flex cursor-pointer select-none items-center gap-1.5 px-3.5"
       style={{ height: SIDEBAR_PROJECT_HEADER_ROW_HEIGHT }}
